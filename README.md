@@ -34,6 +34,7 @@ poll_interval_seconds = 120
 ```
 
 You can use `config.ini.template` by removing `.template` from the file name to leave it as just `config.ini`.
+
 The template file holds advice how to gather the required data.
 
 ### Notes
@@ -68,7 +69,7 @@ Then place your `config.ini` next to the generated `.exe`.
 
 When the app is running:
 
-* 🟢 Green Spotify icon appears in your tray
+* 🟢 Green Spotify-like icon appears in your tray
 * Right-click →
 
   * **📁 Open Logs** → opens the log folder
@@ -91,6 +92,7 @@ Each line includes a timestamp for easy tracking.
 ## 🚱 Preventing multiple instances
 
 The app uses a Windows mutex (`SpotifyAutoSkipperMutex`) to ensure that only one instance runs at a time.
+
 If you try to start it again, it will show a small info popup and immediately exit.
 
 ---
@@ -107,4 +109,5 @@ If you try to start it again, it will show a small info popup and immediately ex
 ## 👨‍💻 Credits
 
 Created by [**Vatroslav Mileusnić**](https://www.linkedin.com/in/vatroslavmileusnic)
+
 Code + comments co-written with ChatGPT 5
