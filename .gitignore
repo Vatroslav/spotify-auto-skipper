@@ -1,0 +1,12 @@
+*.spec
+*.exe
+
+config.ini
+
+/build/
+/dist/
+/logs/
+
+__pycache__/
+*.pyc
+*.pyo
