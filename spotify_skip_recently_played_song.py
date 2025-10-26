@@ -46,7 +46,7 @@ import threading
 
 import builtins # builtins needed to print timestamps with every print
 
-APP_VERSION = "v1.0.0"
+APP_VERSION = "v1.0.1"
 
 # -------------------------------------------------------------
 # SETTINGS FROM config.ini
@@ -459,7 +459,7 @@ def main_loop():
 
 			# If nothing plays or there is no valid data — skip
 			if not track or not track.get('artist') or not track.get('id'):
-				print("🎧 Nothing is playing right now..")
+				print("🎧 Nothing is playing right now.")
 				time.sleep(POLL_INTERVAL_SECONDS)
 				continue
 
