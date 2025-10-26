@@ -1,0 +1,38 @@
+# ============================================================
+# Spotify Auto-Skipper Configuration
+# ============================================================
+# This configuration file is used by the Spotify Auto-Skipper app.
+# It allows you to control how recently played songs are skipped,
+# and provides the API credentials for Spotify and Last.fm.
+# ============================================================
+
+[LastFM]
+# 🔑 Your Last.fm API key.
+#    Create one here: https://www.last.fm/api/account/create
+api_key = your_lastfm_api_key
+
+# 👤 Your Last.fm username (the one you scrobble under).
+username = YourLastFMUsername
+
+[Spotify]
+# 🎧 Your Spotify API credentials.
+#    1. Go to https://developer.spotify.com/dashboard
+#    2. Create a new app (or use an existing one)
+#    3. Copy the Client ID and Client Secret below
+client_id = your_spotify_client_id
+client_secret = your_spotify_client_secret
+
+# 🔁 Your Spotify refresh token.
+#    You can obtain it using a Spotify token generator like:
+#    https://github.com/spotify/web-api-auth-examples
+#    or any online tool for “Spotify OAuth Refresh Token”.
+refresh_token = your_spotify_refresh_token
+
+[Settings]
+# 🕓 Number of days during which a previously played song will be skipped.
+#    Example: 60 means songs played in the last 60 days are skipped.
+skip_window_days = 60
+
+# ⏱️ How often (in seconds) the script checks your currently playing track.
+#    Example: 120 means every 2 minutes.
+poll_interval_seconds = 120
