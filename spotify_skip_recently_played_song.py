@@ -46,7 +46,7 @@ import threading
 
 import builtins # builtins needed to print timestamps with every print
 
-APP_VERSION = "v1.0.1"
+APP_VERSION = "v1.1.0"
 
 # -------------------------------------------------------------
 # SETTINGS FROM config.ini
@@ -94,15 +94,15 @@ last_error = ctypes.windll.kernel32.GetLastError()
 
 # If a mutex with the same name already exists, it means the application is already running
 if last_error == 183:  # ERROR_ALREADY_EXISTS
-	# Display a simple message to the user (you can remove it if you want silent operation)
-	ctypes.windll.user32.MessageBoxW(
-		0,
-		"Spotify Auto-Skipper is already running and running in the background.",
-		"Already started",
-		0x40  # MB_ICONINFORMATION
-	)
-	sys.exit(0)
-	
+    # Display a simple message to the user (you can remove it if you want silent operation)
+    ctypes.windll.user32.MessageBoxW(
+        0,
+        "Spotify Auto-Skipper is already running and running in the background.",
+        "Already started",
+        0x40  # MB_ICONINFORMATION
+    )
+    sys.exit(0)
+    
 # -------------------------------------------------------------
 # LOGGING TO A FILE
 # -------------------------------------------------------------
@@ -144,15 +144,15 @@ log_file.flush()
 _original_print = print # save the original print function
 
 def print(*args, **kwargs):
-	"""
-	Prints each message to the log with the current time (HH:MM:SS) in front. 
-	If a line contains a 🎵, it adds a blank line before it for clarity.
-	"""
-	time_prefix = datetime.now().strftime("[%H:%M:%S]")
-	text = " ".join(str(a) for a in args)
-	if "🎵" in text:
-		_original_print("")  # add a blank line before the song
-	_original_print(time_prefix, text, **kwargs)
+    """
+    Prints each message to the log with the current time (HH:MM:SS) in front. 
+    If a line contains a 🎵, it adds a blank line before it for clarity.
+    """
+    time_prefix = datetime.now().strftime("[%H:%M:%S]")
+    text = " ".join(str(a) for a in args)
+    if "🎵" in text:
+        _original_print("")  # add a blank line before the song
+    _original_print(time_prefix, text, **kwargs)
 
 
 # -------------------------------------------------------------
@@ -163,54 +163,57 @@ def print(*args, **kwargs):
 # When you right-click and select "Exit", the application closes gracefully.
 # -------------------------------------------------------------
 
+should_exit = False
+
 def create_tray_icon():
-	"""
-	Creates a tray icon (next to the clock) that looks like the Spotify logo: 
-	- Green Background (#1DB954) 
-	- Three white curved Spotify lines 
-	- Black skip symbol (▶▶│) over them 
-	Right click -> 'Open Logs' opens the log folder, 'Exit' closes the application.
-	"""
+    """
+    Creates a tray icon (next to the clock) that looks like the Spotify logo: 
+    - Green Background (#1DB954) 
+    - Three white curved Spotify lines 
+    - Black skip symbol (▶▶│) over them 
+    Right click -> 'Open Logs' opens the log folder, 'Exit' closes the application.
+    """
 
-	# ---------------------------------------------------------
-	# CREATE ICON (size 64x64 because tray automatically scales)
-	# ---------------------------------------------------------
-	size = 64
-	img = Image.new("RGB", (size, size), color=(29, 185, 84))  # Spotify green (#1DB954)
-	draw = ImageDraw.Draw(img)
+    # ---------------------------------------------------------
+    # CREATE ICON (size 64x64 because tray automatically scales)
+    # ---------------------------------------------------------
+    size = 64
+    img = Image.new("RGB", (size, size), color=(29, 185, 84))  # Spotify green (#1DB954)
+    draw = ImageDraw.Draw(img)
 
-	# Draw three white curved lines (Spotify "waves")
-	wave_color = (255, 255, 255)
-	for i, offset in enumerate([10, 20, 30]):
-		draw.arc([10, offset, 54, offset + 25], start=200, end=340, fill=wave_color, width=4)
+    # Draw three white curved lines (Spotify "waves")
+    wave_color = (255, 255, 255)
+    for i, offset in enumerate([10, 20, 30]):
+        draw.arc([10, offset, 54, offset + 25], start=200, end=340, fill=wave_color, width=4)
 
-	# Add black skip symbol (▶▶│)
-	skip_color = (0, 0, 0)
-	draw.polygon([(36, 20), (46, 32), (36, 44)], fill=skip_color) # first triangle
-	draw.polygon([(46, 20), (56, 32), (46, 44)], fill=skip_color) # second triangle
-	draw.rectangle([57, 20, 59, 44], fill=skip_color)			  # line (│)
+    # Add black skip symbol (▶▶│)
+    skip_color = (0, 0, 0)
+    draw.polygon([(36, 20), (46, 32), (36, 44)], fill=skip_color) # first triangle
+    draw.polygon([(46, 20), (56, 32), (46, 44)], fill=skip_color) # second triangle
+    draw.rectangle([57, 20, 59, 44], fill=skip_color)              # line (│)
 
-	# ---------------------------------------------------------
-	# MENU ACTIONS
-	# ---------------------------------------------------------
-	def on_exit(icon, item):
-		icon.stop()
-		sys.exit(0)
+    # ---------------------------------------------------------
+    # MENU ACTIONS
+    # ---------------------------------------------------------
+    def on_exit(icon, item):
+        global should_exit
+        should_exit = True
+        icon.stop()
 
-	def open_logs(icon, item):
-		logs_path = os.path.join(os.path.dirname(getattr(sys, "executable", sys.argv[0])), "logs")
-		os.startfile(logs_path)
+    def open_logs(icon, item):
+        logs_path = os.path.join(os.path.dirname(getattr(sys, "executable", sys.argv[0])), "logs")
+        os.startfile(logs_path)
 
-	menu = pystray.Menu(
-		pystray.MenuItem("📁 Open Logs", open_logs),
-		pystray.MenuItem("❌ Exit", on_exit)
-	)
+    menu = pystray.Menu(
+        pystray.MenuItem("📁 Open Logs", open_logs),
+        pystray.MenuItem("❌ Exit", on_exit)
+    )
 
-	# ---------------------------------------------------------
-	# CREATE A TRAY ICON AND RUN IT IN THE BACKGROUND
-	# ---------------------------------------------------------
-	icon = pystray.Icon("spotify_skipper", img, f"Spotify Auto-Skipper {APP_VERSION}", menu)
-	threading.Thread(target=icon.run, daemon=True).start()
+    # ---------------------------------------------------------
+    # CREATE A TRAY ICON AND RUN IT IN THE BACKGROUND
+    # ---------------------------------------------------------
+    icon = pystray.Icon("spotify_skipper", img, f"Spotify Auto-Skipper {APP_VERSION}", menu)
+    threading.Thread(target=icon.run, daemon=True).start()
 
 
 # -------------------------------------------------------------
@@ -227,295 +230,321 @@ last_checked_timestamp = None
 # -------------------------------------------------------------
 
 def refresh_access_token():
-	"""
-	Request a new 'access_token' from Spotify using 'refresh_token'.
-	This works "in the background" so you don't have to log in again every hour.
+    """
+    Request a new 'access_token' from Spotify using 'refresh_token'.
+    This works "in the background" so you don't have to log in again every hour.
 
-	Technically:
-	- Spotify expects a Basic auth header with Base64(ClientID:ClientSecret).
-	- 'grant_type' must be 'refresh_token'.
-	- If successful, we will get a new 'access_token' (and possibly a new 'refresh_token', but most often not).
-	- 'expires_in' is about 3600s (1h) — we "cut" it to ~3500s to refresh a little earlier.
-	"""
-	global SPOTIFY_TOKEN, TOKEN_EXPIRES_AT
+    Technically:
+    - Spotify expects a Basic auth header with Base64(ClientID:ClientSecret).
+    - 'grant_type' must be 'refresh_token'.
+    - If successful, we will get a new 'access_token' (and possibly a new 'refresh_token', but most often not).
+    - 'expires_in' is about 3600s (1h) — we "cut" it to ~3500s to refresh a little earlier.
+    """
+    global SPOTIFY_TOKEN, TOKEN_EXPIRES_AT
 
-	# ClientID:ClientSecret in Base64, as Spotify asks for in the header
-	auth_header = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
+    # ClientID:ClientSecret in Base64, as Spotify asks for in the header
+    auth_header = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
 
-	# POST to the Spotify token endpoint
-	r = requests.post(
-		"https://accounts.spotify.com/api/token",
-		headers={
-			"Authorization": f"Basic {auth_header}",
-			"Content-Type": "application/x-www-form-urlencoded",
-		},
-		data={
-			"grant_type": "refresh_token",
-			"refresh_token": REFRESH_TOKEN,
-		},
-		timeout=15,
-	)
+    # POST to the Spotify token endpoint
+    r = requests.post(
+        "https://accounts.spotify.com/api/token",
+        headers={
+            "Authorization": f"Basic {auth_header}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        data={
+            "grant_type": "refresh_token",
+            "refresh_token": REFRESH_TOKEN,
+        },
+        timeout=15,
+    )
 
-	# If something goes wrong (e.g. wrong credentials, expired refresh token...), raise a clear error
-	if r.status_code != 200:
-		raise RuntimeError(f"Failed to refresh token (HTTP {r.status_code}): {r.text}")
+    # If something goes wrong (e.g. wrong credentials, expired refresh token...), raise a clear error
+    if r.status_code != 200:
+        raise RuntimeError(f"Failed to refresh token (HTTP {r.status_code}): {r.text}")
 
-	data = r.json()
-	if "access_token" not in data:
-		raise RuntimeError(f"No access_token in response: {data}")
+    data = r.json()
+    if "access_token" not in data:
+        raise RuntimeError(f"No access_token in response: {data}")
 
-	SPOTIFY_TOKEN = data["access_token"]
+    SPOTIFY_TOKEN = data["access_token"]
 
-	# If the API returns 'expires_in', use it; otherwise assume ~3600s.
-	expires_in = int(data.get("expires_in", 3600))
-	# Refresh 100 seconds early to avoid 'on the verge' of expiration during the call
-	TOKEN_EXPIRES_AT = datetime.now(timezone.utc) + timedelta(seconds=max(0, expires_in - 100))
+    # If the API returns 'expires_in', use it; otherwise assume ~3600s.
+    expires_in = int(data.get("expires_in", 3600))
+    # Refresh 100 seconds early to avoid 'on the verge' of expiration during the call
+    TOKEN_EXPIRES_AT = datetime.now(timezone.utc) + timedelta(seconds=max(0, expires_in - 100))
 
-	print("🔄 [Spotify] Access token refreshed.")
+    print("🔄 [Spotify] Access token refreshed.")
 
 
 def get_spotify_token():
-	"""
-	Returns a valid Spotify access_token.
-	- If we don't have one or it has expired -> automatically refresh it.
-	- Call this from every function that goes to the Spotify API (e.g. get_current_track, skip_current_track).
-	"""
-	global SPOTIFY_TOKEN
-	if SPOTIFY_TOKEN is None or datetime.now(timezone.utc) >= TOKEN_EXPIRES_AT:
-		refresh_access_token()
-	return SPOTIFY_TOKEN
+    """
+    Returns a valid Spotify access_token.
+    - If we don't have one or it has expired -> automatically refresh it.
+    - Call this from every function that goes to the Spotify API (e.g. get_current_track, skip_current_track).
+    """
+    global SPOTIFY_TOKEN
+    if SPOTIFY_TOKEN is None or datetime.now(timezone.utc) >= TOKEN_EXPIRES_AT:
+        refresh_access_token()
+    return SPOTIFY_TOKEN
 
 
 def spotify_get(url, params=None):
-	"""
-	Streamlining GET calls to the Spotify API. 
-	- Always adds a valid Authorization header with a Bearer token. 
-	- Return a 'requests.Response' object so we can check the status and content. 
-	- It has a basic timeout so that the script does not "hang" indefinitely.
-	"""
-	token = get_spotify_token()
-	return requests.get(
-		url,
-		headers={"Authorization": f"Bearer {token}"},
-		params=params or {},
-		timeout=15,
-	)
+    """
+    Streamlining GET calls to the Spotify API. 
+    - Always adds a valid Authorization header with a Bearer token. 
+    - Return a 'requests.Response' object so we can check the status and content. 
+    - It has a basic timeout so that the script does not "hang" indefinitely.
+    """
+    token = get_spotify_token()
+    return requests.get(
+        url,
+        headers={"Authorization": f"Bearer {token}"},
+        params=params or {},
+        timeout=15,
+    )
 
 
 def spotify_post(url, params=None, data=None):
-	"""
-	Streamlining POST calls to the Spotify API. 
-	- Use a valid token. 
-	- We don't need 'data' for the skip command, only header and endpoint.
-	"""
-	token = get_spotify_token()
-	return requests.post(
-		url,
-		headers={"Authorization": f"Bearer {token}"},
-		params=params or {},
-		data=data or {},
-		timeout=15,
-	)
+    """
+    Streamlining POST calls to the Spotify API. 
+    - Use a valid token. 
+    - We don't need 'data' for the skip command, only header and endpoint.
+    """
+    token = get_spotify_token()
+    return requests.post(
+        url,
+        headers={"Authorization": f"Bearer {token}"},
+        params=params or {},
+        data=data or {},
+        timeout=15,
+    )
 
 # -------------------------------------------------------------
 # FUNCTIONS FOR GETTING THE CURRENT SONG AND SKIP
 # -------------------------------------------------------------
 
 def get_current_track():
-	"""
-	Returns a dict with information about the currently playing song.
-	Example:
-	{
-		"id": "6HD0bX8N8Yd7Ij3mAjI93y",
-		"name": "Heart of the Forest",
-		"artist": "Skyforest"
-	}
-	If nothing is playing -> returns None.
-	"""
+    """
+    Returns a dict with information about the currently playing song.
+    Example:
+    {
+        "id": "6HD0bX8N8Yd7Ij3mAjI93y",
+        "name": "Heart of the Forest",
+        "artist": "Skyforest"
+    }
+    If nothing is playing -> returns None.
+    """
 
-	r = spotify_get("https://api.spotify.com/v1/me/player/currently-playing")
+    r = spotify_get("https://api.spotify.com/v1/me/player/currently-playing")
 
-	# 204 = nothing is playing, 200 = there is content
-	if r.status_code == 204:
-		return None
-	if r.status_code != 200:
-		print(f"⚠️ [Spotify] Unexpected status {r.status_code}: {r.text}")
-		return None
+    # 204 = nothing is playing, 200 = there is content
+    if r.status_code == 204:
+        return None
+    if r.status_code != 200:
+        print(f"⚠️ [Spotify] Unexpected status {r.status_code}: {r.text}")
+        return None
 
-	data = r.json() or {}
-	item = data.get("item")
-	if not item:
-		return None
+    data = r.json() or {}
+    item = data.get("item")
+    if not item:
+        return None
 
-	# Extract basic data
-	artists = item.get("artists") or []
-	artist_name = artists[0]["name"] if artists else None
-	track_name = item.get("name")
-	track_id = item.get("id")
+    # Extract basic data
+    artists = item.get("artists") or []
+    artist_name = artists[0]["name"] if artists else None
+    track_name = item.get("name")
+    track_id = item.get("id")
 
-	if track_id and artist_name and track_name:
-		return {"id": track_id, "name": track_name, "artist": artist_name}
+    if track_id and artist_name and track_name:
+        return {"id": track_id, "name": track_name, "artist": artist_name}
 
-	return None
+    return None
 
 
 def skip_current_track():
-	"""
-	Sends a command to Spotify to skip to the next song.
-	Endpoint: POST /v1/me/player/next
-	Assumption: you have an active device (desktop app, mobile, web player).
-	"""
-	r = spotify_post("https://api.spotify.com/v1/me/player/next")
-	if r.status_code not in (200, 202, 204):
-		# 204 is a common success; 202 sometimes means "accepted"; 200 is returned by the web player
-		print(f"⚠️ [Spotify] Skip failed (HTTP {r.status_code}): {r.text}")
+    """
+    Sends a command to Spotify to skip to the next song.
+    Endpoint: POST /v1/me/player/next
+    Assumption: you have an active device (desktop app, mobile, web player).
+    """
+    r = spotify_post("https://api.spotify.com/v1/me/player/next")
+    if r.status_code not in (200, 202, 204):
+        # 204 is a common success; 202 sometimes means "accepted"; 200 is returned by the web player
+        print(f"⚠️ [Spotify] Skip failed (HTTP {r.status_code}): {r.text}")
+        
+def is_spotify_paused():
+    r = spotify_get("https://api.spotify.com/v1/me/player")
+    if r.status_code != 200:
+        return False
+    data = r.json() or {}
+    return not data.get("is_playing", True)
+    
+def pause_spotify_playback():
+    r = requests.put(
+        "https://api.spotify.com/v1/me/player/pause",
+        headers={"Authorization": f"Bearer {get_spotify_token()}"},
+        timeout=10,
+    )
+    if r.status_code not in (200, 202, 204):
+        print(f"⚠️ [Spotify] Failed to pause after skip (HTTP {r.status_code}): {r.text}")
 
 # -------------------------------------------------------------
 # LAST.FM: CHECK WHEN A SONG WAS LAST SCROBBLED
 # -------------------------------------------------------------
 
 def get_last_play_date(artist, track):
-	"""
-	Returns the datetime (UTC) of the last scrobble for the given (artist, track)
-		from Last.fm, or None if there are no scrobbles.
-	Endpoint: user.getTrackScrobbles
-	- Here we use 'params' instead of manually building the URL format-string, so that the artist/song names
-		are correctly URL-encoded (important for diacritics, commas, brackets…).
-	- 'limit=1' only searches for the latest scrobbles -> fastest and sufficient for our logic.
-	"""
-	try:
-		r = requests.get(
-			"https://ws.audioscrobbler.com/2.0/",
-			params={
-				"method": "user.gettrackscrobbles",
-				"user": LASTFM_USER,
-				"artist": artist,
-				"track": track,
-				"api_key": LASTFM_API_KEY,
-				"format": "json",
-				"limit": 1,
-			},
-			timeout=15,
-		)
-	except requests.RequestException as e:
-		print(f"⚠️ [Last.fm] Network error: {e}")
-		return None
+    """
+    Returns the datetime (UTC) of the last scrobble for the given (artist, track)
+        from Last.fm, or None if there are no scrobbles.
+    Endpoint: user.getTrackScrobbles
+    - Here we use 'params' instead of manually building the URL format-string, so that the artist/song names
+        are correctly URL-encoded (important for diacritics, commas, brackets…).
+    - 'limit=1' only searches for the latest scrobbles -> fastest and sufficient for our logic.
+    """
+    try:
+        r = requests.get(
+            "https://ws.audioscrobbler.com/2.0/",
+            params={
+                "method": "user.gettrackscrobbles",
+                "user": LASTFM_USER,
+                "artist": artist,
+                "track": track,
+                "api_key": LASTFM_API_KEY,
+                "format": "json",
+                "limit": 1,
+            },
+            timeout=15,
+        )
+    except requests.RequestException as e:
+        print(f"⚠️ [Last.fm] Network error: {e}")
+        return None
 
-	if r.status_code != 200:
-		print(f"⚠️ [Last.fm] Unexpected status {r.status_code}: {r.text}")
-		return None
+    if r.status_code != 200:
+        print(f"⚠️ [Last.fm] Unexpected status {r.status_code}: {r.text}")
+        return None
 
-	data = r.json() or {}
-	trackscrobbles = data.get("trackscrobbles", {})
-	scrobbles = trackscrobbles.get("track")
+    data = r.json() or {}
+    trackscrobbles = data.get("trackscrobbles", {})
+    scrobbles = trackscrobbles.get("track")
 
-	# If there are no scrobbles for that song, the API may return an empty object/list.
-	if not scrobbles:
-		return None
+    # If there are no scrobbles for that song, the API may return an empty object/list.
+    if not scrobbles:
+        return None
 
-	# If it's a list, take the first (latest) one and extract the timestamp
-	if isinstance(scrobbles, list):
-		latest = scrobbles[0]
-		date_obj = latest.get("date", {})
-		uts = date_obj.get("uts")
-		if uts:
-			try:
-				return datetime.fromtimestamp(int(uts), tz=timezone.utc)
-			except ValueError:
-				return None
+    # If it's a list, take the first (latest) one and extract the timestamp
+    if isinstance(scrobbles, list):
+        latest = scrobbles[0]
+        date_obj = latest.get("date", {})
+        uts = date_obj.get("uts")
+        if uts:
+            try:
+                return datetime.fromtimestamp(int(uts), tz=timezone.utc)
+            except ValueError:
+                return None
 
-	# If it's a single object (less common), try the same
-	if isinstance(scrobbles, dict):
-		date_obj = scrobbles.get("date", {})
-		uts = date_obj.get("uts")
-		if uts:
-			try:
-				return datetime.utcfromtimestamp(int(uts))
-			except ValueError:
-				return None
+    # If it's a single object (less common), try the same
+    if isinstance(scrobbles, dict):
+        date_obj = scrobbles.get("date", {})
+        uts = date_obj.get("uts")
+        if uts:
+            try:
+                return datetime.utcfromtimestamp(int(uts))
+            except ValueError:
+                return None
 
-	return None
+    return None
 
 # -------------------------------------------------------------
 # MAIN LOOP: "CHECK → DECIDE → (MAYBE) SKIP" LOGIC
 # -------------------------------------------------------------
 
 def main_loop():
-	"""
-	A loop that:
-	- checks what's playing every POLL_INTERVAL_SECONDS seconds
-	- if something is playing, asks Last.fm when it was last played
-	- if it's within SKIP_WINDOW_DAYS days, sends a skip
-	- otherwise does nothing and just waits for the next check
-	"""
-	global last_checked_track_id, last_checked_timestamp
+    """
+    A loop that:
+    - checks what's playing every POLL_INTERVAL_SECONDS seconds
+    - if something is playing, asks Last.fm when it was last played
+    - if it's within SKIP_WINDOW_DAYS days, sends a skip
+    - otherwise does nothing and just waits for the next check
+    """
+    global last_checked_track_id, last_checked_timestamp
 
-	print("🚀 Auto-skipper enabled. Skipping songs that have been listened to in the last "
-		  f"{SKIP_WINDOW_DAYS} days.\n")
+    print("🚀 Auto-skipper enabled. Skipping songs that have been listened to in the last "
+          f"{SKIP_WINDOW_DAYS} days.\n")
 
-	while True:
-		try:
-			track = get_current_track()
+    while not should_exit:
+        try:
+            track = get_current_track()
 
-			# If nothing plays or there is no valid data — skip
-			if not track or not track.get('artist') or not track.get('id'):
-				print("🎧 Nothing is playing right now.")
-				time.sleep(POLL_INTERVAL_SECONDS)
-				continue
+            # If nothing plays or there is no valid data — skip
+            if not track or not track.get('artist') or not track.get('id'):
+                print("🎧 Nothing is playing right now.")
+                time.sleep(POLL_INTERVAL_SECONDS)
+                continue
 
-			# If nothing is playing at the moment (pause, stop, silence) – just take a nap and continue
-			if not track['artist'] or not track['id']:
-				time.sleep(POLL_INTERVAL_SECONDS)
-				continue
+            # If nothing is playing at the moment (pause, stop, silence) – just take a nap and continue
+            if not track['artist'] or not track['id']:
+                time.sleep(POLL_INTERVAL_SECONDS)
+                continue
 
-			# Skip if it's the same song as last time
-			if track['id'] == last_checked_track_id:
-				print(f"⏸️ Same song as last time ({track['name']}) — skipping the check.")
-				time.sleep(POLL_INTERVAL_SECONDS)
-				continue
+            # Skip if it's the same song as last time
+            if track['id'] == last_checked_track_id:
+                print(f"⏸️ Same song as last time ({track['name']}) — skipping the check.")
+                time.sleep(POLL_INTERVAL_SECONDS)
+                continue
 
-			# If it's a new song, remember the ID
-			last_checked_track_id = track['id']
-			last_checked_timestamp = datetime.now(timezone.utc)
+            # If it's a new song, remember the ID
+            last_checked_track_id = track['id']
+            last_checked_timestamp = datetime.now(timezone.utc)
 
-			print(f"🎵 Currently playing: {track['artist']} – {track['name']}")
+            print(f"🎵 Currently playing: {track['artist']} – {track['name']}")
 
-			# Get the latest scrobble date from Last.fm
-			last_played = get_last_play_date(track['artist'], track['name'])
-			if last_played:
-				# Calculate how many days have passed since the last scrobble
-				days_since = (datetime.now(timezone.utc) - last_played).days
-				# Print information about it
-				print(f"ℹ️ Last scrobble: {last_played.strftime('%Y-%m-%d')} - {days_since} days ago")
+            # Get the latest scrobble date from Last.fm
+            last_played = get_last_play_date(track['artist'], track['name'])
+            if last_played:
+                # Calculate how many days have passed since the last scrobble
+                days_since = (datetime.now(timezone.utc) - last_played).days
+                # Print information about it
+                print(f"ℹ️ Last scrobble: {last_played.strftime('%Y-%m-%d')} - {days_since} days ago")
 
-				# If it's within our 'window' (e.g. 30 days), skip it
-				cutoff = datetime.now(timezone.utc) - timedelta(days=SKIP_WINDOW_DAYS)
-				if last_played > cutoff:
-					print(f"⏭️ Already listened to {days_since} days ago — skipping")
-					skip_current_track()
-					time.sleep(5)
-				else:
-					print("✅ The last scrobble is older than the window — not skipping.")
-			else:
-				print("ℹ️ There's no scrobble for this song — not skipping.")
+                # If it's within our 'window' (e.g. 30 days), skip it
+                cutoff = datetime.now(timezone.utc) - timedelta(days=SKIP_WINDOW_DAYS)
+                if last_played > cutoff:
+                    print(f"⏭️ Already listened to {days_since} days ago — skipping")
+                    was_paused = is_spotify_paused()
+                    skip_current_track()
+                    if was_paused:
+                        time.sleep(1)  # give Spotify a moment to switch tracks
+                        pause_spotify_playback()
+                    time.sleep(5)
+                    # Immediately check the next song instead of waiting full interval
+                    print("🔁 Checking the next song right away...")
+                    continue
+                else:
+                    print("✅ The last scrobble is older than the window — not skipping.")
+            else:
+                print("ℹ️ There's no scrobble for this song — not skipping.")
 
 
-		except KeyboardInterrupt:
-			# Provides a graceful exit if you manually terminate the script
-			print("\n👋 Stopped by user.")
-			break
-		except Exception as e:
-			# Any unexpected error: print and continue after a short sleep
-			print(f"❗ Unexpected error: {e}")
-			time.sleep(POLL_INTERVAL_SECONDS)
+        except KeyboardInterrupt:
+            # Provides a graceful exit if you manually terminate the script
+            print("\n👋 Stopped by user.")
+            break
+        except Exception as e:
+            # Any unexpected error: print and continue after a short sleep
+            print(f"❗ Unexpected error: {e}")
+            time.sleep(POLL_INTERVAL_SECONDS)
 
-		# Standard pause between check cycles
-		time.sleep(POLL_INTERVAL_SECONDS)
+        # Standard pause between check cycles
+        time.sleep(POLL_INTERVAL_SECONDS)
+    
+    print("\n👋 Exiting.")
+    sys.exit(0)
 
 # -------------------------------------------------------------
 # Entry point: start the main loop
 # -------------------------------------------------------------
 
 if __name__ == "__main__":
-	create_tray_icon()
-	main_loop()
+    create_tray_icon()
+    main_loop()
