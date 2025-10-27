@@ -538,8 +538,9 @@ def main_loop():
         # Standard pause between check cycles
         time.sleep(POLL_INTERVAL_SECONDS)
     
-    print("\n👋 Exiting.")
-    sys.exit(0)
+    print("\n👋 Exiting gracefully.")
+    log_file.flush() # ensure everything is written
+    os._exit(0)
 
 # -------------------------------------------------------------
 # Entry point: start the main loop
