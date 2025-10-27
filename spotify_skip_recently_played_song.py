@@ -38,8 +38,6 @@ import os
 
 import configparser # configparser needed to read config.ini
 
-import signal # signal needed to handle shutdown via tray icon
-
 from PIL import Image, ImageDraw, ImageFont # PIL, pystray, and threading needed for displaying in the system tray
 import pystray
 import threading
@@ -163,7 +161,7 @@ def print(*args, **kwargs):
 # When you right-click and select "Exit", the application closes gracefully.
 # -------------------------------------------------------------
 
-should_exit = False
+should_exit = threading.Event()
 
 def create_tray_icon():
     """
@@ -196,9 +194,10 @@ def create_tray_icon():
     # MENU ACTIONS
     # ---------------------------------------------------------
     def on_exit(icon, item):
-        global should_exit
-        should_exit = True
+        print("\n🛑 Exit clicked from tray.")
         icon.stop()
+        log_file.flush()
+        os._exit(0)
 
     def open_logs(icon, item):
         logs_path = os.path.join(os.path.dirname(getattr(sys, "executable", sys.argv[0])), "logs")
@@ -472,7 +471,7 @@ def main_loop():
     print("🚀 Auto-skipper enabled. Skipping songs that have been listened to in the last "
           f"{SKIP_WINDOW_DAYS} days.\n")
 
-    while not should_exit:
+    while True:
         try:
             track = get_current_track()
 
@@ -537,10 +536,6 @@ def main_loop():
 
         # Standard pause between check cycles
         time.sleep(POLL_INTERVAL_SECONDS)
-    
-    print("\n👋 Exiting gracefully.")
-    log_file.flush() # ensure everything is written
-    os._exit(0)
 
 # -------------------------------------------------------------
 # Entry point: start the main loop
