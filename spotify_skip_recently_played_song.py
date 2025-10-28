@@ -151,7 +151,7 @@ def print(*args, **kwargs):
     if "🎵" in text:
         _original_print("")  # add a blank line before the song
     _original_print(time_prefix, text, **kwargs)
-
+    log_file.flush()
 
 # -------------------------------------------------------------
 # SYSTEM TRAY ICON
