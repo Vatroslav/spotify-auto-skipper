@@ -44,7 +44,7 @@ import threading
 
 import builtins # builtins needed to print timestamps with every print
 
-APP_VERSION = "v1.2.0"
+APP_VERSION = "v1.3.0"
 
 # -------------------------------------------------------------
 # SETTINGS FROM config.ini
@@ -70,6 +70,11 @@ REFRESH_TOKEN = config.get("Spotify", "refresh_token")
 # Settings
 SKIP_WINDOW_DAYS = config.getint("Settings", "skip_window_days", fallback=60)
 POLL_INTERVAL_SECONDS = config.getint("Settings", "poll_interval_seconds", fallback=120)
+ENABLE_RESTART_PATTERN = config.getboolean("Settings", "enable_restart_pattern", fallback=True)
+RESTART_PATTERN_SONG_COUNT = config.getint("Settings", "restart_pattern_song_count", fallback=5)
+RESTART_PATTERN_DAY_DIFF = config.getint("Settings", "restart_pattern_day_diff", fallback=2)
+DUMMY_PLAYLIST_ID = config.get("Settings", "dummy_playlist_id", fallback="37i9dQZF1DX0XUsuxWHRQd")
+REMOTE_CONTROL_URL = config.get("Settings", "remote_control_url", fallback="ON")
 
 # Simple “soft” timeout cache for access_token
 SPOTIFY_TOKEN = None
@@ -162,6 +167,7 @@ def print(*args, **kwargs):
 # -------------------------------------------------------------
 
 should_exit = threading.Event()
+skipping_paused = False
 
 def create_tray_icon():
     """
@@ -171,6 +177,8 @@ def create_tray_icon():
     - Black skip symbol (▶▶│) over them 
     Right click -> 'Open Logs' opens the log folder, 'Exit' closes the application.
     """
+    
+    global skipping_paused
 
     # ---------------------------------------------------------
     # CREATE ICON (size 64x64 because tray automatically scales)
@@ -193,17 +201,30 @@ def create_tray_icon():
     # ---------------------------------------------------------
     # MENU ACTIONS
     # ---------------------------------------------------------
-    def on_exit(icon, item):
-        print("\n🛑 Exit clicked from tray.")
-        icon.stop()
-        log_file.flush()
-        os._exit(0)
+    def toggle_skip(icon, item):
+        global skipping_paused
+        skipping_paused = not skipping_paused
+        state = "paused" if skipping_paused else "resumed"
+        print(f"⏯️ Skipping manually {state} from tray.")
+        # Update menu label dynamically
+        icon.update_menu()
 
     def open_logs(icon, item):
         logs_path = os.path.join(os.path.dirname(getattr(sys, "executable", sys.argv[0])), "logs")
         os.startfile(logs_path)
+    
+    def on_exit(icon, item):
+        print("🛑 Exit clicked from tray.")
+        icon.stop()
+        log_file.flush()
+        os._exit(0)
+        
+    def skip_label(item):
+        return "⏸️ Resume Skipping" if skipping_paused else "⏯️ Pause Skipping"
 
+    # Menu definition ("lambda" used to show dynamic text)
     menu = pystray.Menu(
+        pystray.MenuItem(skip_label, toggle_skip),
         pystray.MenuItem("📁 Open Logs", open_logs),
         pystray.MenuItem("❌ Exit", on_exit)
     )
@@ -212,8 +233,7 @@ def create_tray_icon():
     # CREATE A TRAY ICON AND RUN IT IN THE BACKGROUND
     # ---------------------------------------------------------
     icon = pystray.Icon("spotify_skipper", img, f"Spotify Auto-Skipper {APP_VERSION}", menu)
-    threading.Thread(target=icon.run, daemon=True).start()
-
+    threading.Thread(target=icon.run, daemon=False).start()
 
 # -------------------------------------------------------------
 # TRACKING THE LAST CHECKED SONG
@@ -319,6 +339,17 @@ def spotify_post(url, params=None, data=None):
         timeout=15,
     )
 
+def spotify_put(url, params=None, data=None):
+    """Wrapper for PUT calls to Spotify API (for playback/shuffle control)."""
+    token = get_spotify_token()
+    return requests.put(
+        url,
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        params=params or {},
+        json=data or {},
+        timeout=15,
+    )
+
 # -------------------------------------------------------------
 # FUNCTIONS FOR GETTING THE CURRENT SONG AND SKIP
 # -------------------------------------------------------------
@@ -387,6 +418,50 @@ def pause_spotify_playback():
     )
     if r.status_code not in (200, 202, 204):
         print(f"⚠️ [Spotify] Failed to pause after skip (HTTP {r.status_code}): {r.text}")
+
+def restart_playlist():
+    """Restart the current playlist (shuffle on) to break repeating patterns."""
+    try:
+        # Get current context (playlist URI)
+        r = spotify_get("https://api.spotify.com/v1/me/player/currently-playing")
+        if r.status_code != 200:
+            print(f"⚠️ [Spotify] Cannot get current playback context (HTTP {r.status_code})")
+            return
+        data = r.json()
+        context = data.get("context", {})
+        context_uri = context.get("uri")
+        if not context_uri:
+            print("⚠️ [Spotify] No playlist context found — cannot restart.")
+            return
+
+        print(f"🔁 Restarting playlist: {context_uri}")
+        # Start a dummy playlist first (can be any known Spotify playlist)
+        spotify_put("https://api.spotify.com/v1/me/player/play",
+            data={"context_uri": f"spotify:playlist:{DUMMY_PLAYLIST_ID}"}) # “dummy” playlist
+        time.sleep(1)
+
+        # Enable shuffle again
+        spotify_put("https://api.spotify.com/v1/me/player/shuffle", params={"state": "true"})
+        time.sleep(1)
+
+        # Restart original playlist
+        spotify_put("https://api.spotify.com/v1/me/player/play", data={"context_uri": context_uri})
+        print("✅ Playlist restarted successfully.")
+    except Exception as e:
+        print(f"❗ Failed to restart playlist: {e}")
+        
+def is_skipping_enabled():
+    """Checks the Dropbox remote_control.txt file; returns True if ON."""
+    if not REMOTE_CONTROL_URL:
+        print("⚠️ [Remote Control] No REMOTE_CONTROL_URL set.")
+        return True
+    try:
+        r = requests.get(REMOTE_CONTROL_URL, timeout=10)
+        first_line = r.text.strip().splitlines()[0].strip().lower()
+        return first_line == "on"
+    except Exception as e:
+        print(f"⚠️ [Remote Control] Failed to check status: {e}")
+        return True
 
 # -------------------------------------------------------------
 # LAST.FM: CHECK WHEN A SONG WAS LAST SCROBBLED
@@ -467,12 +542,26 @@ def main_loop():
     - otherwise does nothing and just waits for the next check
     """
     global last_checked_track_id, last_checked_timestamp
+    
+    recent_skip_days = []
 
     print("🚀 Auto-skipper enabled. Skipping songs that have been listened to in the last "
           f"{SKIP_WINDOW_DAYS} days.\n")
 
     while True:
         try:
+            # Manual pause from the tray
+            if skipping_paused:
+                print("⏸️ Skipping manually paused via tray.")
+                time.sleep(POLL_INTERVAL_SECONDS)
+                continue
+
+            # Remote Dropbox toggle
+            if not is_skipping_enabled():
+                print("🚫 Remote control: skipping temporarily disabled.")
+                time.sleep(POLL_INTERVAL_SECONDS)
+                continue
+            
             track = get_current_track()
 
             # If nothing plays or there is no valid data — skip
@@ -515,6 +604,22 @@ def main_loop():
                     if was_paused:
                         time.sleep(1)  # give Spotify a moment to switch tracks
                         pause_spotify_playback()
+                        
+                    # Track recent skip patterns (only if enabled)
+                    if ENABLE_RESTART_PATTERN:
+                        recent_skip_days.append(days_since)
+                        if len(recent_skip_days) > RESTART_PATTERN_SONG_COUNT:
+                            recent_skip_days.pop(0)
+
+                        # Detect repeating pattern within configured tolerance
+                        if (
+                            len(recent_skip_days) == RESTART_PATTERN_SONG_COUNT
+                            and max(recent_skip_days) - min(recent_skip_days) <= RESTART_PATTERN_DAY_DIFF
+                        ):
+                            print(f"⚠️ Detected repeating pattern ({RESTART_PATTERN_SONG_COUNT} skips within ±{RESTART_PATTERN_DAY_DIFF} day) — restarting playlist...")
+                            restart_playlist()
+                            recent_skip_days.clear()
+                        
                     time.sleep(5)
                     # Immediately check the next song instead of waiting full interval
                     print("🔁 Checking the next song right away...")
