@@ -240,7 +240,7 @@ def create_tray_icon():
     # Menu definition ("lambda" used to show dynamic text)
     menu = pystray.Menu(
         pystray.MenuItem(skip_label, toggle_skip),
-        pystray.MenuItem("🎵 Skip This Song Later", pause_current_song),
+        pystray.MenuItem("🎵 Don't skip this song", pause_current_song),
         pystray.MenuItem("📁 Open Logs", open_logs),
         pystray.MenuItem("❌ Exit", on_exit)
     )
