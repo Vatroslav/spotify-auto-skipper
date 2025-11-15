@@ -216,8 +216,7 @@ def create_tray_icon():
             track = get_current_track()
             if track and track.get('id'):
                 temp_pause_track_id = track['id']
-                print(f"🎵 Temporarily paused skipping for: {track['artist']} – {track['name']}")
-                print(f"   (Will resume skipping when next song plays)")
+                print(f"🎵 Temporarily paused skipping for: {track['artist']} – {track['name']} (will resume on next song)")
             else:
                 print("⚠️ No song currently playing to pause skipping for.")
         except Exception as e:
