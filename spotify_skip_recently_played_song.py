@@ -1,7 +1,7 @@
 # -------------------------------------------------------------
 # Spotify + Last.fm AUTO-SKIPPER (with detailed comments)
 # -------------------------------------------------------------
-# Author: Vatroslav + ChatGPT 5
+# Author: Vatroslav + ChatGPT 5 + GitHub Copilot
 #
 # What it does:
 # - regularly checks which song is currently playing on your Spotify account
