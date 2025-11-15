@@ -73,7 +73,7 @@ When the app is running:
 * Right-click →
 
   * **⏯️ Pause Skipping** → pauses ALL skipping (toggle to resume)
-  * **🎵 Skip This Song Later** → pauses skipping for the current song only (automatically resumes when next song plays)
+  * **🎵 Don't skip this song** → pauses skipping for the current song only (automatically resumes when next song plays)
   * **📁 Open Logs** → opens the log folder
   * **❌ Exit** → stops the app
 
