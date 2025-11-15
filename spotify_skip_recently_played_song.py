@@ -1,7 +1,7 @@
 # -------------------------------------------------------------
 # Spotify + Last.fm AUTO-SKIPPER (with detailed comments)
 # -------------------------------------------------------------
-# Author: Vatroslav + ChatGPT 5
+# Author: Vatroslav + ChatGPT 5 + GitHub Copilot
 #
 # What it does:
 # - regularly checks which song is currently playing on your Spotify account
@@ -44,7 +44,7 @@ import threading
 
 import builtins # builtins needed to print timestamps with every print
 
-APP_VERSION = "v1.3.0"
+APP_VERSION = "v1.4.0"
 
 # -------------------------------------------------------------
 # SETTINGS FROM config.ini
@@ -168,6 +168,7 @@ def print(*args, **kwargs):
 
 should_exit = threading.Event()
 skipping_paused = False
+temp_pause_track_id = None  # Track ID for which skipping is temporarily paused
 
 def create_tray_icon():
     """
@@ -178,7 +179,7 @@ def create_tray_icon():
     Right click -> 'Open Logs' opens the log folder, 'Exit' closes the application.
     """
     
-    global skipping_paused
+    global skipping_paused, temp_pause_track_id
 
     # ---------------------------------------------------------
     # CREATE ICON (size 64x64 because tray automatically scales)
@@ -209,6 +210,19 @@ def create_tray_icon():
         # Update menu label dynamically
         icon.update_menu()
 
+    def pause_current_song(icon, item):
+        global temp_pause_track_id
+        try:
+            track = get_current_track()
+            if track and track.get('id'):
+                temp_pause_track_id = track['id']
+                print(f"🎵 Temporarily paused skipping for: {track['artist']} – {track['name']} (will resume on next song)")
+            else:
+                print("⚠️ No song currently playing to pause skipping for.")
+        except Exception as e:
+            print(f"❗ Failed to pause current song: {e}")
+        icon.update_menu()
+
     def open_logs(icon, item):
         logs_path = os.path.join(os.path.dirname(getattr(sys, "executable", sys.argv[0])), "logs")
         os.startfile(logs_path)
@@ -225,6 +239,7 @@ def create_tray_icon():
     # Menu definition ("lambda" used to show dynamic text)
     menu = pystray.Menu(
         pystray.MenuItem(skip_label, toggle_skip),
+        pystray.MenuItem("🎵 Don't skip this song", pause_current_song),
         pystray.MenuItem("📁 Open Logs", open_logs),
         pystray.MenuItem("❌ Exit", on_exit)
     )
@@ -541,7 +556,7 @@ def main_loop():
     - if it's within SKIP_WINDOW_DAYS days, sends a skip
     - otherwise does nothing and just waits for the next check
     """
-    global last_checked_track_id, last_checked_timestamp
+    global last_checked_track_id, last_checked_timestamp, temp_pause_track_id
     
     recent_skip_days = []
 
@@ -584,8 +599,19 @@ def main_loop():
             # If it's a new song, remember the ID
             last_checked_track_id = track['id']
             last_checked_timestamp = datetime.now(timezone.utc)
+            
+            # Clear temporary pause if a different song is playing
+            if temp_pause_track_id and temp_pause_track_id != track['id']:
+                print(f"🔓 Clearing temporary pause (song changed)")
+                temp_pause_track_id = None
 
             print(f"🎵 Currently playing: {track['artist']} – {track['name']}")
+            
+            # Check if skipping is temporarily paused for this specific song
+            if temp_pause_track_id == track['id']:
+                print(f"⏸️ Skipping is temporarily paused for this song")
+                time.sleep(POLL_INTERVAL_SECONDS)
+                continue
 
             # Get the latest scrobble date from Last.fm
             last_played = get_last_play_date(track['artist'], track['name'])
