@@ -1,7 +1,7 @@
 # -------------------------------------------------------------
 # Spotify + Last.fm AUTO-SKIPPER (with detailed comments)
 # -------------------------------------------------------------
-# Author: Vatroslav + ChatGPT 5
+# Author: Vatroslav + ChatGPT 5 + GitHub Copilot
 #
 # What it does:
 # - regularly checks which song is currently playing on your Spotify account
@@ -44,7 +44,11 @@ import threading
 
 import builtins # builtins needed to print timestamps with every print
 
+<<<<<<< HEAD
 APP_VERSION = "v1.4.1"
+=======
+APP_VERSION = "v1.4.0"
+>>>>>>> e8a6e39f769d26bd9963b03f51bc9d9f19dcd8ba
 
 # -------------------------------------------------------------
 # SETTINGS FROM config.ini
@@ -216,8 +220,12 @@ def create_tray_icon():
             track = get_current_track()
             if track and track.get('id'):
                 temp_pause_track_id = track['id']
+<<<<<<< HEAD
                 print(f"🎵 Temporarily paused skipping for: {track['artist']} – {track['name']}")
                 print(f"   (Will resume skipping when next song plays)")
+=======
+                print(f"🎵 Temporarily paused skipping for: {track['artist']} – {track['name']} (will resume on next song)")
+>>>>>>> e8a6e39f769d26bd9963b03f51bc9d9f19dcd8ba
             else:
                 print("⚠️ No song currently playing to pause skipping for.")
         except Exception as e:
