@@ -44,7 +44,7 @@ import threading
 
 import builtins # builtins needed to print timestamps with every print
 
-APP_VERSION = "v1.5.1"
+APP_VERSION = "v1.5.0"
 
 # -------------------------------------------------------------
 # SETTINGS FROM config.ini
@@ -489,21 +489,7 @@ def is_track_liked(track_id):
     try:
         r = spotify_get("https://api.spotify.com/v1/me/tracks/contains", params={"ids": track_id})
         if r.status_code != 200:
-            error_msg = f"⚠️ [Spotify] Failed to check liked status (HTTP {r.status_code}): {r.text}"
-            print(error_msg)
-            
-            # Check if it's a scope error
-            if r.status_code == 403:
-                try:
-                    error_data = r.json()
-                    error_message = error_data.get('error', {}).get('message', '')
-                    if "Insufficient client scope" in error_message:
-                        print("💡 [Spotify] To use the always_play_liked_songs feature, you need to regenerate your")
-                        print("   refresh token with the 'user-library-read' scope. See README.md for details.")
-                        print("   Alternatively, set always_play_liked_songs=false in config.ini to disable this feature.")
-                except (ValueError, KeyError):
-                    pass
-            
+            print(f"⚠️ [Spotify] Failed to check liked status (HTTP {r.status_code}): {r.text}")
             return False
         
         data = r.json()
