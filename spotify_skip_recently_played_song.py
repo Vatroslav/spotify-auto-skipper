@@ -75,6 +75,7 @@ RESTART_PATTERN_SONG_COUNT = config.getint("Settings", "restart_pattern_song_cou
 RESTART_PATTERN_DAY_DIFF = config.getint("Settings", "restart_pattern_day_diff", fallback=2)
 DUMMY_PLAYLIST_ID = config.get("Settings", "dummy_playlist_id", fallback="37i9dQZF1DX0XUsuxWHRQd")
 REMOTE_CONTROL_URL = config.get("Settings", "remote_control_url", fallback="ON")
+SKIP_LIKED_SONGS = config.getboolean("Settings", "skip_liked_songs", fallback=False)
 
 # Simple “soft” timeout cache for access_token
 SPOTIFY_TOKEN = None
@@ -479,6 +480,27 @@ def is_skipping_enabled():
         print(f"⚠️ [Remote Control] Failed to check status: {e}")
         return True
 
+def is_track_liked(track_id):
+    """
+    Check if a track is in the user's Liked Songs (Saved Tracks).
+    Returns True if the track is liked, False otherwise.
+    Endpoint: GET /v1/me/tracks/contains?ids={track_id}
+    """
+    try:
+        r = spotify_get("https://api.spotify.com/v1/me/tracks/contains", params={"ids": track_id})
+        if r.status_code != 200:
+            print(f"⚠️ [Spotify] Failed to check liked status (HTTP {r.status_code}): {r.text}")
+            return False
+        
+        data = r.json()
+        # API returns an array of booleans, one for each track ID
+        if isinstance(data, list) and len(data) > 0:
+            return data[0]
+        return False
+    except Exception as e:
+        print(f"❗ [Spotify] Error checking if track is liked: {e}")
+        return False
+
 # -------------------------------------------------------------
 # LAST.FM: CHECK WHEN A SONG WAS LAST SCROBBLED
 # -------------------------------------------------------------
@@ -625,32 +647,36 @@ def main_loop():
                 # If it's within our 'window' (e.g. 30 days), skip it
                 cutoff = datetime.now(timezone.utc) - timedelta(days=SKIP_WINDOW_DAYS)
                 if last_played > cutoff:
-                    print(f"⏭️ Already listened to {days_since} days ago — skipping")
-                    was_paused = is_spotify_paused()
-                    skip_current_track()
-                    if was_paused:
-                        time.sleep(1)  # give Spotify a moment to switch tracks
-                        pause_spotify_playback()
+                    # Check if track is liked and if we should skip liked songs
+                    if not SKIP_LIKED_SONGS and is_track_liked(track['id']):
+                        print(f"💚 Track is in Liked Songs — not skipping")
+                    else:
+                        print(f"⏭️ Already listened to {days_since} days ago — skipping")
+                        was_paused = is_spotify_paused()
+                        skip_current_track()
+                        if was_paused:
+                            time.sleep(1)  # give Spotify a moment to switch tracks
+                            pause_spotify_playback()
                         
-                    # Track recent skip patterns (only if enabled)
-                    if ENABLE_RESTART_PATTERN:
-                        recent_skip_days.append(days_since)
-                        if len(recent_skip_days) > RESTART_PATTERN_SONG_COUNT:
-                            recent_skip_days.pop(0)
+                        # Track recent skip patterns (only if enabled)
+                        if ENABLE_RESTART_PATTERN:
+                            recent_skip_days.append(days_since)
+                            if len(recent_skip_days) > RESTART_PATTERN_SONG_COUNT:
+                                recent_skip_days.pop(0)
 
-                        # Detect repeating pattern within configured tolerance
-                        if (
-                            len(recent_skip_days) == RESTART_PATTERN_SONG_COUNT
-                            and max(recent_skip_days) - min(recent_skip_days) <= RESTART_PATTERN_DAY_DIFF
-                        ):
-                            print(f"⚠️ Detected repeating pattern ({RESTART_PATTERN_SONG_COUNT} skips within ±{RESTART_PATTERN_DAY_DIFF} day) — restarting playlist...")
-                            restart_playlist()
-                            recent_skip_days.clear()
+                            # Detect repeating pattern within configured tolerance
+                            if (
+                                len(recent_skip_days) == RESTART_PATTERN_SONG_COUNT
+                                and max(recent_skip_days) - min(recent_skip_days) <= RESTART_PATTERN_DAY_DIFF
+                            ):
+                                print(f"⚠️ Detected repeating pattern ({RESTART_PATTERN_SONG_COUNT} skips within ±{RESTART_PATTERN_DAY_DIFF} day) — restarting playlist...")
+                                restart_playlist()
+                                recent_skip_days.clear()
                         
-                    time.sleep(3)
-                    # Immediately check the next song instead of waiting full interval
-                    print("🔁 Checking the next song right away...")
-                    continue
+                        time.sleep(3)
+                        # Immediately check the next song instead of waiting full interval
+                        print("🔁 Checking the next song right away...")
+                        continue
                 else:
                     print("✅ The last scrobble is older than the window — not skipping.")
             else:
