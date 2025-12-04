@@ -44,7 +44,7 @@ import threading
 
 import builtins # builtins needed to print timestamps with every print
 
-APP_VERSION = "v1.4.1"
+APP_VERSION = "v1.5.0"
 
 # -------------------------------------------------------------
 # SETTINGS FROM config.ini
@@ -75,7 +75,7 @@ RESTART_PATTERN_SONG_COUNT = config.getint("Settings", "restart_pattern_song_cou
 RESTART_PATTERN_DAY_DIFF = config.getint("Settings", "restart_pattern_day_diff", fallback=2)
 DUMMY_PLAYLIST_ID = config.get("Settings", "dummy_playlist_id", fallback="37i9dQZF1DX0XUsuxWHRQd")
 REMOTE_CONTROL_URL = config.get("Settings", "remote_control_url", fallback="ON")
-SKIP_LIKED_SONGS = config.getboolean("Settings", "skip_liked_songs", fallback=False)
+ALWAYS_PLAY_LIKED_SONGS = config.getboolean("Settings", "always_play_liked_songs", fallback=True)
 
 # Simple “soft” timeout cache for access_token
 SPOTIFY_TOKEN = None
@@ -647,8 +647,8 @@ def main_loop():
                 # If it's within our 'window' (e.g. 30 days), skip it
                 cutoff = datetime.now(timezone.utc) - timedelta(days=SKIP_WINDOW_DAYS)
                 if last_played > cutoff:
-                    # Check if track is liked and if we should skip liked songs
-                    if not SKIP_LIKED_SONGS and is_track_liked(track['id']):
+                    # Check if track is liked and if we should always play liked songs
+                    if ALWAYS_PLAY_LIKED_SONGS and is_track_liked(track['id']):
                         print(f"💚 Track is in Liked Songs — not skipping")
                     else:
                         print(f"⏭️ Already listened to {days_since} days ago — skipping")
