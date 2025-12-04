@@ -496,11 +496,12 @@ def is_track_liked(track_id):
             if r.status_code == 403:
                 try:
                     error_data = r.json()
-                    if "error" in error_data and "Insufficient client scope" in str(error_data):
+                    error_message = error_data.get('error', {}).get('message', '')
+                    if "Insufficient client scope" in error_message:
                         print("💡 [Spotify] To use the always_play_liked_songs feature, you need to regenerate your")
                         print("   refresh token with the 'user-library-read' scope. See README.md for details.")
                         print("   Alternatively, set always_play_liked_songs=false in config.ini to disable this feature.")
-                except:
+                except (ValueError, KeyError):
                     pass
             
             return False
