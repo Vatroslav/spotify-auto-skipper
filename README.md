@@ -37,6 +37,16 @@ You can use `config.ini.template` by removing `.template` from the file name to 
 
 The template file holds advice how to gather the required data.
 
+### Important: Spotify API Scopes
+
+When generating your Spotify refresh token, make sure to include these scopes:
+* `user-read-currently-playing` — to detect what's playing
+* `user-read-playback-state` — to check playback status
+* `user-modify-playback-state` — to skip tracks
+* `user-library-read` — **required** if you enable `always_play_liked_songs` (to check if a track is in your Liked Songs)
+
+If you get an error like `Insufficient client scope`, you need to regenerate your refresh token with the correct scopes.
+
 ### Notes
 
 * `skip_window_days` → how many days back to check your scrobbles
