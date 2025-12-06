@@ -77,10 +77,12 @@ DUMMY_PLAYLIST_ID = config.get("Settings", "dummy_playlist_id", fallback="37i9dQ
 REMOTE_CONTROL_URL = config.get("Settings", "remote_control_url", fallback="ON")
 ALWAYS_PLAY_LIKED_SONGS = config.getboolean("Settings", "always_play_liked_songs", fallback=True)
 NEVER_SKIP_ARTIST_IDS = config.get("Settings", "never_skip_artist_ids", fallback="")
-# Parse comma-separated artist IDs into a set for efficient lookup
+# Parse comma-separated artist IDs - keep as list to preserve order, then convert to set for efficient lookup
 if NEVER_SKIP_ARTIST_IDS:
-    NEVER_SKIP_ARTIST_IDS_SET = set(artist_id.strip() for artist_id in NEVER_SKIP_ARTIST_IDS.split(",") if artist_id.strip())
+    NEVER_SKIP_ARTIST_IDS_LIST = [artist_id.strip() for artist_id in NEVER_SKIP_ARTIST_IDS.split(",") if artist_id.strip()]
+    NEVER_SKIP_ARTIST_IDS_SET = set(NEVER_SKIP_ARTIST_IDS_LIST)
 else:
+    NEVER_SKIP_ARTIST_IDS_LIST = []
     NEVER_SKIP_ARTIST_IDS_SET = set()
 
 # Simple “soft” timeout cache for access_token
@@ -641,9 +643,12 @@ def main_loop():
     _original_print("")
     
     # Get artist names for never-skip list
-    if NEVER_SKIP_ARTIST_IDS_SET:
+    if NEVER_SKIP_ARTIST_IDS_LIST:
+        # Ensure token is refreshed before fetching artist names to avoid refresh message appearing in the middle
+        get_spotify_token()
+        
         print(f"   • The following artists will never be skipped:")
-        artist_names = get_artist_names_from_ids(list(NEVER_SKIP_ARTIST_IDS_SET))
+        artist_names = get_artist_names_from_ids(NEVER_SKIP_ARTIST_IDS_LIST)
         for name in artist_names:
             print(f"     - {name}")
     else:
