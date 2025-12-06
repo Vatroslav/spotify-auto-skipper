@@ -60,3 +60,11 @@ remote_control_url = https://dl.dropboxusercontent.com/scl/fi/.../remote_control
 # Set to false to skip liked songs (same as other songs)
 # Default: true (liked songs are always played)
 always_play_liked_songs = true
+
+# Comma-separated list of Spotify artist IDs that should never be skipped.
+# Songs from these artists will always play, regardless of when they were last scrobbled.
+# Example: 3WrFJ7ztbogyGnTHbHJFl2,4Z8W4fKeB5YxbusRsdQVPb
+# To find an artist's Spotify ID, go to the artist's Spotify page, click Share -> Copy link to artist
+# The ID is the last part of the URL (e.g., spotify.com/artist/3WrFJ7ztbogyGnTHbHJFl2)
+# Leave empty to disable this feature.
+never_skip_artist_ids =
