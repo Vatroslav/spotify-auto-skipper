@@ -166,6 +166,28 @@ def print(*args, **kwargs):
     log_file.flush()
 
 # -------------------------------------------------------------
+# LOG CONFIGURATION SETTINGS
+# -------------------------------------------------------------
+print("⚙️ Configuration loaded:")
+print(f"   • Skip window: {SKIP_WINDOW_DAYS} days")
+print(f"   • Poll interval: {POLL_INTERVAL_SECONDS} seconds")
+print(f"   • Always play liked songs: {'ON' if ALWAYS_PLAY_LIKED_SONGS else 'OFF'}")
+print(f"   • Restart pattern detection: {'ON' if ENABLE_RESTART_PATTERN else 'OFF'}")
+if ENABLE_RESTART_PATTERN:
+    print(f"     - Song count threshold: {RESTART_PATTERN_SONG_COUNT}")
+    print(f"     - Day difference threshold: ±{RESTART_PATTERN_DAY_DIFF} days")
+
+# Get artist names for never-skip list
+if NEVER_SKIP_ARTIST_IDS_SET:
+    print(f"   • Never-skip artists:")
+    artist_names = get_artist_names_from_ids(list(NEVER_SKIP_ARTIST_IDS_SET))
+    for name in artist_names:
+        print(f"     - {name}")
+else:
+    print(f"   • Never-skip artists: None")
+print("")  # Add blank line for readability
+
+# -------------------------------------------------------------
 # SYSTEM TRAY ICON
 # -------------------------------------------------------------
 # This part creates a small icon next to the clock (system tray)
@@ -517,6 +539,28 @@ def is_artist_never_skipped(artist_ids):
     if not NEVER_SKIP_ARTIST_IDS_SET:
         return False
     return any(artist_id in NEVER_SKIP_ARTIST_IDS_SET for artist_id in artist_ids)
+
+def get_artist_names_from_ids(artist_ids):
+    """
+    Fetch artist names from Spotify API given a list of artist IDs.
+    Returns a list of artist names, or empty list if there's an error.
+    """
+    if not artist_ids:
+        return []
+    
+    artist_names = []
+    for artist_id in artist_ids:
+        try:
+            r = spotify_get(f"https://api.spotify.com/v1/artists/{artist_id}")
+            if r.status_code == 200:
+                data = r.json()
+                artist_names.append(data.get("name", f"Unknown ({artist_id})"))
+            else:
+                artist_names.append(f"Unknown ({artist_id})")
+        except Exception:
+            artist_names.append(f"Unknown ({artist_id})")
+    
+    return artist_names
 
 # -------------------------------------------------------------
 # LAST.FM: CHECK WHEN A SONG WAS LAST SCROBBLED
