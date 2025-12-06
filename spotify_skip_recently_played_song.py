@@ -166,28 +166,6 @@ def print(*args, **kwargs):
     log_file.flush()
 
 # -------------------------------------------------------------
-# LOG CONFIGURATION SETTINGS
-# -------------------------------------------------------------
-print("⚙️ Configuration loaded:")
-print(f"   • Skip window: {SKIP_WINDOW_DAYS} days")
-print(f"   • Poll interval: {POLL_INTERVAL_SECONDS} seconds")
-print(f"   • Always play liked songs: {'ON' if ALWAYS_PLAY_LIKED_SONGS else 'OFF'}")
-print(f"   • Restart pattern detection: {'ON' if ENABLE_RESTART_PATTERN else 'OFF'}")
-if ENABLE_RESTART_PATTERN:
-    print(f"     - Song count threshold: {RESTART_PATTERN_SONG_COUNT}")
-    print(f"     - Day difference threshold: ±{RESTART_PATTERN_DAY_DIFF} days")
-
-# Get artist names for never-skip list
-if NEVER_SKIP_ARTIST_IDS_SET:
-    print(f"   • Never-skip artists:")
-    artist_names = get_artist_names_from_ids(list(NEVER_SKIP_ARTIST_IDS_SET))
-    for name in artist_names:
-        print(f"     - {name}")
-else:
-    print(f"   • Never-skip artists: None")
-print("")  # Add blank line for readability
-
-# -------------------------------------------------------------
 # SYSTEM TRAY ICON
 # -------------------------------------------------------------
 # This part creates a small icon next to the clock (system tray)
@@ -644,8 +622,35 @@ def main_loop():
     
     recent_skip_days = []
 
-    print("🚀 Auto-skipper enabled. Skipping songs that have been listened to in the last "
-          f"{SKIP_WINDOW_DAYS} days.\n")
+    # Log configuration at startup
+    print("🚀 Auto-skipper enabled. Here's the configuration:")
+    print(f"   • Skipping songs that have been listened to in the last {SKIP_WINDOW_DAYS} days.")
+    print(f"   • Retrieving the currently playing song every {POLL_INTERVAL_SECONDS} seconds.")
+    
+    if ALWAYS_PLAY_LIKED_SONGS:
+        print(f"   • Will always play liked songs.")
+    else:
+        print(f"   • Will skip liked songs if they were played within the skip window.")
+    
+    if ENABLE_RESTART_PATTERN:
+        print(f"   • Will restart the playlist if a repeated pattern is detected ({RESTART_PATTERN_SONG_COUNT} skips within ±{RESTART_PATTERN_DAY_DIFF} days).")
+    else:
+        print(f"   • Won't restart the playlist if a repeated pattern is detected.")
+    
+    # Print empty line without timestamp
+    _original_print("")
+    
+    # Get artist names for never-skip list
+    if NEVER_SKIP_ARTIST_IDS_SET:
+        print(f"   • The following artists will never be skipped:")
+        artist_names = get_artist_names_from_ids(list(NEVER_SKIP_ARTIST_IDS_SET))
+        for name in artist_names:
+            print(f"     - {name}")
+    else:
+        print(f"   • No artists are configured to never be skipped.")
+    
+    # Print empty line without timestamp
+    _original_print("")
 
     while True:
         try:
