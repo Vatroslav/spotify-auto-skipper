@@ -78,7 +78,10 @@ REMOTE_CONTROL_URL = config.get("Settings", "remote_control_url", fallback="ON")
 ALWAYS_PLAY_LIKED_SONGS = config.getboolean("Settings", "always_play_liked_songs", fallback=True)
 NEVER_SKIP_ARTIST_IDS = config.get("Settings", "never_skip_artist_ids", fallback="")
 # Parse comma-separated artist IDs into a set for efficient lookup
-NEVER_SKIP_ARTIST_IDS_SET = set(artist_id.strip() for artist_id in NEVER_SKIP_ARTIST_IDS.split(",") if artist_id.strip())
+if NEVER_SKIP_ARTIST_IDS:
+    NEVER_SKIP_ARTIST_IDS_SET = set(artist_id.strip() for artist_id in NEVER_SKIP_ARTIST_IDS.split(",") if artist_id.strip())
+else:
+    NEVER_SKIP_ARTIST_IDS_SET = set()
 
 # Simple “soft” timeout cache for access_token
 SPOTIFY_TOKEN = None
