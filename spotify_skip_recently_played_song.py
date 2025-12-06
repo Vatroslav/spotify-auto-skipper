@@ -623,6 +623,8 @@ def main_loop():
     global last_checked_track_id, last_checked_timestamp, temp_pause_track_id
     
     recent_skip_days = []
+    
+    get_spotify_token()
 
     # Log configuration at startup
     print("🚀 Auto-skipper enabled. Here's the configuration:")
@@ -644,9 +646,6 @@ def main_loop():
     
     # Get artist names for never-skip list
     if NEVER_SKIP_ARTIST_IDS_LIST:
-        # Ensure token is refreshed before fetching artist names to avoid refresh message appearing in the middle
-        get_spotify_token()
-        
         print(f"   • The following artists will never be skipped:")
         artist_names = get_artist_names_from_ids(NEVER_SKIP_ARTIST_IDS_LIST)
         for name in artist_names:
