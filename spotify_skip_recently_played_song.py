@@ -76,6 +76,9 @@ RESTART_PATTERN_DAY_DIFF = config.getint("Settings", "restart_pattern_day_diff",
 DUMMY_PLAYLIST_ID = config.get("Settings", "dummy_playlist_id", fallback="37i9dQZF1DX0XUsuxWHRQd")
 REMOTE_CONTROL_URL = config.get("Settings", "remote_control_url", fallback="ON")
 ALWAYS_PLAY_LIKED_SONGS = config.getboolean("Settings", "always_play_liked_songs", fallback=True)
+NEVER_SKIP_ARTIST_IDS = config.get("Settings", "never_skip_artist_ids", fallback="")
+# Parse comma-separated artist IDs into a set for efficient lookup
+NEVER_SKIP_ARTIST_IDS_SET = set(artist_id.strip() for artist_id in NEVER_SKIP_ARTIST_IDS.split(",") if artist_id.strip())
 
 # Simple “soft” timeout cache for access_token
 SPOTIFY_TOKEN = None
@@ -378,7 +381,8 @@ def get_current_track():
     {
         "id": "6HD0bX8N8Yd7Ij3mAjI93y",
         "name": "Heart of the Forest",
-        "artist": "Skyforest"
+        "artist": "Skyforest",
+        "artist_ids": ["3WrFJ7ztbogyGnTHbHJFl2"]
     }
     If nothing is playing -> returns None.
     """
@@ -400,11 +404,12 @@ def get_current_track():
     # Extract basic data
     artists = item.get("artists") or []
     artist_name = artists[0]["name"] if artists else None
+    artist_ids = [artist["id"] for artist in artists if artist.get("id")]
     track_name = item.get("name")
     track_id = item.get("id")
 
     if track_id and artist_name and track_name:
-        return {"id": track_id, "name": track_name, "artist": artist_name}
+        return {"id": track_id, "name": track_name, "artist": artist_name, "artist_ids": artist_ids}
 
     return None
 
@@ -500,6 +505,15 @@ def is_track_liked(track_id):
     except Exception as e:
         print(f"❗ [Spotify] Error checking if track is liked: {e}")
         return False
+
+def is_artist_never_skipped(artist_ids):
+    """
+    Check if any of the track's artists are in the never-skip list.
+    Returns True if at least one artist should never be skipped, False otherwise.
+    """
+    if not NEVER_SKIP_ARTIST_IDS_SET:
+        return False
+    return any(artist_id in NEVER_SKIP_ARTIST_IDS_SET for artist_id in artist_ids)
 
 # -------------------------------------------------------------
 # LAST.FM: CHECK WHEN A SONG WAS LAST SCROBBLED
@@ -647,8 +661,11 @@ def main_loop():
                 # If it's within our 'window' (e.g. 30 days), skip it
                 cutoff = datetime.now(timezone.utc) - timedelta(days=SKIP_WINDOW_DAYS)
                 if last_played > cutoff:
+                    # Check if artist is in the never-skip list
+                    if is_artist_never_skipped(track.get('artist_ids', [])):
+                        print(f"🎤 Artist is in never-skip list — not skipping")
                     # Check if track is liked and if we should always play liked songs
-                    if ALWAYS_PLAY_LIKED_SONGS and is_track_liked(track['id']):
+                    elif ALWAYS_PLAY_LIKED_SONGS and is_track_liked(track['id']):
                         print(f"💚 Track is in Liked Songs — not skipping")
                     else:
                         print(f"⏭️ Already listened to {days_since} days ago — skipping")
