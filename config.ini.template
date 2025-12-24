@@ -69,3 +69,8 @@ always_play_liked_songs = true
 # The ID is the last part of the URL (e.g., spotify.com/artist/3WrFJ7ztbogyGnTHbHJFl2)
 # Leave empty to disable this feature.
 never_skip_artist_ids =
+
+# Number of days to keep log files before automatic deletion.
+# Example: 30 means logs older than 30 days will be deleted on app startup.
+# Default: 30 days
+log_retention_days = 30
