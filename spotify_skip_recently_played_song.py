@@ -356,11 +356,12 @@ def spotify_get(url, params=None):
         
         # If rate limited (HTTP 429), wait and retry
         if response.status_code == 429 and attempt < RATE_LIMIT_MAX_RETRIES:
+            delay_index = min(attempt, len(RATE_LIMIT_RETRY_DELAYS) - 1)
             try:
-                retry_after = int(response.headers.get("Retry-After", RATE_LIMIT_RETRY_DELAYS[attempt]))
+                retry_after = int(response.headers.get("Retry-After", RATE_LIMIT_RETRY_DELAYS[delay_index]))
             except (ValueError, TypeError):
-                retry_after = RATE_LIMIT_RETRY_DELAYS[attempt]
-            wait_time = min(retry_after, RATE_LIMIT_RETRY_DELAYS[attempt])
+                retry_after = RATE_LIMIT_RETRY_DELAYS[delay_index]
+            wait_time = min(retry_after, RATE_LIMIT_RETRY_DELAYS[delay_index])
             print(f"⚠️ [Spotify] Rate limited (429). Waiting {wait_time}s before retry {attempt + 1}/{RATE_LIMIT_MAX_RETRIES}...")
             time.sleep(wait_time)
             continue
@@ -389,11 +390,12 @@ def spotify_post(url, params=None, data=None):
         
         # If rate limited (HTTP 429), wait and retry
         if response.status_code == 429 and attempt < RATE_LIMIT_MAX_RETRIES:
+            delay_index = min(attempt, len(RATE_LIMIT_RETRY_DELAYS) - 1)
             try:
-                retry_after = int(response.headers.get("Retry-After", RATE_LIMIT_RETRY_DELAYS[attempt]))
+                retry_after = int(response.headers.get("Retry-After", RATE_LIMIT_RETRY_DELAYS[delay_index]))
             except (ValueError, TypeError):
-                retry_after = RATE_LIMIT_RETRY_DELAYS[attempt]
-            wait_time = min(retry_after, RATE_LIMIT_RETRY_DELAYS[attempt])
+                retry_after = RATE_LIMIT_RETRY_DELAYS[delay_index]
+            wait_time = min(retry_after, RATE_LIMIT_RETRY_DELAYS[delay_index])
             print(f"⚠️ [Spotify] Rate limited (429). Waiting {wait_time}s before retry {attempt + 1}/{RATE_LIMIT_MAX_RETRIES}...")
             time.sleep(wait_time)
             continue
@@ -419,11 +421,12 @@ def spotify_put(url, params=None, data=None):
         
         # If rate limited (HTTP 429), wait and retry
         if response.status_code == 429 and attempt < RATE_LIMIT_MAX_RETRIES:
+            delay_index = min(attempt, len(RATE_LIMIT_RETRY_DELAYS) - 1)
             try:
-                retry_after = int(response.headers.get("Retry-After", RATE_LIMIT_RETRY_DELAYS[attempt]))
+                retry_after = int(response.headers.get("Retry-After", RATE_LIMIT_RETRY_DELAYS[delay_index]))
             except (ValueError, TypeError):
-                retry_after = RATE_LIMIT_RETRY_DELAYS[attempt]
-            wait_time = min(retry_after, RATE_LIMIT_RETRY_DELAYS[attempt])
+                retry_after = RATE_LIMIT_RETRY_DELAYS[delay_index]
+            wait_time = min(retry_after, RATE_LIMIT_RETRY_DELAYS[delay_index])
             print(f"⚠️ [Spotify] Rate limited (429). Waiting {wait_time}s before retry {attempt + 1}/{RATE_LIMIT_MAX_RETRIES}...")
             time.sleep(wait_time)
             continue
