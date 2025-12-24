@@ -109,7 +109,7 @@ The app automatically purges log files older than 30 days on every startup to pr
 log_retention_days = 30
 ```
 
-The purge operation is logged to the console at startup, showing which files were deleted.
+The purge operation is logged to the day's log file at startup, showing which files were deleted (or any errors encountered).
 
 ---
 

@@ -134,12 +134,27 @@ LOG_DIR = os.path.join(os.path.dirname(getattr(sys, "executable", sys.argv[0])),
 # If the folder doesn't exist, create it
 os.makedirs(LOG_DIR, exist_ok=True)
 
+# Make the name of the log file according to today's date
+log_filename = datetime.now().strftime("%Y-%m-%d") + ".txt"
+log_path = os.path.join(LOG_DIR, log_filename)
+
+# Open the file in "append" mode (continues writing, does not delete old logs)
+log_file = open(log_path, "a", encoding="utf-8")
+
+# Redirect standard output (print) and errors (traceback, warnings) to a log file
+sys.stdout = log_file
+sys.stderr = log_file
+
+# Each print() will immediately write the line to the file (no buffering)
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
+
 # -------------------------------------------------------------
 # PURGE OLD LOG FILES
 # -------------------------------------------------------------
 # This block automatically deletes log files older than the configured
 # retention period (default 30 days) to prevent storage bloat.
-# It runs once at startup before opening the current day's log file.
+# It runs after opening today's log file so errors are captured in the log.
 # -------------------------------------------------------------
 
 def purge_old_logs():
@@ -164,6 +179,10 @@ def purge_old_logs():
             if not os.path.isfile(file_path):
                 continue
             
+            # Skip today's log file (already open)
+            if filename == log_filename:
+                continue
+            
             # Try to parse the filename as a date (expected format: YYYY-MM-DD.txt)
             if filename.endswith('.txt'):
                 try:
@@ -184,33 +203,18 @@ def purge_old_logs():
     
     except Exception as e:
         # If something goes wrong with the entire purge process, don't crash the app
-        # Just print the error (will go to stderr, which isn't redirected yet)
-        print(f"Warning: Failed to purge old logs: {e}", file=sys.stderr)
+        # Log the error to the log file
+        print(f"⚠️ Warning: Failed to purge old logs: {e}")
         return 0, []
 
 # Purge old log files at startup
 deleted_count, deleted_files = purge_old_logs()
 if deleted_count > 0:
-    # Print to original stdout since log file isn't opened yet
-    print(f"🗑️ Purged {deleted_count} old log file(s) (older than {LOG_RETENTION_DAYS} days)", file=sys.__stdout__)
+    # Log purge results to the log file
+    print(f"🗑️ Purged {deleted_count} old log file(s) (older than {LOG_RETENTION_DAYS} days)")
     for filename in deleted_files:
-        print(f"   - Deleted: {filename}", file=sys.__stdout__)
+        print(f"   - Deleted: {filename}")
 
-
-# Make the name of the log file according to today's date
-log_filename = datetime.now().strftime("%Y-%m-%d") + ".txt"
-log_path = os.path.join(LOG_DIR, log_filename)
-
-# Open the file in "append" mode (continues writing, does not delete old logs)
-log_file = open(log_path, "a", encoding="utf-8")
-
-# Redirect standard output (print) and errors (traceback, warnings) to a log file
-sys.stdout = log_file
-sys.stderr = log_file
-
-# Each print() will immediately write the line to the file (no buffering)
-sys.stdout.reconfigure(line_buffering=True)
-sys.stderr.reconfigure(line_buffering=True)
 
 # Write the header at the beginning of each run
 print(f"\n{'='*60}")
