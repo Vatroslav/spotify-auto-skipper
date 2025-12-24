@@ -44,7 +44,7 @@ import threading
 
 import builtins # builtins needed to print timestamps with every print
 
-APP_VERSION = "v1.6.0"
+APP_VERSION = "v1.7.0"
 
 # -------------------------------------------------------------
 # SETTINGS FROM config.ini
@@ -69,7 +69,7 @@ REFRESH_TOKEN = config.get("Spotify", "refresh_token")
 
 # Settings
 SKIP_WINDOW_DAYS = config.getint("Settings", "skip_window_days", fallback=60)
-POLL_INTERVAL_SECONDS = config.getint("Settings", "poll_interval_seconds", fallback=120)
+POLL_INTERVAL_SECONDS = max(5, config.getint("Settings", "poll_interval_seconds", fallback=120))  # Minimum 5 seconds
 ENABLE_RESTART_PATTERN = config.getboolean("Settings", "enable_restart_pattern", fallback=True)
 RESTART_PATTERN_SONG_COUNT = config.getint("Settings", "restart_pattern_song_count", fallback=5)
 RESTART_PATTERN_DAY_DIFF = config.getint("Settings", "restart_pattern_day_diff", fallback=2)
@@ -89,6 +89,10 @@ else:
 SPOTIFY_TOKEN = None
 TOKEN_EXPIRES_AT = datetime.now(timezone.utc) # the moment when the token (approximately) expires
 
+
+# Rate limiting configuration
+RATE_LIMIT_MAX_RETRIES = 3
+RATE_LIMIT_RETRY_DELAYS = [5, 10, 20]  # seconds
 # -------------------------------------------------------------
 # PREVENTING MULTIPLE INSTANCES (Windows mutex)
 # -------------------------------------------------------------
@@ -339,14 +343,32 @@ def spotify_get(url, params=None):
     - Always adds a valid Authorization header with a Bearer token. 
     - Return a 'requests.Response' object so we can check the status and content. 
     - It has a basic timeout so that the script does not "hang" indefinitely.
+    - Implements exponential backoff on rate limiting (HTTP 429).
     """
-    token = get_spotify_token()
-    return requests.get(
-        url,
-        headers={"Authorization": f"Bearer {token}"},
-        params=params or {},
-        timeout=15,
-    )
+    for attempt in range(RATE_LIMIT_MAX_RETRIES + 1):
+        token = get_spotify_token()  # Refresh token for each attempt
+        response = requests.get(
+            url,
+            headers={"Authorization": f"Bearer {token}"},
+            params=params or {},
+            timeout=15,
+        )
+        
+        # If rate limited (HTTP 429), wait and retry
+        if response.status_code == 429 and attempt < RATE_LIMIT_MAX_RETRIES:
+            delay_index = min(attempt, len(RATE_LIMIT_RETRY_DELAYS) - 1)
+            try:
+                retry_after = int(response.headers.get("Retry-After", RATE_LIMIT_RETRY_DELAYS[delay_index]))
+            except (ValueError, TypeError):
+                retry_after = RATE_LIMIT_RETRY_DELAYS[delay_index]
+            wait_time = min(retry_after, RATE_LIMIT_RETRY_DELAYS[delay_index])
+            print(f"⚠️ [Spotify] Rate limited (429). Waiting {wait_time}s before retry {attempt + 1}/{RATE_LIMIT_MAX_RETRIES}...")
+            time.sleep(wait_time)
+            continue
+        
+        return response
+    
+    return response
 
 
 def spotify_post(url, params=None, data=None):
@@ -354,26 +376,64 @@ def spotify_post(url, params=None, data=None):
     Streamlining POST calls to the Spotify API. 
     - Use a valid token. 
     - We don't need 'data' for the skip command, only header and endpoint.
+    - Implements exponential backoff on rate limiting (HTTP 429).
     """
-    token = get_spotify_token()
-    return requests.post(
-        url,
-        headers={"Authorization": f"Bearer {token}"},
-        params=params or {},
-        data=data or {},
-        timeout=15,
-    )
+    for attempt in range(RATE_LIMIT_MAX_RETRIES + 1):
+        token = get_spotify_token()  # Refresh token for each attempt
+        response = requests.post(
+            url,
+            headers={"Authorization": f"Bearer {token}"},
+            params=params or {},
+            data=data or {},
+            timeout=15,
+        )
+        
+        # If rate limited (HTTP 429), wait and retry
+        if response.status_code == 429 and attempt < RATE_LIMIT_MAX_RETRIES:
+            delay_index = min(attempt, len(RATE_LIMIT_RETRY_DELAYS) - 1)
+            try:
+                retry_after = int(response.headers.get("Retry-After", RATE_LIMIT_RETRY_DELAYS[delay_index]))
+            except (ValueError, TypeError):
+                retry_after = RATE_LIMIT_RETRY_DELAYS[delay_index]
+            wait_time = min(retry_after, RATE_LIMIT_RETRY_DELAYS[delay_index])
+            print(f"⚠️ [Spotify] Rate limited (429). Waiting {wait_time}s before retry {attempt + 1}/{RATE_LIMIT_MAX_RETRIES}...")
+            time.sleep(wait_time)
+            continue
+        
+        return response
+    
+    return response
 
 def spotify_put(url, params=None, data=None):
-    """Wrapper for PUT calls to Spotify API (for playback/shuffle control)."""
-    token = get_spotify_token()
-    return requests.put(
-        url,
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        params=params or {},
-        json=data or {},
-        timeout=15,
-    )
+    """
+    Wrapper for PUT calls to Spotify API (for playback/shuffle control).
+    - Implements exponential backoff on rate limiting (HTTP 429).
+    """
+    for attempt in range(RATE_LIMIT_MAX_RETRIES + 1):
+        token = get_spotify_token()  # Refresh token for each attempt
+        response = requests.put(
+            url,
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            params=params or {},
+            json=data or {},
+            timeout=15,
+        )
+        
+        # If rate limited (HTTP 429), wait and retry
+        if response.status_code == 429 and attempt < RATE_LIMIT_MAX_RETRIES:
+            delay_index = min(attempt, len(RATE_LIMIT_RETRY_DELAYS) - 1)
+            try:
+                retry_after = int(response.headers.get("Retry-After", RATE_LIMIT_RETRY_DELAYS[delay_index]))
+            except (ValueError, TypeError):
+                retry_after = RATE_LIMIT_RETRY_DELAYS[delay_index]
+            wait_time = min(retry_after, RATE_LIMIT_RETRY_DELAYS[delay_index])
+            print(f"⚠️ [Spotify] Rate limited (429). Waiting {wait_time}s before retry {attempt + 1}/{RATE_LIMIT_MAX_RETRIES}...")
+            time.sleep(wait_time)
+            continue
+        
+        return response
+    
+    return response
 
 # -------------------------------------------------------------
 # FUNCTIONS FOR GETTING THE CURRENT SONG AND SKIP
