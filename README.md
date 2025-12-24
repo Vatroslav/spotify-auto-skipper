@@ -100,6 +100,17 @@ C:\Users\<yourname>\Tools\Spotify skip recently scrobbled song\logs\2025-10-24.t
 
 Each line includes a timestamp for easy tracking.
 
+### Automatic Log Cleanup
+
+The app automatically purges log files older than 30 days on every startup to prevent storage bloat. You can customize the retention period in `config.ini`:
+
+```ini
+[Settings]
+log_retention_days = 30
+```
+
+The purge operation is logged to the console at startup, showing which files were deleted.
+
 ---
 
 ## 🚱 Preventing multiple instances
