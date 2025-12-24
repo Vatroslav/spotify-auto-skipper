@@ -185,7 +185,7 @@ def purge_old_logs():
     except Exception as e:
         # If something goes wrong with the entire purge process, don't crash the app
         # Just print the error (will go to stderr, which isn't redirected yet)
-        print(f"Warning: Failed to purge old logs: {e}", file=sys.__stderr__)
+        print(f"Warning: Failed to purge old logs: {e}", file=sys.stderr)
         return 0, []
 
 # Purge old log files at startup
