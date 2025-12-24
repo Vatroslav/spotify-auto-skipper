@@ -44,7 +44,7 @@ import threading
 
 import builtins # builtins needed to print timestamps with every print
 
-APP_VERSION = "v1.7.0"
+APP_VERSION = "v1.8.0"
 
 # -------------------------------------------------------------
 # SETTINGS FROM config.ini
@@ -77,6 +77,7 @@ DUMMY_PLAYLIST_ID = config.get("Settings", "dummy_playlist_id", fallback="37i9dQ
 REMOTE_CONTROL_URL = config.get("Settings", "remote_control_url", fallback="ON")
 ALWAYS_PLAY_LIKED_SONGS = config.getboolean("Settings", "always_play_liked_songs", fallback=True)
 NEVER_SKIP_ARTIST_IDS = config.get("Settings", "never_skip_artist_ids", fallback="")
+LOG_RETENTION_DAYS = config.getint("Settings", "log_retention_days", fallback=30)
 # Parse comma-separated artist IDs - keep as list to preserve order, then convert to set for efficient lookup
 if NEVER_SKIP_ARTIST_IDS:
     NEVER_SKIP_ARTIST_IDS_LIST = [artist_id.strip() for artist_id in NEVER_SKIP_ARTIST_IDS.split(",") if artist_id.strip()]
@@ -147,6 +148,73 @@ sys.stderr = log_file
 # Each print() will immediately write the line to the file (no buffering)
 sys.stdout.reconfigure(line_buffering=True)
 sys.stderr.reconfigure(line_buffering=True)
+
+# -------------------------------------------------------------
+# PURGE OLD LOG FILES
+# -------------------------------------------------------------
+# This block automatically deletes log files older than the configured
+# retention period (default 30 days) to prevent storage bloat.
+# It runs after opening today's log file so errors are captured in the log.
+# -------------------------------------------------------------
+
+def purge_old_logs():
+    """
+    Delete log files older than LOG_RETENTION_DAYS from the logs directory.
+    This function is called once at app startup to maintain a clean log folder.
+    
+    Returns:
+        tuple: (number of files deleted, list of deleted filenames)
+    """
+    try:
+        # Calculate the cutoff date
+        cutoff_date = datetime.now() - timedelta(days=LOG_RETENTION_DAYS)
+        
+        deleted_files = []
+        
+        # Iterate through all files in the log directory
+        for filename in os.listdir(LOG_DIR):
+            file_path = os.path.join(LOG_DIR, filename)
+            
+            # Skip if not a file (e.g., subdirectories)
+            if not os.path.isfile(file_path):
+                continue
+            
+            # Skip today's log file (already open)
+            if filename == log_filename:
+                continue
+            
+            # Try to parse the filename as a date (expected format: YYYY-MM-DD.txt)
+            if filename.endswith('.txt'):
+                try:
+                    # Extract date from filename (remove .txt extension)
+                    date_str = filename[:-4]
+                    file_date = datetime.strptime(date_str, "%Y-%m-%d")
+                    
+                    # If the file is older than the cutoff, delete it
+                    if file_date < cutoff_date:
+                        os.remove(file_path)
+                        deleted_files.append(filename)
+                except (ValueError, OSError):
+                    # If we can't parse the date or delete the file, skip it
+                    # This prevents crashes from unexpected filenames
+                    pass
+        
+        return len(deleted_files), deleted_files
+    
+    except Exception as e:
+        # If something goes wrong with the entire purge process, don't crash the app
+        # Log the error to the log file
+        print(f"⚠️ Warning: Failed to purge old logs: {e}")
+        return 0, []
+
+# Purge old log files at startup
+deleted_count, deleted_files = purge_old_logs()
+if deleted_count > 0:
+    # Log purge results to the log file
+    print(f"🗑️ Purged {deleted_count} old log file(s) (older than {LOG_RETENTION_DAYS} days)")
+    for filename in deleted_files:
+        print(f"   - Deleted: {filename}")
+
 
 # Write the header at the beginning of each run
 print(f"\n{'='*60}")
