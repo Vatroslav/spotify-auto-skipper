@@ -50,7 +50,7 @@ If you get an error like `Insufficient client scope`, you need to regenerate you
 ### Notes
 
 * `skip_window_days` → how many days back to check your scrobbles
-* `poll_interval_seconds` → how often to check what’s currently playing
+* `poll_interval_seconds` → how often to check what's currently playing (minimum 5 seconds to avoid rate limiting)
 * `never_skip_artist_ids` → comma-separated list of Spotify artist IDs that should never be skipped. To find an artist's Spotify ID, go to the artist's Spotify page, click **Share → Copy link to artist**. The ID is the last part of the URL (e.g., `spotify.com/artist/3WrFJ7ztbogyGnTHbHJFl2`)
 * The app reads this config **only at startup**, so restart the app after changes.
 
