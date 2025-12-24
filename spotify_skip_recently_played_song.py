@@ -175,7 +175,7 @@ def purge_old_logs():
                     if file_date < cutoff_date:
                         os.remove(file_path)
                         deleted_files.append(filename)
-                except (ValueError, OSError) as e:
+                except (ValueError, OSError):
                     # If we can't parse the date or delete the file, skip it
                     # This prevents crashes from unexpected filenames
                     pass
@@ -184,8 +184,8 @@ def purge_old_logs():
     
     except Exception as e:
         # If something goes wrong with the entire purge process, don't crash the app
-        # Just print the error (will go to stdout, which isn't redirected yet)
-        print(f"Warning: Failed to purge old logs: {e}", file=sys.__stdout__)
+        # Just print the error (will go to stderr, which isn't redirected yet)
+        print(f"Warning: Failed to purge old logs: {e}", file=sys.__stderr__)
         return 0, []
 
 # Purge old log files at startup
