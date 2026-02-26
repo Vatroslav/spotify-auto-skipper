@@ -44,7 +44,7 @@ import threading
 
 import builtins # builtins needed to print timestamps with every print
 
-APP_VERSION = "v1.8.0"
+APP_VERSION = "v1.8.1"
 
 # -------------------------------------------------------------
 # SETTINGS FROM config.ini
