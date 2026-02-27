@@ -1,0 +1,56 @@
+# -*- mode: python ; coding: utf-8 -*-
+
+
+a = Analysis(
+    ['spotify_skip_recently_played_song.py'],
+    pathex=[],
+    binaries=[],
+    datas=[
+        ('assets/app.ico', 'assets'),
+    ],
+    hiddenimports=[
+        'spotify_auto_skipper',
+        'spotify_auto_skipper.app',
+        'spotify_auto_skipper.config',
+        'spotify_auto_skipper.encryption',
+        'spotify_auto_skipper.spotify_api',
+        'spotify_auto_skipper.lastfm_api',
+        'spotify_auto_skipper.tray',
+        'spotify_auto_skipper.startup',
+        'spotify_auto_skipper.utils',
+        'spotify_auto_skipper.gui',
+        'spotify_auto_skipper.gui.settings_window',
+        'spotify_auto_skipper.gui.setup_wizard',
+        'spotify_auto_skipper.gui.widgets',
+        'pystray._win32',
+    ],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    noarchive=False,
+    optimize=0,
+)
+pyz = PYZ(a.pure)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.datas,
+    [],
+    name='SpotifyAutoSkipper',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=False,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon='assets/app.ico',
+)

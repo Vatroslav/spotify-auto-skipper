@@ -13,6 +13,15 @@ def get_exe_dir():
         return os.path.dirname(os.path.abspath(sys.argv[0]))
 
 
+def resource_path(relative_path):
+    """Get path to a bundled resource (works in dev and PyInstaller .exe)."""
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_path, relative_path)
+
+
 def get_appdata_dir():
     """Returns %APPDATA%/SpotifyAutoSkipper, creates if needed."""
     appdata = os.environ.get("APPDATA", os.path.expanduser("~"))
