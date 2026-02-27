@@ -16,7 +16,7 @@ from spotify_auto_skipper.spotify_api import (
     get_artist_names_from_ids,
 )
 from spotify_auto_skipper.lastfm_api import get_last_play_date
-from spotify_auto_skipper.tray import create_tray_icon
+from spotify_auto_skipper.tray import create_tray_icon, open_settings_event
 
 
 # Module-level refs set by _setup_logging()
@@ -277,6 +277,26 @@ def main_loop():
 # Entry point
 # -----------------------------------------------------------------
 
+def _idle_loop():
+    """
+    Main-thread idle loop. Checks for GUI events (e.g. open settings)
+    and dispatches tkinter windows. Tkinter requires the main thread.
+    """
+    import tkinter as tk
+
+    while not utils.should_exit.is_set():
+        if open_settings_event.wait(timeout=1):
+            open_settings_event.clear()
+            try:
+                root = tk.Tk()
+                root.withdraw()
+                from spotify_auto_skipper.gui.settings_window import SettingsWindow
+                SettingsWindow.open(root)
+                root.mainloop()
+            except Exception as e:
+                print(f"\u2757 Error opening settings: {e}")
+
+
 def main():
     _mutex = _check_single_instance()
 
@@ -297,4 +317,10 @@ def main():
     _print_startup_header()
 
     create_tray_icon()
-    main_loop()
+
+    # Run main_loop in a daemon thread so main thread can handle GUI
+    import threading
+    worker = threading.Thread(target=main_loop, daemon=True)
+    worker.start()
+
+    _idle_loop()

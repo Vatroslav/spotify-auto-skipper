@@ -27,6 +27,7 @@ class SettingsWindow:
 
     def __init__(self, parent=None):
         self._cfg = Config()
+        self._parent = parent
         self._window = tk.Toplevel(parent) if parent else tk.Tk()
         self._window.title("Spotify Auto-Skipper Settings")
         self._window.resizable(False, False)
@@ -218,12 +219,20 @@ class SettingsWindow:
         load_config()
 
         print("\u2705 Settings saved.")
-        self._window.destroy()
-        SettingsWindow._instance = None
+        self._close()
 
     def _on_cancel(self):
+        self._close()
+
+    def _close(self):
         self._window.destroy()
         SettingsWindow._instance = None
+        # If opened with a hidden root, destroy it to exit mainloop
+        if self._parent:
+            try:
+                self._parent.destroy()
+            except tk.TclError:
+                pass
 
     def wait(self):
         """Block until the settings window is closed (for wizard-like usage)."""
