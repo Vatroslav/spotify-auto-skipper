@@ -4,6 +4,7 @@ import configparser
 import threading
 
 from spotify_auto_skipper.utils import get_exe_dir, get_appdata_dir
+from spotify_auto_skipper.encryption import CredentialEncryption
 
 # Default values for all config keys
 CONFIG_DEFAULTS = {
@@ -74,6 +75,7 @@ class Config:
             cls._instance = super().__new__(cls)
             cls._instance._data = dict(CONFIG_DEFAULTS)
             cls._instance._loaded = False
+            cls._instance._encryption = CredentialEncryption()
         return cls._instance
 
     @property
@@ -105,6 +107,10 @@ class Config:
             stored = json.load(f)
         # Merge with defaults so new keys added in future versions get their defaults
         self._data = {**CONFIG_DEFAULTS, **stored}
+        # Decrypt sensitive values transparently
+        for key in SENSITIVE_KEYS:
+            if key in self._data and self._data[key]:
+                self._data[key] = self._encryption.decrypt(self._data[key])
 
     def _migrate_from_ini(self):
         """Read legacy config.ini, convert to JSON structure, save as JSON."""
@@ -135,8 +141,13 @@ class Config:
 
     def save(self):
         with self._lock:
+            # Encrypt sensitive values for storage
+            to_write = dict(self._data)
+            for key in SENSITIVE_KEYS:
+                if key in to_write and to_write[key]:
+                    to_write[key] = self._encryption.encrypt(to_write[key])
             with open(self.json_path, "w", encoding="utf-8") as f:
-                json.dump(self._data, f, indent=2)
+                json.dump(to_write, f, indent=2)
 
     def get(self, key, default=None):
         with self._lock:
