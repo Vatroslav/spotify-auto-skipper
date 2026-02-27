@@ -130,6 +130,41 @@ def _print_startup_header():
 
 
 # -----------------------------------------------------------------
+# Artist name resolution
+# -----------------------------------------------------------------
+
+def _resolve_missing_artist_names():
+    """
+    If any never-skip artists have an ID but no name (from old config format),
+    look them up via Spotify API and save the names back to config.
+    """
+    artists = config.NEVER_SKIP_ARTISTS
+    if not artists:
+        return
+
+    needs_update = [a for a in artists if isinstance(a, dict) and a.get("id") and not a.get("name")]
+    if not needs_update:
+        return
+
+    print(f"Resolving names for {len(needs_update)} never-skip artist(s)...")
+    ids_to_resolve = [a["id"] for a in needs_update]
+    resolved_names = get_artist_names_from_ids(ids_to_resolve)
+
+    # Update the in-memory list
+    for artist_dict, name in zip(needs_update, resolved_names):
+        artist_dict["name"] = name
+
+    # Persist to config so this only happens once
+    cfg = config.Config()
+    cfg.set("never_skip_artists", artists)
+    cfg.save()
+
+    # Reload module-level variables
+    load_config()
+    print("Artist names resolved and saved.")
+
+
+# -----------------------------------------------------------------
 # Main loop
 # -----------------------------------------------------------------
 
@@ -141,6 +176,9 @@ def main_loop():
     recent_skip_days = []
 
     get_spotify_token()
+
+    # Resolve missing artist names (one-time migration from old ID-only format)
+    _resolve_missing_artist_names()
 
     # Log configuration
     print("\U0001f680 Auto-skipper enabled. Here's the configuration:")
