@@ -3,7 +3,7 @@ from tkinter import ttk, messagebox
 
 from spotify_auto_skipper.config import Config, load_config
 from spotify_auto_skipper.startup import set_startup
-from spotify_auto_skipper.gui.widgets import LabeledEntry, LabeledSpinbox, LabeledCheckbox
+from spotify_auto_skipper.gui.widgets import LabeledEntry, LabeledSpinbox, LabeledCheckbox, ArtistListWidget
 
 
 class SettingsWindow:
@@ -146,14 +146,12 @@ class SettingsWindow:
 
         ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=10)
 
-        lbl = ttk.Label(
-            frame,
-            text="Never-skip Artist IDs (comma-separated Spotify artist IDs):",
-            wraplength=420,
-        )
+        lbl = ttk.Label(frame, text="Never-skip Artists:", font=("Segoe UI", 10, "bold"))
         lbl.pack(anchor="w", pady=(0, 3))
-        self._artist_text = tk.Text(frame, height=3, width=50, wrap="word")
-        self._artist_text.pack(fill="x", pady=2)
+
+        from spotify_auto_skipper.spotify_api import search_artists
+        self._artist_widget = ArtistListWidget(frame, search_fn=search_artists)
+        self._artist_widget.pack(fill="both", expand=True, pady=2)
 
         ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=10)
 
@@ -180,9 +178,8 @@ class SettingsWindow:
         """Populate all fields from the current Config."""
         for key, widget in self._fields.items():
             widget.set(self._cfg.get(key))
-        # Special: artist IDs text widget
-        self._artist_text.delete("1.0", "end")
-        self._artist_text.insert("1.0", self._cfg.get("never_skip_artist_ids", ""))
+        # Load artist list
+        self._artist_widget.set(self._cfg.get("never_skip_artists", []))
 
     def _on_save(self):
         """Validate, save to Config, reload module-level vars, close."""
@@ -191,8 +188,8 @@ class SettingsWindow:
         for key, widget in self._fields.items():
             values[key] = widget.get()
 
-        # Special: artist IDs
-        values["never_skip_artist_ids"] = self._artist_text.get("1.0", "end").strip()
+        # Artist list (special handling — not in _fields)
+        values["never_skip_artists"] = self._artist_widget.get()
 
         # Validation
         if values["poll_interval_seconds"] < 5:
