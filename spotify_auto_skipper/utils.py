@@ -13,6 +13,14 @@ def get_exe_dir():
         return os.path.dirname(os.path.abspath(sys.argv[0]))
 
 
+def get_appdata_dir():
+    """Returns %APPDATA%/SpotifyAutoSkipper, creates if needed."""
+    appdata = os.environ.get("APPDATA", os.path.expanduser("~"))
+    path = os.path.join(appdata, "SpotifyAutoSkipper")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
 # -----------------------------------------------------------------
 # Shared application state (accessed by tray.py and app.py)
 # -----------------------------------------------------------------

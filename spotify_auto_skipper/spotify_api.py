@@ -3,11 +3,7 @@ import base64
 from datetime import datetime, timedelta, timezone
 import requests
 
-from spotify_auto_skipper.config import (
-    CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN,
-    DUMMY_PLAYLIST_ID, REMOTE_CONTROL_URL,
-    NEVER_SKIP_ARTIST_IDS_SET, ALWAYS_PLAY_LIKED_SONGS,
-)
+from spotify_auto_skipper import config
 
 # Token state
 SPOTIFY_TOKEN = None
@@ -30,7 +26,9 @@ def refresh_access_token():
     """
     global SPOTIFY_TOKEN, TOKEN_EXPIRES_AT
 
-    auth_header = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
+    auth_header = base64.b64encode(
+        f"{config.CLIENT_ID}:{config.CLIENT_SECRET}".encode()
+    ).decode()
 
     try:
         r = requests.post(
@@ -41,7 +39,7 @@ def refresh_access_token():
             },
             data={
                 "grant_type": "refresh_token",
-                "refresh_token": REFRESH_TOKEN,
+                "refresh_token": config.REFRESH_TOKEN,
             },
             timeout=15,
         )
@@ -259,7 +257,7 @@ def restart_playlist():
 
         print(f"\U0001f501 Restarting playlist: {context_uri}")
         spotify_put("https://api.spotify.com/v1/me/player/play",
-            data={"context_uri": f"spotify:playlist:{DUMMY_PLAYLIST_ID}"})
+            data={"context_uri": f"spotify:playlist:{config.DUMMY_PLAYLIST_ID}"})
         time.sleep(1)
 
         spotify_put("https://api.spotify.com/v1/me/player/shuffle", params={"state": "true"})
@@ -273,11 +271,11 @@ def restart_playlist():
 
 def is_skipping_enabled():
     """Checks the Dropbox remote_control.txt file; returns True if ON."""
-    if not REMOTE_CONTROL_URL:
+    if not config.REMOTE_CONTROL_URL:
         print("\u26a0\ufe0f [Remote Control] No REMOTE_CONTROL_URL set.")
         return True
     try:
-        r = requests.get(REMOTE_CONTROL_URL, timeout=10)
+        r = requests.get(config.REMOTE_CONTROL_URL, timeout=10)
         first_line = r.text.strip().splitlines()[0].strip().lower()
         return first_line == "on"
     except Exception as e:
@@ -307,9 +305,9 @@ def is_track_liked(track_id):
 
 def is_artist_never_skipped(artist_ids):
     """Check if any of the track's artists are in the never-skip list."""
-    if not NEVER_SKIP_ARTIST_IDS_SET:
+    if not config.NEVER_SKIP_ARTIST_IDS_SET:
         return False
-    return any(artist_id in NEVER_SKIP_ARTIST_IDS_SET for artist_id in artist_ids)
+    return any(artist_id in config.NEVER_SKIP_ARTIST_IDS_SET for artist_id in artist_ids)
 
 
 def get_artist_names_from_ids(artist_ids):
