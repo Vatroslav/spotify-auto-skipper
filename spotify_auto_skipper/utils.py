@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import threading
@@ -24,46 +25,100 @@ def resource_path(relative_path):
 
 def get_appdata_dir():
     """Returns %APPDATA%/SpotifyAutoSkipper, creates if needed.
-    Always used for key.bin (encryption key stays local for security)."""
+    Always used for key.bin and paths.json (stay local for security)."""
     appdata = os.environ.get("APPDATA", os.path.expanduser("~"))
     path = os.path.join(appdata, "SpotifyAutoSkipper")
     os.makedirs(path, exist_ok=True)
     return path
 
 
-# Cached config directory (set once at startup)
-_config_dir = None
+# -----------------------------------------------------------------
+# paths.json — stored in %APPDATA%, points to config & log dirs
+# -----------------------------------------------------------------
 
+_PATHS_FILE = None  # lazy-init
+_paths_cache = None
+
+
+def _get_paths_file():
+    global _PATHS_FILE
+    if _PATHS_FILE is None:
+        _PATHS_FILE = os.path.join(get_appdata_dir(), "paths.json")
+    return _PATHS_FILE
+
+
+def _load_paths():
+    """Load paths.json from %APPDATA%. Returns dict with config_dir, log_dir."""
+    global _paths_cache
+    if _paths_cache is not None:
+        return _paths_cache
+
+    paths_file = _get_paths_file()
+    defaults = {
+        "config_dir": get_appdata_dir(),
+        "log_dir": os.path.join(get_appdata_dir(), "logs"),
+    }
+
+    if os.path.exists(paths_file):
+        try:
+            with open(paths_file, "r", encoding="utf-8") as f:
+                stored = json.load(f)
+            defaults.update({k: v for k, v in stored.items() if v})
+        except (json.JSONDecodeError, OSError):
+            pass
+    else:
+        # Backward compat: if config.json exists next to exe, use that
+        exe_dir = get_exe_dir()
+        if os.path.exists(os.path.join(exe_dir, "config.json")):
+            defaults["config_dir"] = exe_dir
+
+    _paths_cache = defaults
+    return _paths_cache
+
+
+def _save_paths(paths):
+    """Save paths.json to %APPDATA%."""
+    global _paths_cache
+    _paths_cache = dict(paths)
+    paths_file = _get_paths_file()
+    with open(paths_file, "w", encoding="utf-8") as f:
+        json.dump(paths, f, indent=2)
+
+
+# -----------------------------------------------------------------
+# Public directory getters
+# -----------------------------------------------------------------
 
 def get_config_dir():
-    """Returns the directory where config.json is stored.
-    Priority:
-      1. Next to the .exe / script (portable mode, e.g. Dropbox)
-      2. %APPDATA%/SpotifyAutoSkipper/ (default)
-    """
-    global _config_dir
-    if _config_dir is not None:
-        return _config_dir
-
-    exe_dir = get_exe_dir()
-    if os.path.exists(os.path.join(exe_dir, "config.json")):
-        _config_dir = exe_dir
-    else:
-        _config_dir = get_appdata_dir()
-    return _config_dir
+    """Returns the directory where config.json is stored."""
+    paths = _load_paths()
+    d = paths["config_dir"]
+    os.makedirs(d, exist_ok=True)
+    return d
 
 
-def set_config_dir(path):
-    """Override the config directory (used when moving config)."""
-    global _config_dir
-    os.makedirs(path, exist_ok=True)
-    _config_dir = path
+def get_log_dir():
+    """Returns the directory where log files are stored."""
+    paths = _load_paths()
+    d = paths["log_dir"]
+    os.makedirs(d, exist_ok=True)
+    return d
 
 
-def is_portable_mode():
-    """True if config.json lives next to the exe (not in %APPDATA%)."""
-    return os.path.normcase(os.path.normpath(get_config_dir())) == \
-           os.path.normcase(os.path.normpath(get_exe_dir()))
+def set_config_dir(new_dir):
+    """Change the config directory and persist to paths.json."""
+    os.makedirs(new_dir, exist_ok=True)
+    paths = _load_paths()
+    paths["config_dir"] = new_dir
+    _save_paths(paths)
+
+
+def set_log_dir(new_dir):
+    """Change the log directory and persist to paths.json."""
+    os.makedirs(new_dir, exist_ok=True)
+    paths = _load_paths()
+    paths["log_dir"] = new_dir
+    _save_paths(paths)
 
 
 # -----------------------------------------------------------------

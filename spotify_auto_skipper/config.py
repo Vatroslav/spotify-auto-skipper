@@ -3,7 +3,7 @@ import os
 import configparser
 import threading
 
-from spotify_auto_skipper.utils import get_exe_dir, get_appdata_dir, get_config_dir, set_config_dir, is_portable_mode
+from spotify_auto_skipper.utils import get_exe_dir, get_config_dir, set_config_dir
 from spotify_auto_skipper.encryption import CredentialEncryption
 
 # Default values for all config keys

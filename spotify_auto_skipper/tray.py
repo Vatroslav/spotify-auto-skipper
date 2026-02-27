@@ -68,8 +68,7 @@ def create_tray_icon():
         print("\U0001f50d Check Now triggered from tray.")
 
     def open_logs(icon, item):
-        logs_path = os.path.join(utils.get_exe_dir(), "logs")
-        os.startfile(logs_path)
+        os.startfile(utils.get_log_dir())
 
     def on_exit(icon, item):
         print("\U0001f6d1 Exit clicked from tray.")

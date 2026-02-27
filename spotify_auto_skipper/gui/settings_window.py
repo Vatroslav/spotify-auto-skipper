@@ -1,10 +1,11 @@
+import os
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 
 from spotify_auto_skipper.config import Config, load_config
 from spotify_auto_skipper.startup import set_startup
-from spotify_auto_skipper.utils import get_config_dir, get_exe_dir, get_appdata_dir, is_portable_mode
-from spotify_auto_skipper.gui.widgets import LabeledEntry, LabeledSpinbox, LabeledCheckbox, ArtistListWidget
+from spotify_auto_skipper.utils import get_config_dir, get_log_dir, set_log_dir
+from spotify_auto_skipper.gui.widgets import LabeledEntry, LabeledSpinbox, LabeledCheckbox, LabeledDirectoryPicker, ArtistListWidget
 
 
 class SettingsWindow:
@@ -162,31 +163,15 @@ class SettingsWindow:
 
         ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=10)
 
-        # Config location
-        lbl = ttk.Label(frame, text="Config Location:", font=("Segoe UI", 10, "bold"))
+        # Storage locations
+        lbl = ttk.Label(frame, text="Storage Locations:", font=("Segoe UI", 10, "bold"))
         lbl.pack(anchor="w", pady=(0, 3))
 
-        self._portable_var = tk.BooleanVar(value=is_portable_mode())
-        portable_check = ttk.Checkbutton(
-            frame,
-            text="Store config next to application (portable / Dropbox)",
-            variable=self._portable_var,
-        )
-        portable_check.pack(anchor="w")
+        self._config_dir_picker = LabeledDirectoryPicker(frame, "Config folder:", self._window)
+        self._config_dir_picker.pack(fill="x", pady=2)
 
-        self._config_path_label = ttk.Label(
-            frame, text=get_config_dir(), foreground="gray",
-            font=("Segoe UI", 8),
-        )
-        self._config_path_label.pack(anchor="w", padx=(20, 0), pady=(2, 0))
-
-        # Update label when checkbox changes
-        def _update_path_preview(*_args):
-            if self._portable_var.get():
-                self._config_path_label.configure(text=get_exe_dir())
-            else:
-                self._config_path_label.configure(text=get_appdata_dir())
-        self._portable_var.trace_add("write", _update_path_preview)
+        self._log_dir_picker = LabeledDirectoryPicker(frame, "Log folder:", self._window)
+        self._log_dir_picker.pack(fill="x", pady=2)
 
     def _build_buttons(self):
         btn_frame = ttk.Frame(self._window)
@@ -209,6 +194,9 @@ class SettingsWindow:
             widget.set(self._cfg.get(key))
         # Load artist list
         self._artist_widget.set(self._cfg.get("never_skip_artists", []))
+        # Load directory pickers
+        self._config_dir_picker.set(get_config_dir())
+        self._log_dir_picker.set(get_log_dir())
 
     def _on_save(self):
         """Validate, save to Config, reload module-level vars, close."""
@@ -241,14 +229,19 @@ class SettingsWindow:
         for key, value in values.items():
             self._cfg.set(key, value)
 
-        # Handle config location change (portable ↔ appdata)
-        want_portable = self._portable_var.get()
-        currently_portable = is_portable_mode()
-        if want_portable != currently_portable:
-            new_dir = get_exe_dir() if want_portable else get_appdata_dir()
-            self._cfg.move_to(new_dir)
+        # Handle config directory change
+        new_config_dir = self._config_dir_picker.get().strip()
+        if new_config_dir and os.path.normcase(os.path.normpath(new_config_dir)) != \
+           os.path.normcase(os.path.normpath(get_config_dir())):
+            self._cfg.move_to(new_config_dir)
         else:
             self._cfg.save()
+
+        # Handle log directory change
+        new_log_dir = self._log_dir_picker.get().strip()
+        if new_log_dir and os.path.normcase(os.path.normpath(new_log_dir)) != \
+           os.path.normcase(os.path.normpath(get_log_dir())):
+            set_log_dir(new_log_dir)
 
         # Sync Windows startup registry with checkbox
         set_startup(values.get("start_with_windows", False))
