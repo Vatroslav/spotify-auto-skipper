@@ -44,7 +44,7 @@ import threading
 
 import builtins # builtins needed to print timestamps with every print
 
-APP_VERSION = "v1.8.1"
+APP_VERSION = "v1.9.0"
 
 # -------------------------------------------------------------
 # SETTINGS FROM config.ini
@@ -248,8 +248,14 @@ def print(*args, **kwargs):
 # -------------------------------------------------------------
 
 should_exit = threading.Event()
+check_now_event = threading.Event()
 skipping_paused = False
 temp_pause_track_id = None  # Track ID for which skipping is temporarily paused
+
+def interruptible_sleep(seconds):
+    """Sleep that can be interrupted by the Check Now tray action."""
+    check_now_event.wait(timeout=seconds)
+    check_now_event.clear()
 
 def create_tray_icon():
     """
@@ -305,6 +311,12 @@ def create_tray_icon():
             print(f"❗ Failed to pause current song: {e}")
         icon.update_menu()
 
+    def check_now(icon, item):
+        global last_checked_track_id
+        last_checked_track_id = None
+        check_now_event.set()
+        print("🔍 Check Now triggered from tray.")
+
     def open_logs(icon, item):
         logs_path = os.path.join(os.path.dirname(getattr(sys, "executable", sys.argv[0])), "logs")
         os.startfile(logs_path)
@@ -322,6 +334,7 @@ def create_tray_icon():
     menu = pystray.Menu(
         pystray.MenuItem(skip_label, toggle_skip),
         pystray.MenuItem("🎵 Don't skip this song", pause_current_song),
+        pystray.MenuItem("🔍 Check Now", check_now),
         pystray.MenuItem("📁 Open Logs", open_logs),
         pystray.MenuItem("❌ Exit", on_exit)
     )
@@ -362,18 +375,22 @@ def refresh_access_token():
     auth_header = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
 
     # POST to the Spotify token endpoint
-    r = requests.post(
-        "https://accounts.spotify.com/api/token",
-        headers={
-            "Authorization": f"Basic {auth_header}",
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-        data={
-            "grant_type": "refresh_token",
-            "refresh_token": REFRESH_TOKEN,
-        },
-        timeout=15,
-    )
+    try:
+        r = requests.post(
+            "https://accounts.spotify.com/api/token",
+            headers={
+                "Authorization": f"Basic {auth_header}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            data={
+                "grant_type": "refresh_token",
+                "refresh_token": REFRESH_TOKEN,
+            },
+            timeout=15,
+        )
+    except requests.RequestException as e:
+        print(f"⚠️ [Spotify] Network error refreshing token: {e}")
+        return
 
     # If something goes wrong (e.g. wrong credentials, expired refresh token...), raise a clear error
     if r.status_code != 200:
@@ -414,14 +431,21 @@ def spotify_get(url, params=None):
     - Implements exponential backoff on rate limiting (HTTP 429).
     """
     for attempt in range(RATE_LIMIT_MAX_RETRIES + 1):
-        token = get_spotify_token()  # Refresh token for each attempt
-        response = requests.get(
-            url,
-            headers={"Authorization": f"Bearer {token}"},
-            params=params or {},
-            timeout=15,
-        )
-        
+        try:
+            token = get_spotify_token()  # Refresh token for each attempt
+            response = requests.get(
+                url,
+                headers={"Authorization": f"Bearer {token}"},
+                params=params or {},
+                timeout=15,
+            )
+        except requests.RequestException as e:
+            print(f"⚠️ [Spotify] GET network error (attempt {attempt + 1}): {e}")
+            if attempt < RATE_LIMIT_MAX_RETRIES:
+                time.sleep(RATE_LIMIT_RETRY_DELAYS[min(attempt, len(RATE_LIMIT_RETRY_DELAYS) - 1)])
+                continue
+            return None
+
         # If rate limited (HTTP 429), wait and retry
         if response.status_code == 429 and attempt < RATE_LIMIT_MAX_RETRIES:
             delay_index = min(attempt, len(RATE_LIMIT_RETRY_DELAYS) - 1)
@@ -433,29 +457,36 @@ def spotify_get(url, params=None):
             print(f"⚠️ [Spotify] Rate limited (429). Waiting {wait_time}s before retry {attempt + 1}/{RATE_LIMIT_MAX_RETRIES}...")
             time.sleep(wait_time)
             continue
-        
+
         return response
-    
+
     return response
 
 
 def spotify_post(url, params=None, data=None):
     """
-    Streamlining POST calls to the Spotify API. 
-    - Use a valid token. 
+    Streamlining POST calls to the Spotify API.
+    - Use a valid token.
     - We don't need 'data' for the skip command, only header and endpoint.
     - Implements exponential backoff on rate limiting (HTTP 429).
     """
     for attempt in range(RATE_LIMIT_MAX_RETRIES + 1):
-        token = get_spotify_token()  # Refresh token for each attempt
-        response = requests.post(
-            url,
-            headers={"Authorization": f"Bearer {token}"},
-            params=params or {},
-            data=data or {},
-            timeout=15,
-        )
-        
+        try:
+            token = get_spotify_token()  # Refresh token for each attempt
+            response = requests.post(
+                url,
+                headers={"Authorization": f"Bearer {token}"},
+                params=params or {},
+                data=data or {},
+                timeout=15,
+            )
+        except requests.RequestException as e:
+            print(f"⚠️ [Spotify] POST network error (attempt {attempt + 1}): {e}")
+            if attempt < RATE_LIMIT_MAX_RETRIES:
+                time.sleep(RATE_LIMIT_RETRY_DELAYS[min(attempt, len(RATE_LIMIT_RETRY_DELAYS) - 1)])
+                continue
+            return None
+
         # If rate limited (HTTP 429), wait and retry
         if response.status_code == 429 and attempt < RATE_LIMIT_MAX_RETRIES:
             delay_index = min(attempt, len(RATE_LIMIT_RETRY_DELAYS) - 1)
@@ -467,9 +498,9 @@ def spotify_post(url, params=None, data=None):
             print(f"⚠️ [Spotify] Rate limited (429). Waiting {wait_time}s before retry {attempt + 1}/{RATE_LIMIT_MAX_RETRIES}...")
             time.sleep(wait_time)
             continue
-        
+
         return response
-    
+
     return response
 
 def spotify_put(url, params=None, data=None):
@@ -478,15 +509,22 @@ def spotify_put(url, params=None, data=None):
     - Implements exponential backoff on rate limiting (HTTP 429).
     """
     for attempt in range(RATE_LIMIT_MAX_RETRIES + 1):
-        token = get_spotify_token()  # Refresh token for each attempt
-        response = requests.put(
-            url,
-            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-            params=params or {},
-            json=data or {},
-            timeout=15,
-        )
-        
+        try:
+            token = get_spotify_token()  # Refresh token for each attempt
+            response = requests.put(
+                url,
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                params=params or {},
+                json=data or {},
+                timeout=15,
+            )
+        except requests.RequestException as e:
+            print(f"⚠️ [Spotify] PUT network error (attempt {attempt + 1}): {e}")
+            if attempt < RATE_LIMIT_MAX_RETRIES:
+                time.sleep(RATE_LIMIT_RETRY_DELAYS[min(attempt, len(RATE_LIMIT_RETRY_DELAYS) - 1)])
+                continue
+            return None
+
         # If rate limited (HTTP 429), wait and retry
         if response.status_code == 429 and attempt < RATE_LIMIT_MAX_RETRIES:
             delay_index = min(attempt, len(RATE_LIMIT_RETRY_DELAYS) - 1)
@@ -498,9 +536,9 @@ def spotify_put(url, params=None, data=None):
             print(f"⚠️ [Spotify] Rate limited (429). Waiting {wait_time}s before retry {attempt + 1}/{RATE_LIMIT_MAX_RETRIES}...")
             time.sleep(wait_time)
             continue
-        
+
         return response
-    
+
     return response
 
 # -------------------------------------------------------------
@@ -521,6 +559,8 @@ def get_current_track():
     """
 
     r = spotify_get("https://api.spotify.com/v1/me/player/currently-playing")
+    if r is None:
+        return None
 
     # 204 = nothing is playing, 200 = there is content
     if r.status_code == 204:
@@ -554,23 +594,25 @@ def skip_current_track():
     Assumption: you have an active device (desktop app, mobile, web player).
     """
     r = spotify_post("https://api.spotify.com/v1/me/player/next")
+    if r is None:
+        print("⚠️ [Spotify] Skip failed (network error)")
+        return
     if r.status_code not in (200, 202, 204):
         # 204 is a common success; 202 sometimes means "accepted"; 200 is returned by the web player
         print(f"⚠️ [Spotify] Skip failed (HTTP {r.status_code}): {r.text}")
-        
+
 def is_spotify_paused():
     r = spotify_get("https://api.spotify.com/v1/me/player")
-    if r.status_code != 200:
+    if r is None or r.status_code != 200:
         return False
     data = r.json() or {}
     return not data.get("is_playing", True)
     
 def pause_spotify_playback():
-    r = requests.put(
-        "https://api.spotify.com/v1/me/player/pause",
-        headers={"Authorization": f"Bearer {get_spotify_token()}"},
-        timeout=10,
-    )
+    r = spotify_put("https://api.spotify.com/v1/me/player/pause")
+    if r is None:
+        print("⚠️ [Spotify] Failed to pause after skip (network error)")
+        return
     if r.status_code not in (200, 202, 204):
         print(f"⚠️ [Spotify] Failed to pause after skip (HTTP {r.status_code}): {r.text}")
 
@@ -579,8 +621,8 @@ def restart_playlist():
     try:
         # Get current context (playlist URI)
         r = spotify_get("https://api.spotify.com/v1/me/player/currently-playing")
-        if r.status_code != 200:
-            print(f"⚠️ [Spotify] Cannot get current playback context (HTTP {r.status_code})")
+        if r is None or r.status_code != 200:
+            print(f"⚠️ [Spotify] Cannot get current playback context")
             return
         data = r.json()
         context = data.get("context", {})
@@ -628,7 +670,7 @@ def is_track_liked(track_id):
     """
     try:
         r = spotify_get("https://api.spotify.com/v1/me/library/contains", params={"ids": f"spotify:track:{track_id}"})
-        if r.status_code != 200:
+        if r is None or r.status_code != 200:
             print(f"⚠️ [Spotify] Failed to check liked status (HTTP {r.status_code}): {r.text}")
             return False
         
@@ -723,7 +765,7 @@ def get_last_play_date(artist, track):
         if uts:
             try:
                 return datetime.fromtimestamp(int(uts), tz=timezone.utc)
-            except ValueError:
+            except (ValueError, OSError):
                 return None
 
     # If it's a single object (less common), try the same
@@ -732,8 +774,8 @@ def get_last_play_date(artist, track):
         uts = date_obj.get("uts")
         if uts:
             try:
-                return datetime.utcfromtimestamp(int(uts))
-            except ValueError:
+                return datetime.fromtimestamp(int(uts), tz=timezone.utc)
+            except (ValueError, OSError):
                 return None
 
     return None
@@ -791,13 +833,13 @@ def main_loop():
             # Manual pause from the tray
             if skipping_paused:
                 print("⏸️ Skipping manually paused via tray.")
-                time.sleep(POLL_INTERVAL_SECONDS)
+                interruptible_sleep(POLL_INTERVAL_SECONDS)
                 continue
 
             # Remote Dropbox toggle
             if not is_skipping_enabled():
                 print("🚫 Remote control: skipping temporarily disabled.")
-                time.sleep(POLL_INTERVAL_SECONDS)
+                interruptible_sleep(POLL_INTERVAL_SECONDS)
                 continue
             
             track = get_current_track()
@@ -805,18 +847,18 @@ def main_loop():
             # If nothing plays or there is no valid data — skip
             if not track or not track.get('artist') or not track.get('id'):
                 print("🎧 Nothing is playing right now.")
-                time.sleep(POLL_INTERVAL_SECONDS)
+                interruptible_sleep(POLL_INTERVAL_SECONDS)
                 continue
 
             # If nothing is playing at the moment (pause, stop, silence) – just take a nap and continue
             if not track['artist'] or not track['id']:
-                time.sleep(POLL_INTERVAL_SECONDS)
+                interruptible_sleep(POLL_INTERVAL_SECONDS)
                 continue
 
             # Skip if it's the same song as last time
             if track['id'] == last_checked_track_id:
                 print(f"⏸️ Same song as last time ({track['name']}) — skipping the check.")
-                time.sleep(POLL_INTERVAL_SECONDS)
+                interruptible_sleep(POLL_INTERVAL_SECONDS)
                 continue
 
             # If it's a new song, remember the ID
@@ -833,7 +875,7 @@ def main_loop():
             # Check if skipping is temporarily paused for this specific song
             if temp_pause_track_id == track['id']:
                 print(f"⏸️ Skipping is temporarily paused for this song")
-                time.sleep(POLL_INTERVAL_SECONDS)
+                interruptible_sleep(POLL_INTERVAL_SECONDS)
                 continue
 
             # Get the latest scrobble date from Last.fm
@@ -893,10 +935,10 @@ def main_loop():
         except Exception as e:
             # Any unexpected error: print and continue after a short sleep
             print(f"❗ Unexpected error: {e}")
-            time.sleep(POLL_INTERVAL_SECONDS)
+            interruptible_sleep(POLL_INTERVAL_SECONDS)
 
         # Standard pause between check cycles
-        time.sleep(POLL_INTERVAL_SECONDS)
+        interruptible_sleep(POLL_INTERVAL_SECONDS)
 
 # -------------------------------------------------------------
 # Entry point: start the main loop
