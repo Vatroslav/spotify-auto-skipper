@@ -61,10 +61,20 @@ class LabeledCheckbox(ttk.Frame):
 class ArtistListWidget(ttk.Frame):
     """
     Widget for managing never-skip artists.
-    Shows a list of artist names with X buttons for removal.
+    Displays artists as Material-style chips in a flowing layout.
     Has a search field + Add button to search Spotify and add artists.
-    Data model: list of {"id": str, "name": str} dicts.
+    Data model: list of {"id": str, "name": str} dicts, sorted alphabetically.
     """
+
+    # Chip style constants
+    _CHIP_BG = "#e8e8e8"
+    _CHIP_FG = "#333333"
+    _CHIP_X_FG = "#666666"
+    _CHIP_X_HOVER = "#cc0000"
+    _CHIP_FONT = ("Segoe UI", 9)
+    _CHIP_X_FONT = ("Segoe UI", 8, "bold")
+    _CHIP_PADX = 6
+    _CHIP_PADY = 3
 
     def __init__(self, parent, search_fn=None, **kwargs):
         """
@@ -75,23 +85,25 @@ class ArtistListWidget(ttk.Frame):
         self._artists = []  # list of {"id": str, "name": str}
         self._search_fn = search_fn
 
-        # --- Artist list (scrollable) ---
+        # --- Chip area (scrollable Text widget for flow layout) ---
         list_frame = ttk.Frame(self)
         list_frame.pack(fill="both", expand=True)
 
-        self._canvas = tk.Canvas(list_frame, height=100, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=self._canvas.yview)
-        self._inner_frame = ttk.Frame(self._canvas)
-
-        self._inner_frame.bind(
-            "<Configure>",
-            lambda e: self._canvas.configure(scrollregion=self._canvas.bbox("all"))
+        self._text = tk.Text(
+            list_frame, height=5, wrap="word", cursor="arrow",
+            state="disabled", relief="sunken", borderwidth=1,
+            background="#fafafa", highlightthickness=0,
         )
-        self._canvas.create_window((0, 0), window=self._inner_frame, anchor="nw")
-        self._canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=self._text.yview)
+        self._text.configure(yscrollcommand=scrollbar.set)
 
-        self._canvas.pack(side="left", fill="both", expand=True)
+        self._text.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+
+        # Mouse-wheel scrolling
+        self._text.bind("<MouseWheel>", self._on_mousewheel)
+        self._text.bind("<Enter>", self._bind_global_mousewheel)
+        self._text.bind("<Leave>", self._unbind_global_mousewheel)
 
         # --- Search bar ---
         search_frame = ttk.Frame(self)
@@ -108,46 +120,111 @@ class ArtistListWidget(ttk.Frame):
         # --- Search results popup (Listbox) ---
         self._results_popup = None
 
+    # ----------------------------------------------------------
+    # Mouse-wheel scrolling
+    # ----------------------------------------------------------
+
+    def _on_mousewheel(self, event):
+        self._text.yview_scroll(-1 * (event.delta // 120), "units")
+        return "break"
+
+    def _bind_global_mousewheel(self, event):
+        self._text.bind_all("<MouseWheel>", self._on_mousewheel)
+
+    def _unbind_global_mousewheel(self, event):
+        self._text.unbind_all("<MouseWheel>")
+
+    # ----------------------------------------------------------
+    # Data access
+    # ----------------------------------------------------------
+
     def get(self):
-        """Return the list of {"id", "name"} dicts."""
+        """Return the list of {"id", "name"} dicts (sorted alphabetically)."""
         return list(self._artists)
 
     def set(self, artists):
         """Load a list of {"id", "name"} dicts."""
         self._artists = list(artists) if artists else []
-        self._rebuild_list()
+        self._sort_artists()
+        self._rebuild_chips()
 
-    def _rebuild_list(self):
-        """Redraw the artist list."""
-        for child in self._inner_frame.winfo_children():
-            child.destroy()
+    def _sort_artists(self):
+        """Sort artists alphabetically by name (case-insensitive)."""
+        self._artists.sort(
+            key=lambda a: (a.get("name") or a.get("id", "")).lower()
+        )
+
+    # ----------------------------------------------------------
+    # Chip rendering
+    # ----------------------------------------------------------
+
+    def _rebuild_chips(self):
+        """Redraw all artist chips in a flowing layout."""
+        self._text.configure(state="normal")
+        self._text.delete("1.0", "end")
 
         if not self._artists:
-            ttk.Label(self._inner_frame, text="No artists added", foreground="gray").pack(anchor="w")
+            self._text.insert("1.0", "  No artists added")
+            self._text.configure(state="disabled", foreground="gray")
             return
 
+        self._text.configure(foreground=self._CHIP_FG)
+
         for i, artist in enumerate(self._artists):
-            row = ttk.Frame(self._inner_frame)
-            row.pack(fill="x", pady=1)
+            chip = self._create_chip(artist, i)
+            self._text.window_create("end", window=chip, padx=3, pady=3)
 
-            name = artist.get("name") or artist.get("id", "Unknown")
-            ttk.Label(row, text=name).pack(side="left", padx=(5, 0))
+        self._text.configure(state="disabled")
 
-            # Show ID in parentheses if name is available (for transparency)
-            if artist.get("name") and artist.get("id"):
-                id_short = artist["id"][:8] + "..."
-                ttk.Label(row, text=f"({id_short})", foreground="gray").pack(side="left", padx=(5, 0))
+    def _create_chip(self, artist, index):
+        """Create a single chip widget for an artist."""
+        name = artist.get("name") or artist.get("id", "Unknown")
 
-            remove_btn = ttk.Button(
-                row, text="\u2715", width=3,
-                command=lambda idx=i: self._remove_artist(idx)
-            )
-            remove_btn.pack(side="right", padx=(5, 0))
+        chip = tk.Frame(
+            self._text, background=self._CHIP_BG,
+            padx=self._CHIP_PADX, pady=self._CHIP_PADY,
+        )
+
+        label = tk.Label(
+            chip, text=name, background=self._CHIP_BG,
+            foreground=self._CHIP_FG, font=self._CHIP_FONT,
+            cursor="arrow",
+        )
+        label.pack(side="left", padx=(2, 4))
+
+        x_btn = tk.Label(
+            chip, text="\u2715", background=self._CHIP_BG,
+            foreground=self._CHIP_X_FG, font=self._CHIP_X_FONT,
+            cursor="hand2",
+        )
+        x_btn.pack(side="left", padx=(0, 2))
+
+        # Hover effect on X button
+        x_btn.bind("<Enter>", lambda e: x_btn.configure(foreground=self._CHIP_X_HOVER))
+        x_btn.bind("<Leave>", lambda e: x_btn.configure(foreground=self._CHIP_X_FG))
+        x_btn.bind("<Button-1>", lambda e, idx=index: self._remove_artist(idx))
+
+        # Forward mouse wheel from chip elements to the text widget
+        for w in (chip, label, x_btn):
+            w.bind("<MouseWheel>", self._on_mousewheel)
+
+        return chip
+
+    # ----------------------------------------------------------
+    # Add / Remove
+    # ----------------------------------------------------------
 
     def _remove_artist(self, index):
         if 0 <= index < len(self._artists):
             self._artists.pop(index)
-            self._rebuild_list()
+            self._rebuild_chips()
+
+    def _add_artist(self, artist):
+        """Add an artist (if not duplicate), sort, and rebuild."""
+        if not any(a["id"] == artist["id"] for a in self._artists):
+            self._artists.append(artist)
+            self._sort_artists()
+            self._rebuild_chips()
 
     def _on_search(self):
         query = self._search_var.get().strip()
@@ -183,11 +260,7 @@ class ArtistListWidget(ttk.Frame):
         def on_select():
             sel = listbox.curselection()
             if sel:
-                chosen = results[sel[0]]
-                # Don't add duplicates
-                if not any(a["id"] == chosen["id"] for a in self._artists):
-                    self._artists.append(chosen)
-                    self._rebuild_list()
+                self._add_artist(results[sel[0]])
             self._close_results()
             self._search_var.set("")
 
