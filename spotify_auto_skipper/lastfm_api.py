@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 import requests
 
-from spotify_auto_skipper.config import LASTFM_USER, LASTFM_API_KEY
+from spotify_auto_skipper import config
 
 
 def get_last_play_date(artist, track):
@@ -15,10 +15,10 @@ def get_last_play_date(artist, track):
             "https://ws.audioscrobbler.com/2.0/",
             params={
                 "method": "user.gettrackscrobbles",
-                "user": LASTFM_USER,
+                "user": config.LASTFM_USER,
                 "artist": artist,
                 "track": track,
-                "api_key": LASTFM_API_KEY,
+                "api_key": config.LASTFM_API_KEY,
                 "format": "json",
                 "limit": 1,
             },

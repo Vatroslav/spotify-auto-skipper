@@ -7,12 +7,8 @@ from datetime import datetime, timedelta, timezone
 
 from spotify_auto_skipper import APP_VERSION
 from spotify_auto_skipper import utils
-from spotify_auto_skipper.config import (
-    SKIP_WINDOW_DAYS, POLL_INTERVAL_SECONDS,
-    ENABLE_RESTART_PATTERN, RESTART_PATTERN_SONG_COUNT, RESTART_PATTERN_DAY_DIFF,
-    ALWAYS_PLAY_LIKED_SONGS, NEVER_SKIP_ARTIST_IDS_LIST,
-    LOG_RETENTION_DAYS,
-)
+from spotify_auto_skipper import config
+from spotify_auto_skipper.config import load_config
 from spotify_auto_skipper.spotify_api import (
     get_spotify_token, get_current_track, skip_current_track,
     is_spotify_paused, pause_spotify_playback, restart_playlist,
@@ -23,7 +19,7 @@ from spotify_auto_skipper.lastfm_api import get_last_play_date
 from spotify_auto_skipper.tray import create_tray_icon
 
 
-# Module-level refs set by setup_logging()
+# Module-level refs set by _setup_logging()
 _original_print = None
 _log_file = None
 _log_dir = None
@@ -89,9 +85,9 @@ def _setup_logging():
 
 
 def _purge_old_logs():
-    """Delete log files older than LOG_RETENTION_DAYS."""
+    """Delete log files older than configured retention days."""
     try:
-        cutoff_date = datetime.now() - timedelta(days=LOG_RETENTION_DAYS)
+        cutoff_date = datetime.now() - timedelta(days=config.LOG_RETENTION_DAYS)
         deleted_files = []
 
         for filename in os.listdir(_log_dir):
@@ -123,7 +119,7 @@ def _print_startup_header():
     """Print the startup header and purge results."""
     deleted_count, deleted_files = _purge_old_logs()
     if deleted_count > 0:
-        print(f"\U0001f5d1\ufe0f Purged {deleted_count} old log file(s) (older than {LOG_RETENTION_DAYS} days)")
+        print(f"\U0001f5d1\ufe0f Purged {deleted_count} old log file(s) (older than {config.LOG_RETENTION_DAYS} days)")
         for filename in deleted_files:
             print(f"   - Deleted: {filename}")
 
@@ -148,24 +144,24 @@ def main_loop():
 
     # Log configuration
     print("\U0001f680 Auto-skipper enabled. Here's the configuration:")
-    print(f"   \u2022 Skipping songs that have been listened to in the last {SKIP_WINDOW_DAYS} days.")
-    print(f"   \u2022 Retrieving the currently playing song every {POLL_INTERVAL_SECONDS} seconds.")
+    print(f"   \u2022 Skipping songs that have been listened to in the last {config.SKIP_WINDOW_DAYS} days.")
+    print(f"   \u2022 Retrieving the currently playing song every {config.POLL_INTERVAL_SECONDS} seconds.")
 
-    if ALWAYS_PLAY_LIKED_SONGS:
+    if config.ALWAYS_PLAY_LIKED_SONGS:
         print("   \u2022 Will always play liked songs.")
     else:
         print("   \u2022 Will skip liked songs if they were played within the skip window.")
 
-    if ENABLE_RESTART_PATTERN:
-        print(f"   \u2022 Will restart the playlist if a repeated pattern is detected ({RESTART_PATTERN_SONG_COUNT} skips within \u00b1{RESTART_PATTERN_DAY_DIFF} days).")
+    if config.ENABLE_RESTART_PATTERN:
+        print(f"   \u2022 Will restart the playlist if a repeated pattern is detected ({config.RESTART_PATTERN_SONG_COUNT} skips within \u00b1{config.RESTART_PATTERN_DAY_DIFF} days).")
     else:
         print("   \u2022 Won't restart the playlist if a repeated pattern is detected.")
 
     _original_print("")
 
-    if NEVER_SKIP_ARTIST_IDS_LIST:
+    if config.NEVER_SKIP_ARTIST_IDS_LIST:
         print("   \u2022 The following artists will never be skipped:")
-        artist_names = get_artist_names_from_ids(NEVER_SKIP_ARTIST_IDS_LIST)
+        artist_names = get_artist_names_from_ids(config.NEVER_SKIP_ARTIST_IDS_LIST)
         for name in artist_names:
             print(f"     - {name}")
     else:
@@ -178,13 +174,13 @@ def main_loop():
             # Manual pause from the tray
             if utils.skipping_paused:
                 print("\u23f8\ufe0f Skipping manually paused via tray.")
-                utils.interruptible_sleep(POLL_INTERVAL_SECONDS)
+                utils.interruptible_sleep(config.POLL_INTERVAL_SECONDS)
                 continue
 
             # Remote Dropbox toggle
             if not is_skipping_enabled():
                 print("\U0001f6ab Remote control: skipping temporarily disabled.")
-                utils.interruptible_sleep(POLL_INTERVAL_SECONDS)
+                utils.interruptible_sleep(config.POLL_INTERVAL_SECONDS)
                 continue
 
             track = get_current_track()
@@ -192,17 +188,17 @@ def main_loop():
             # Nothing playing or invalid data
             if not track or not track.get('artist') or not track.get('id'):
                 print("\U0001f3a7 Nothing is playing right now.")
-                utils.interruptible_sleep(POLL_INTERVAL_SECONDS)
+                utils.interruptible_sleep(config.POLL_INTERVAL_SECONDS)
                 continue
 
             if not track['artist'] or not track['id']:
-                utils.interruptible_sleep(POLL_INTERVAL_SECONDS)
+                utils.interruptible_sleep(config.POLL_INTERVAL_SECONDS)
                 continue
 
             # Same song as last time
             if track['id'] == utils.last_checked_track_id:
                 print(f"\u23f8\ufe0f Same song as last time ({track['name']}) \u2014 skipping the check.")
-                utils.interruptible_sleep(POLL_INTERVAL_SECONDS)
+                utils.interruptible_sleep(config.POLL_INTERVAL_SECONDS)
                 continue
 
             # New song — remember it
@@ -219,7 +215,7 @@ def main_loop():
             # Temporarily paused for this specific song
             if utils.temp_pause_track_id == track['id']:
                 print("\u23f8\ufe0f Skipping is temporarily paused for this song")
-                utils.interruptible_sleep(POLL_INTERVAL_SECONDS)
+                utils.interruptible_sleep(config.POLL_INTERVAL_SECONDS)
                 continue
 
             # Get latest scrobble date from Last.fm
@@ -228,13 +224,13 @@ def main_loop():
                 days_since = (datetime.now(timezone.utc) - last_played).days
                 print(f"\u2139\ufe0f Last scrobble: {last_played.strftime('%Y-%m-%d')} - {days_since} days ago")
 
-                cutoff = datetime.now(timezone.utc) - timedelta(days=SKIP_WINDOW_DAYS)
+                cutoff = datetime.now(timezone.utc) - timedelta(days=config.SKIP_WINDOW_DAYS)
                 if last_played > cutoff:
                     # Check never-skip list
                     if is_artist_never_skipped(track.get('artist_ids', [])):
                         print("\U0001f3a4 Artist is in never-skip list \u2014 not skipping")
                     # Check liked songs
-                    elif ALWAYS_PLAY_LIKED_SONGS and is_track_liked(track['id']):
+                    elif config.ALWAYS_PLAY_LIKED_SONGS and is_track_liked(track['id']):
                         print("\U0001f49a Track is in Liked Songs \u2014 not skipping")
                     else:
                         print(f"\u23ed\ufe0f Already listened to {days_since} days ago \u2014 skipping")
@@ -245,16 +241,16 @@ def main_loop():
                             pause_spotify_playback()
 
                         # Track recent skip patterns
-                        if ENABLE_RESTART_PATTERN:
+                        if config.ENABLE_RESTART_PATTERN:
                             recent_skip_days.append(days_since)
-                            if len(recent_skip_days) > RESTART_PATTERN_SONG_COUNT:
+                            if len(recent_skip_days) > config.RESTART_PATTERN_SONG_COUNT:
                                 recent_skip_days.pop(0)
 
                             if (
-                                len(recent_skip_days) == RESTART_PATTERN_SONG_COUNT
-                                and max(recent_skip_days) - min(recent_skip_days) <= RESTART_PATTERN_DAY_DIFF
+                                len(recent_skip_days) == config.RESTART_PATTERN_SONG_COUNT
+                                and max(recent_skip_days) - min(recent_skip_days) <= config.RESTART_PATTERN_DAY_DIFF
                             ):
-                                print(f"\u26a0\ufe0f Detected repeating pattern ({RESTART_PATTERN_SONG_COUNT} skips within \u00b1{RESTART_PATTERN_DAY_DIFF} day) \u2014 restarting playlist...")
+                                print(f"\u26a0\ufe0f Detected repeating pattern ({config.RESTART_PATTERN_SONG_COUNT} skips within \u00b1{config.RESTART_PATTERN_DAY_DIFF} day) \u2014 restarting playlist...")
                                 restart_playlist()
                                 recent_skip_days.clear()
 
@@ -271,10 +267,10 @@ def main_loop():
             break
         except Exception as e:
             print(f"\u2757 Unexpected error: {e}")
-            utils.interruptible_sleep(POLL_INTERVAL_SECONDS)
+            utils.interruptible_sleep(config.POLL_INTERVAL_SECONDS)
 
         # Standard pause between check cycles
-        utils.interruptible_sleep(POLL_INTERVAL_SECONDS)
+        utils.interruptible_sleep(config.POLL_INTERVAL_SECONDS)
 
 
 # -----------------------------------------------------------------
@@ -284,6 +280,13 @@ def main_loop():
 def main():
     _mutex = _check_single_instance()
     _setup_logging()
+    load_config()
+
+    # Log migration message now that logging is set up (UTF-8 safe)
+    cfg = config.Config()
+    if getattr(cfg, '_migrated', False):
+        print(f"\U0001f4e6 Migrated config from config.ini to {cfg.json_path}")
+
     _print_startup_header()
 
     create_tray_icon()

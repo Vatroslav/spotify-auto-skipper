@@ -2,6 +2,8 @@
 *.exe
 
 config.ini
+config.json
+key.bin
 
 /build/
 /dist/
