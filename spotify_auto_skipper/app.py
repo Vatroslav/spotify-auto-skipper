@@ -333,6 +333,8 @@ def _idle_loop():
                 root.mainloop()
             except Exception as e:
                 print(f"\u2757 Error opening settings: {e}")
+            # Drain any clicks that arrived while the window was open
+            open_settings_event.clear()
 
 
 def main():
