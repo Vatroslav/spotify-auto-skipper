@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from spotify_auto_skipper.config import Config, load_config
+from spotify_auto_skipper.startup import set_startup
 from spotify_auto_skipper.gui.widgets import LabeledEntry, LabeledSpinbox, LabeledCheckbox
 
 
@@ -214,6 +215,9 @@ class SettingsWindow:
         for key, value in values.items():
             self._cfg.set(key, value)
         self._cfg.save()
+
+        # Sync Windows startup registry with checkbox
+        set_startup(values.get("start_with_windows", False))
 
         # Reload module-level variables so the running app picks up changes
         load_config()
