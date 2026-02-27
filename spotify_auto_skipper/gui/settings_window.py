@@ -1,4 +1,5 @@
 import os
+import sys
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
@@ -183,6 +184,9 @@ class SettingsWindow:
         ttk.Button(btn_frame, text="Cancel", command=self._on_cancel).pack(
             side="right"
         )
+        ttk.Button(btn_frame, text="Exit App", command=self._on_exit_app).pack(
+            side="left"
+        )
 
     # ----------------------------------------------------------
     # Load / Save
@@ -251,6 +255,18 @@ class SettingsWindow:
 
         print("\u2705 Settings saved.")
         self._close()
+
+    def _on_exit_app(self):
+        """Close settings and terminate the entire application."""
+        if messagebox.askyesno(
+            "Exit App",
+            "Are you sure you want to exit Spotify Auto-Skipper?",
+            parent=self._window,
+        ):
+            self._close()
+            print("\U0001f6d1 Exit requested from Settings window.")
+            sys.stdout.flush()
+            os._exit(0)
 
     def _on_cancel(self):
         self._close()
