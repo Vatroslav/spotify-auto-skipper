@@ -279,11 +279,18 @@ def main_loop():
 
 def main():
     _mutex = _check_single_instance()
+
+    # First-run wizard (before logging, needs console stdout for tkinter)
+    cfg = config.Config()
+    if not cfg.exists():
+        from spotify_auto_skipper.gui.setup_wizard import SetupWizard
+        wizard = SetupWizard()
+        wizard.run()  # Blocks until complete or exits if cancelled
+
     _setup_logging()
     load_config()
 
     # Log migration message now that logging is set up (UTF-8 safe)
-    cfg = config.Config()
     if getattr(cfg, '_migrated', False):
         print(f"\U0001f4e6 Migrated config from config.ini to {cfg.json_path}")
 
