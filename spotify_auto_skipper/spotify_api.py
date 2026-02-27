@@ -328,3 +328,27 @@ def get_artist_names_from_ids(artist_ids):
             artist_names.append(f"Unknown ({artist_id})")
 
     return artist_names
+
+
+def search_artists(query, limit=5):
+    """
+    Search Spotify for artists by name.
+    Returns list of {"id": str, "name": str} dicts.
+    """
+    if not query or not query.strip():
+        return []
+
+    get_spotify_token()
+
+    try:
+        r = spotify_get(
+            "https://api.spotify.com/v1/search",
+            params={"q": query, "type": "artist", "limit": limit},
+        )
+        if r is None or r.status_code != 200:
+            return []
+        data = r.json()
+        artists = data.get("artists", {}).get("items", [])
+        return [{"id": a["id"], "name": a["name"]} for a in artists]
+    except Exception:
+        return []

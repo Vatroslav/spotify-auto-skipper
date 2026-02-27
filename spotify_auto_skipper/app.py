@@ -159,10 +159,10 @@ def main_loop():
 
     _original_print("")
 
-    if config.NEVER_SKIP_ARTIST_IDS_LIST:
+    if config.NEVER_SKIP_ARTISTS:
         print("   \u2022 The following artists will never be skipped:")
-        artist_names = get_artist_names_from_ids(config.NEVER_SKIP_ARTIST_IDS_LIST)
-        for name in artist_names:
+        for artist in config.NEVER_SKIP_ARTISTS:
+            name = artist.get("name") or artist.get("id", "Unknown")
             print(f"     - {name}")
     else:
         print("   \u2022 No artists are configured to never be skipped.")

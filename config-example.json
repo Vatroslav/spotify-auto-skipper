@@ -12,7 +12,7 @@
   "dummy_playlist_id": "your_dummy_playlist_id_here",
   "remote_control_url": "https://dl.dropboxusercontent.com/scl/fi/.../remote_control.txt?rlkey=...",
   "always_play_liked_songs": true,
-  "never_skip_artist_ids": "",
+  "never_skip_artists": [],
   "log_retention_days": 30,
   "start_with_windows": false
 }

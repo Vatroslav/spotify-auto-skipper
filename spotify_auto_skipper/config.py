@@ -21,7 +21,7 @@ CONFIG_DEFAULTS = {
     "dummy_playlist_id": "37i9dQZF1DX0XUsuxWHRQd",
     "remote_control_url": "ON",
     "always_play_liked_songs": True,
-    "never_skip_artist_ids": "",
+    "never_skip_artists": [],
     "log_retention_days": 30,
     "start_with_windows": False,
 }
@@ -44,7 +44,7 @@ _INI_TO_JSON_MAP = {
     ("Settings", "dummy_playlist_id"): "dummy_playlist_id",
     ("Settings", "remote_control_url"): "remote_control_url",
     ("Settings", "always_play_liked_songs"): "always_play_liked_songs",
-    ("Settings", "never_skip_artist_ids"): "never_skip_artist_ids",
+    ("Settings", "never_skip_artist_ids"): "never_skip_artist_ids",  # old string, migrated in _enforce_constraints
     ("Settings", "log_retention_days"): "log_retention_days",
 }
 
@@ -134,10 +134,25 @@ class Config:
         self._migrated = True  # Flag for app.py to log after logging is set up
 
     def _enforce_constraints(self):
-        """Enforce minimum/maximum values."""
+        """Enforce minimum/maximum values and data format migrations."""
         self._data["poll_interval_seconds"] = max(5, int(self._data.get("poll_interval_seconds", 120)))
         self._data["skip_window_days"] = max(1, int(self._data.get("skip_window_days", 60)))
         self._data["log_retention_days"] = max(1, int(self._data.get("log_retention_days", 30)))
+
+        # Migrate old "never_skip_artist_ids" string to new "never_skip_artists" list
+        old_val = self._data.pop("never_skip_artist_ids", None)
+        if old_val and isinstance(old_val, str) and old_val.strip():
+            ids = [aid.strip() for aid in old_val.split(",") if aid.strip()]
+            existing = self._data.get("never_skip_artists", [])
+            existing_ids = {a["id"] for a in existing if isinstance(a, dict)}
+            for aid in ids:
+                if aid not in existing_ids:
+                    existing.append({"id": aid, "name": ""})
+            self._data["never_skip_artists"] = existing
+
+        # Ensure never_skip_artists is always a list
+        if not isinstance(self._data.get("never_skip_artists"), list):
+            self._data["never_skip_artists"] = []
 
     def save(self):
         with self._lock:
@@ -186,7 +201,7 @@ RESTART_PATTERN_DAY_DIFF = 2
 DUMMY_PLAYLIST_ID = "37i9dQZF1DX0XUsuxWHRQd"
 REMOTE_CONTROL_URL = "ON"
 ALWAYS_PLAY_LIKED_SONGS = True
-NEVER_SKIP_ARTIST_IDS = ""
+NEVER_SKIP_ARTISTS = []
 LOG_RETENTION_DAYS = 30
 NEVER_SKIP_ARTIST_IDS_LIST = []
 NEVER_SKIP_ARTIST_IDS_SET = set()
@@ -199,7 +214,7 @@ def load_config():
     global SKIP_WINDOW_DAYS, POLL_INTERVAL_SECONDS
     global ENABLE_RESTART_PATTERN, RESTART_PATTERN_SONG_COUNT, RESTART_PATTERN_DAY_DIFF
     global DUMMY_PLAYLIST_ID, REMOTE_CONTROL_URL
-    global ALWAYS_PLAY_LIKED_SONGS, NEVER_SKIP_ARTIST_IDS, LOG_RETENTION_DAYS
+    global ALWAYS_PLAY_LIKED_SONGS, NEVER_SKIP_ARTISTS, LOG_RETENTION_DAYS
     global NEVER_SKIP_ARTIST_IDS_LIST, NEVER_SKIP_ARTIST_IDS_SET
 
     cfg = Config()
@@ -218,13 +233,9 @@ def load_config():
     DUMMY_PLAYLIST_ID = cfg.get("dummy_playlist_id")
     REMOTE_CONTROL_URL = cfg.get("remote_control_url")
     ALWAYS_PLAY_LIKED_SONGS = cfg.get("always_play_liked_songs")
-    NEVER_SKIP_ARTIST_IDS = cfg.get("never_skip_artist_ids")
+    NEVER_SKIP_ARTISTS = cfg.get("never_skip_artists", [])
     LOG_RETENTION_DAYS = cfg.get("log_retention_days")
 
-    # Parse comma-separated artist IDs
-    if NEVER_SKIP_ARTIST_IDS:
-        NEVER_SKIP_ARTIST_IDS_LIST = [aid.strip() for aid in NEVER_SKIP_ARTIST_IDS.split(",") if aid.strip()]
-        NEVER_SKIP_ARTIST_IDS_SET = set(NEVER_SKIP_ARTIST_IDS_LIST)
-    else:
-        NEVER_SKIP_ARTIST_IDS_LIST = []
-        NEVER_SKIP_ARTIST_IDS_SET = set()
+    # Build ID list/set from the artists list
+    NEVER_SKIP_ARTIST_IDS_LIST = [a["id"] for a in NEVER_SKIP_ARTISTS if isinstance(a, dict) and a.get("id")]
+    NEVER_SKIP_ARTIST_IDS_SET = set(NEVER_SKIP_ARTIST_IDS_LIST)
