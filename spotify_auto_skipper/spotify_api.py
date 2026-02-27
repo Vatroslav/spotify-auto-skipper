@@ -330,10 +330,12 @@ def get_artist_names_from_ids(artist_ids):
     return artist_names
 
 
-def search_artists(query, limit=5):
+def search_artists(query, limit=5, offset=0):
     """
     Search Spotify for artists by name.
-    Returns list of {"id": str, "name": str} dicts.
+    Returns list of dicts with keys: id, name, followers, genres, image_url.
+    Extra fields are for display only — only id/name are stored in config.
+    Supports offset for pagination.
     """
     if not query or not query.strip():
         return []
@@ -343,12 +345,24 @@ def search_artists(query, limit=5):
     try:
         r = spotify_get(
             "https://api.spotify.com/v1/search",
-            params={"q": query, "type": "artist", "limit": limit},
+            params={"q": query, "type": "artist", "limit": limit, "offset": offset},
         )
         if r is None or r.status_code != 200:
             return []
         data = r.json()
         artists = data.get("artists", {}).get("items", [])
-        return [{"id": a["id"], "name": a["name"]} for a in artists]
+        results = []
+        for a in artists:
+            # Pick smallest image (usually 160px) for thumbnail use
+            images = a.get("images") or []
+            image_url = images[-1]["url"] if images else ""
+            results.append({
+                "id": a["id"],
+                "name": a["name"],
+                "followers": a.get("followers", {}).get("total", 0),
+                "genres": a.get("genres", []),
+                "image_url": image_url,
+            })
+        return results
     except Exception:
         return []

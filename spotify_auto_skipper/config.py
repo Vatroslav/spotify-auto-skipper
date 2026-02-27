@@ -61,11 +61,16 @@ _BOOL_KEYS = {
 }
 
 
+_CONFIG_FILENAME = "spotify-auto-skipper-config.json"
+_LEGACY_CONFIG_FILENAME = "config.json"
+
+
 class Config:
     """
     Singleton config manager.
-    Loads from JSON in %APPDATA%/SpotifyAutoSkipper/config.json.
+    Loads from JSON in %APPDATA%/SpotifyAutoSkipper/spotify-auto-skipper-config.json.
     Falls back to legacy .ini migration if JSON doesn't exist.
+    Auto-renames old config.json to new name on first load.
     """
     _instance = None
     _lock = threading.RLock()
@@ -80,19 +85,32 @@ class Config:
 
     @property
     def json_path(self):
-        return os.path.join(get_config_dir(), "config.json")
+        return os.path.join(get_config_dir(), _CONFIG_FILENAME)
 
     @property
     def legacy_ini_path(self):
         return os.path.join(get_exe_dir(), "config.ini")
 
+    @property
+    def _legacy_json_path(self):
+        return os.path.join(get_config_dir(), _LEGACY_CONFIG_FILENAME)
+
     def exists(self):
-        """Check if any config file (JSON or legacy .ini) exists."""
-        return os.path.exists(self.json_path) or os.path.exists(self.legacy_ini_path)
+        """Check if any config file (JSON, legacy JSON, or legacy .ini) exists."""
+        return (os.path.exists(self.json_path)
+                or os.path.exists(self._legacy_json_path)
+                or os.path.exists(self.legacy_ini_path))
 
     def load(self):
         """Load config: JSON first, fall back to .ini migration, fall back to defaults."""
         with self._lock:
+            # Auto-rename old config.json → spotify-auto-skipper-config.json
+            if not os.path.exists(self.json_path) and os.path.exists(self._legacy_json_path):
+                try:
+                    os.rename(self._legacy_json_path, self.json_path)
+                except OSError:
+                    pass
+
             if os.path.exists(self.json_path):
                 self._load_json()
             elif os.path.exists(self.legacy_ini_path):
@@ -182,7 +200,7 @@ class Config:
             return dict(self._data)
 
     def move_to(self, new_dir):
-        """Move config.json to a new directory. Returns True on success."""
+        """Move config to a new directory. Returns True on success."""
         with self._lock:
             old_path = self.json_path
             set_config_dir(new_dir)
