@@ -1,5 +1,39 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog
+
+
+class LabeledDirectoryPicker(ttk.Frame):
+    """A label + read-only entry + Browse button for choosing a directory."""
+
+    def __init__(self, parent, label_text, toplevel=None, width=40, **kwargs):
+        super().__init__(parent, **kwargs)
+        self._toplevel = toplevel  # parent window for the dialog
+
+        self.label = ttk.Label(self, text=label_text, width=16, anchor="w")
+        self.label.pack(side="left", padx=(0, 5))
+
+        self.var = tk.StringVar()
+        self.entry = ttk.Entry(self, textvariable=self.var, width=width)
+        self.entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
+
+        self.btn = ttk.Button(self, text="Browse…", width=8, command=self._browse)
+        self.btn.pack(side="right")
+
+    def _browse(self):
+        current = self.var.get()
+        chosen = filedialog.askdirectory(
+            initialdir=current if current else None,
+            title="Select folder",
+            parent=self._toplevel,
+        )
+        if chosen:
+            self.var.set(chosen)
+
+    def get(self):
+        return self.var.get()
+
+    def set(self, value):
+        self.var.set(value if value else "")
 
 
 class LabeledEntry(ttk.Frame):

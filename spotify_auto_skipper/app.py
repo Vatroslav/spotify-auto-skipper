@@ -56,8 +56,7 @@ def _setup_logging():
     """Redirect stdout/stderr to daily log file and install timestamp print."""
     global _original_print, _log_file, _log_dir, _log_filename
 
-    _log_dir = os.path.join(utils.get_exe_dir(), "logs")
-    os.makedirs(_log_dir, exist_ok=True)
+    _log_dir = utils.get_log_dir()
 
     _log_filename = datetime.now().strftime("%Y-%m-%d") + ".txt"
     log_path = os.path.join(_log_dir, _log_filename)
