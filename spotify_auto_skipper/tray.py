@@ -88,7 +88,7 @@ def create_tray_icon():
         pystray.MenuItem(skip_label, toggle_skip),
         pystray.MenuItem("\U0001f3b5 Don't skip this song", pause_current_song),
         pystray.MenuItem("\U0001f50d Check Now", check_now),
-        pystray.MenuItem("\u2699\ufe0f Settings...", open_settings),
+        pystray.MenuItem("\u2699\ufe0f Settings...", open_settings, default=True),
         pystray.MenuItem("\U0001f4c1 Open Logs", open_logs),
         pystray.MenuItem("\u274c Exit", on_exit),
     )

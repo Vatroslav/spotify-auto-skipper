@@ -9,9 +9,9 @@ from spotify_auto_skipper.gui.widgets import LabeledEntry, LabeledSpinbox, Label
 class SettingsWindow:
     """
     Singleton settings window with 3 tabs:
-      - Credentials (Last.fm + Spotify)
       - Settings (skip window, polling, feature toggles)
       - Advanced (dummy playlist, remote control, never-skip artists, autostart)
+      - Credentials (Last.fm + Spotify)
     """
     _instance = None
 
@@ -56,9 +56,9 @@ class SettingsWindow:
         notebook = ttk.Notebook(self._window)
         notebook.pack(padx=10, pady=(10, 0), fill="both", expand=True)
 
-        self._build_credentials_tab(notebook)
         self._build_settings_tab(notebook)
         self._build_advanced_tab(notebook)
+        self._build_credentials_tab(notebook)
 
     def _build_credentials_tab(self, notebook):
         frame = ttk.Frame(notebook, padding=15)
