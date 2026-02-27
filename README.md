@@ -85,6 +85,7 @@ When the app is running:
 
   * **⏯️ Pause Skipping** → pauses ALL skipping (toggle to resume)
   * **🎵 Don't skip this song** → pauses skipping for the current song only (automatically resumes when next song plays)
+  * **🔍 Check Now** → immediately checks the current song instead of waiting for the next poll cycle (useful when starting a new playlist)
   * **📁 Open Logs** → opens the log folder
   * **❌ Exit** → stops the app
 
