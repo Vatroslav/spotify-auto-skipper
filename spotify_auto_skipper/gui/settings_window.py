@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox
 
 from spotify_auto_skipper.config import Config, load_config
 from spotify_auto_skipper.startup import set_startup
+from spotify_auto_skipper.utils import get_config_dir, get_exe_dir, get_appdata_dir, is_portable_mode
 from spotify_auto_skipper.gui.widgets import LabeledEntry, LabeledSpinbox, LabeledCheckbox, ArtistListWidget
 
 
@@ -159,6 +160,34 @@ class SettingsWindow:
         f.pack(fill="x", pady=2)
         self._fields["start_with_windows"] = f
 
+        ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=10)
+
+        # Config location
+        lbl = ttk.Label(frame, text="Config Location:", font=("Segoe UI", 10, "bold"))
+        lbl.pack(anchor="w", pady=(0, 3))
+
+        self._portable_var = tk.BooleanVar(value=is_portable_mode())
+        portable_check = ttk.Checkbutton(
+            frame,
+            text="Store config next to application (portable / Dropbox)",
+            variable=self._portable_var,
+        )
+        portable_check.pack(anchor="w")
+
+        self._config_path_label = ttk.Label(
+            frame, text=get_config_dir(), foreground="gray",
+            font=("Segoe UI", 8),
+        )
+        self._config_path_label.pack(anchor="w", padx=(20, 0), pady=(2, 0))
+
+        # Update label when checkbox changes
+        def _update_path_preview(*_args):
+            if self._portable_var.get():
+                self._config_path_label.configure(text=get_exe_dir())
+            else:
+                self._config_path_label.configure(text=get_appdata_dir())
+        self._portable_var.trace_add("write", _update_path_preview)
+
     def _build_buttons(self):
         btn_frame = ttk.Frame(self._window)
         btn_frame.pack(fill="x", padx=10, pady=10)
@@ -211,7 +240,15 @@ class SettingsWindow:
         # Apply to Config
         for key, value in values.items():
             self._cfg.set(key, value)
-        self._cfg.save()
+
+        # Handle config location change (portable ↔ appdata)
+        want_portable = self._portable_var.get()
+        currently_portable = is_portable_mode()
+        if want_portable != currently_portable:
+            new_dir = get_exe_dir() if want_portable else get_appdata_dir()
+            self._cfg.move_to(new_dir)
+        else:
+            self._cfg.save()
 
         # Sync Windows startup registry with checkbox
         set_startup(values.get("start_with_windows", False))

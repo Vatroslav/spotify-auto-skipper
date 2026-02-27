@@ -23,11 +23,47 @@ def resource_path(relative_path):
 
 
 def get_appdata_dir():
-    """Returns %APPDATA%/SpotifyAutoSkipper, creates if needed."""
+    """Returns %APPDATA%/SpotifyAutoSkipper, creates if needed.
+    Always used for key.bin (encryption key stays local for security)."""
     appdata = os.environ.get("APPDATA", os.path.expanduser("~"))
     path = os.path.join(appdata, "SpotifyAutoSkipper")
     os.makedirs(path, exist_ok=True)
     return path
+
+
+# Cached config directory (set once at startup)
+_config_dir = None
+
+
+def get_config_dir():
+    """Returns the directory where config.json is stored.
+    Priority:
+      1. Next to the .exe / script (portable mode, e.g. Dropbox)
+      2. %APPDATA%/SpotifyAutoSkipper/ (default)
+    """
+    global _config_dir
+    if _config_dir is not None:
+        return _config_dir
+
+    exe_dir = get_exe_dir()
+    if os.path.exists(os.path.join(exe_dir, "config.json")):
+        _config_dir = exe_dir
+    else:
+        _config_dir = get_appdata_dir()
+    return _config_dir
+
+
+def set_config_dir(path):
+    """Override the config directory (used when moving config)."""
+    global _config_dir
+    os.makedirs(path, exist_ok=True)
+    _config_dir = path
+
+
+def is_portable_mode():
+    """True if config.json lives next to the exe (not in %APPDATA%)."""
+    return os.path.normcase(os.path.normpath(get_config_dir())) == \
+           os.path.normcase(os.path.normpath(get_exe_dir()))
 
 
 # -----------------------------------------------------------------

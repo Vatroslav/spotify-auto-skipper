@@ -3,7 +3,7 @@ import os
 import configparser
 import threading
 
-from spotify_auto_skipper.utils import get_exe_dir, get_appdata_dir
+from spotify_auto_skipper.utils import get_exe_dir, get_appdata_dir, get_config_dir, set_config_dir, is_portable_mode
 from spotify_auto_skipper.encryption import CredentialEncryption
 
 # Default values for all config keys
@@ -80,7 +80,7 @@ class Config:
 
     @property
     def json_path(self):
-        return os.path.join(get_appdata_dir(), "config.json")
+        return os.path.join(get_config_dir(), "config.json")
 
     @property
     def legacy_ini_path(self):
@@ -180,6 +180,29 @@ class Config:
     def as_dict(self):
         with self._lock:
             return dict(self._data)
+
+    def move_to(self, new_dir):
+        """Move config.json to a new directory. Returns True on success."""
+        with self._lock:
+            old_path = self.json_path
+            set_config_dir(new_dir)
+            new_path = self.json_path
+
+            if os.path.normcase(os.path.normpath(old_path)) == \
+               os.path.normcase(os.path.normpath(new_path)):
+                return True  # Already there
+
+            # Save to new location
+            self.save()
+
+            # Remove old file
+            try:
+                if os.path.exists(old_path):
+                    os.remove(old_path)
+            except OSError:
+                pass
+
+            return True
 
 
 # -----------------------------------------------------------------
