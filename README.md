@@ -19,7 +19,7 @@ A Windows tray app that automatically skips songs on Spotify that you've already
 * **Encrypted credentials** (Spotify secret, refresh token, Last.fm API key)
 * **Start with Windows** toggle
 * **Never-skip artists** with searchable names instead of raw Spotify IDs
-* Config stored in `%APPDATA%\SpotifyAutoSkipper\config.json`
+* Config stored in `%APPDATA%\SpotifyAutoSkipper\spotify-auto-skipper-config.json`
 
 ---
 
@@ -52,9 +52,7 @@ If you get `Insufficient client scope`, regenerate your refresh token with the c
 
 ## Configuration
 
-Config is stored as JSON in `%APPDATA%\SpotifyAutoSkipper\config.json`. You can edit it through the **Settings GUI** (right-click the tray icon) or manually.
-
-See [`config-example.json`](config-example.json) for the full structure.
+Config is stored as JSON in `%APPDATA%\SpotifyAutoSkipper\spotify-auto-skipper-config.json`. You can edit it through the **Settings GUI** (right-click the tray icon) or manually.
 
 ### Key settings
 

@@ -67,9 +67,10 @@ def _load_paths():
         except (json.JSONDecodeError, OSError):
             pass
     else:
-        # Backward compat: if config.json exists next to exe, use that
+        # Backward compat: if config file exists next to exe, use that (portable mode)
         exe_dir = get_exe_dir()
-        if os.path.exists(os.path.join(exe_dir, "config.json")):
+        if (os.path.exists(os.path.join(exe_dir, "spotify-auto-skipper-config.json"))
+                or os.path.exists(os.path.join(exe_dir, "config.json"))):
             defaults["config_dir"] = exe_dir
 
     _paths_cache = defaults
@@ -90,7 +91,7 @@ def _save_paths(paths):
 # -----------------------------------------------------------------
 
 def get_config_dir():
-    """Returns the directory where config.json is stored."""
+    """Returns the directory where the config file is stored."""
     paths = _load_paths()
     d = paths["config_dir"]
     os.makedirs(d, exist_ok=True)
