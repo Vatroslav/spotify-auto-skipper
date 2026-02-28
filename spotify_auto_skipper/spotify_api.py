@@ -1,6 +1,8 @@
 import time
 import base64
+import re
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import requests
 
 from spotify_auto_skipper import config
@@ -269,13 +271,36 @@ def restart_playlist():
         print(f"\u2757 Failed to restart playlist: {e}")
 
 
+def _normalize_remote_url(url):
+    """Convert Dropbox/Google Drive sharing URLs to direct-download URLs."""
+    parsed = urlparse(url)
+
+    # Dropbox: use raw=1 to get plain-text content instead of HTML preview
+    if parsed.hostname and "dropbox.com" in parsed.hostname:
+        qs = parse_qs(parsed.query, keep_blank_values=True)
+        qs.pop("dl", None)
+        qs["raw"] = ["1"]
+        new_query = urlencode(qs, doseq=True)
+        return urlunparse(parsed._replace(query=new_query))
+
+    # Google Drive: convert /file/d/ID/... to /uc?export=download&id=ID
+    if parsed.hostname and "drive.google.com" in parsed.hostname:
+        m = re.search(r"/file/d/([^/]+)", parsed.path)
+        if m:
+            file_id = m.group(1)
+            return f"https://drive.google.com/uc?export=download&id={file_id}"
+
+    return url
+
+
 def is_skipping_enabled():
     """Checks the Dropbox remote_control.txt file; returns True if ON."""
     if not config.REMOTE_CONTROL_URL:
         print("\u26a0\ufe0f [Remote Control] No REMOTE_CONTROL_URL set.")
         return True
     try:
-        r = requests.get(config.REMOTE_CONTROL_URL, timeout=10)
+        url = _normalize_remote_url(config.REMOTE_CONTROL_URL)
+        r = requests.get(url, timeout=10)
         first_line = r.text.strip().splitlines()[0].strip().lower()
         return first_line == "on"
     except Exception as e:
