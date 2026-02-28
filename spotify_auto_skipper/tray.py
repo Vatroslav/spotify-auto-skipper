@@ -2,11 +2,12 @@ import os
 import sys
 import threading
 
-from PIL import Image, ImageDraw
+from PIL import Image
 import pystray
 
 from spotify_auto_skipper import utils
 from spotify_auto_skipper import APP_VERSION
+from spotify_auto_skipper.utils import resource_path
 from spotify_auto_skipper.spotify_api import get_current_track
 
 
@@ -16,30 +17,15 @@ open_settings_event = threading.Event()
 
 def create_tray_icon():
     """
-    Creates a tray icon (next to the clock) that looks like the Spotify logo:
-    - Green Background (#1DB954)
-    - Three white curved Spotify lines
-    - Black skip symbol over them
+    Creates a tray icon using the app logo.
     Right click -> menu with pause, check now, open logs, exit.
     """
 
     # ---------------------------------------------------------
-    # CREATE ICON (64x64, tray automatically scales)
+    # LOAD ICON from bundled assets
     # ---------------------------------------------------------
-    size = 64
-    img = Image.new("RGB", (size, size), color=(29, 185, 84))  # Spotify green
-    draw = ImageDraw.Draw(img)
-
-    # Three white curved lines (Spotify "waves")
-    wave_color = (255, 255, 255)
-    for i, offset in enumerate([10, 20, 30]):
-        draw.arc([10, offset, 54, offset + 25], start=200, end=340, fill=wave_color, width=4)
-
-    # Black skip symbol
-    skip_color = (0, 0, 0)
-    draw.polygon([(36, 20), (46, 32), (36, 44)], fill=skip_color)
-    draw.polygon([(46, 20), (56, 32), (46, 44)], fill=skip_color)
-    draw.rectangle([57, 20, 59, 44], fill=skip_color)
+    img = Image.open(resource_path("assets/app.png")).convert("RGBA")
+    img = img.resize((64, 64), Image.Resampling.LANCZOS)
 
     # ---------------------------------------------------------
     # MENU ACTIONS

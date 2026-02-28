@@ -7,6 +7,8 @@ a = Analysis(
     binaries=[],
     datas=[
         ('assets/app.ico', 'assets'),
+        ('assets/app.png', 'assets'),
+        ('assets/checkbox_checked.png', 'assets'),
     ],
     hiddenimports=[
         'spotify_auto_skipper',
@@ -22,6 +24,7 @@ a = Analysis(
         'spotify_auto_skipper.gui.settings_window',
         'spotify_auto_skipper.gui.setup_wizard',
         'spotify_auto_skipper.gui.widgets',
+        'spotify_auto_skipper.gui.theme',
         'pystray._win32',
     ],
     hookspath=[],

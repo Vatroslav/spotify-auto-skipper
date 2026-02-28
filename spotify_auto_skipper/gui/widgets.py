@@ -1,603 +1,859 @@
+"""
+PySide6 custom widgets for the Spotify Auto-Skipper GUI.
+"""
+
 import io
-import tkinter as tk
-from tkinter import ttk, filedialog
+import threading
 
 import requests
-from PIL import Image, ImageTk, ImageDraw
+from PySide6.QtWidgets import (
+    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit, QSpinBox,
+    QCheckBox, QPushButton, QFrame, QScrollArea, QFileDialog, QDialog,
+    QSizePolicy,
+)
+from PySide6.QtGui import QPixmap, QPainter, QPainterPath, QColor, QCursor
+from PySide6.QtCore import Qt, Signal, QTimer, QCoreApplication
+
+from spotify_auto_skipper.gui import theme
 
 
-class LabeledDirectoryPicker(ttk.Frame):
-    """A label + read-only entry + Browse button for choosing a directory."""
+# -----------------------------------------------------------------
+# Accent button (green primary)
+# -----------------------------------------------------------------
 
-    def __init__(self, parent, label_text, toplevel=None, width=40, **kwargs):
-        super().__init__(parent, **kwargs)
-        self._toplevel = toplevel  # parent window for the dialog
+class AccentButton(QPushButton):
+    """Green primary button — styled via QSS type selector."""
+    pass
 
-        self.label = ttk.Label(self, text=label_text, width=16, anchor="w")
-        self.label.pack(side="left", padx=(0, 5))
 
-        self.var = tk.StringVar()
-        self.entry = ttk.Entry(self, textvariable=self.var, width=width)
-        self.entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
+# -----------------------------------------------------------------
+# Separator
+# -----------------------------------------------------------------
 
-        self.btn = ttk.Button(self, text="Browse\u2026", width=8, command=self._browse)
-        self.btn.pack(side="right")
+def create_separator():
+    sep = QFrame()
+    sep.setFrameShape(QFrame.Shape.HLine)
+    sep.setFixedHeight(1)
+    sep.setStyleSheet(f"background-color: {theme.BORDER_PRIMARY}; border: none;")
+    return sep
+
+
+# -----------------------------------------------------------------
+# Link label
+# -----------------------------------------------------------------
+
+def create_link_label(text, url):
+    """Create a clickable green hyperlink label."""
+    label = QLabel(f'<a href="{url}" style="color: {theme.ACCENT};">{text}</a>')
+    label.setOpenExternalLinks(True)
+    label.setTextFormat(Qt.TextFormat.RichText)
+    return label
+
+
+# -----------------------------------------------------------------
+# Basic labeled widgets
+# -----------------------------------------------------------------
+
+class LabeledEntry(QWidget):
+    """Label + QLineEdit, optionally masked for passwords."""
+
+    def __init__(self, parent=None, label_text="", show=None, label_width=180):
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 2, 0, 2)
+        layout.setSpacing(16)
+
+        self._label = QLabel(label_text)
+        self._label.setMinimumWidth(label_width)
+        self._label.setStyleSheet(f"font-weight: 500; font-size: 13pt; color: {theme.TEXT_PRIMARY};")
+        layout.addWidget(self._label)
+
+        self._entry = QLineEdit()
+        if show == "*":
+            self._entry.setEchoMode(QLineEdit.EchoMode.Password)
+        layout.addWidget(self._entry, 1)
+
+    def get(self):
+        return self._entry.text()
+
+    def set(self, value):
+        self._entry.setText(str(value) if value else "")
+
+
+class LabeledSpinbox(QWidget):
+    """Label + QSpinBox."""
+
+    def __init__(self, parent=None, label_text="", from_=1, to=9999, label_width=180):
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 2, 0, 2)
+        layout.setSpacing(16)
+
+        self._label = QLabel(label_text)
+        self._label.setMinimumWidth(label_width)
+        self._label.setStyleSheet(f"font-weight: 500; font-size: 13pt; color: {theme.TEXT_PRIMARY};")
+        layout.addWidget(self._label)
+
+        self._spinbox = QSpinBox()
+        self._spinbox.setRange(from_, to)
+        self._spinbox.setFixedWidth(128)
+        layout.addWidget(self._spinbox)
+        layout.addStretch()
+
+    def get(self):
+        return self._spinbox.value()
+
+    def set(self, value):
+        self._spinbox.setValue(int(value))
+
+
+class LabeledCheckbox(QWidget):
+    """QCheckBox wrapper with get/set API."""
+
+    def __init__(self, parent=None, label_text=""):
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 4, 0, 4)
+
+        self._check = QCheckBox(label_text)
+        self._check.setStyleSheet(f"font-weight: 500; font-size: 13pt; color: {theme.TEXT_PRIMARY};")
+        layout.addWidget(self._check)
+        layout.addStretch()
+
+    def get(self):
+        return self._check.isChecked()
+
+    def set(self, value):
+        self._check.setChecked(bool(value))
+
+
+class LabeledDirectoryPicker(QWidget):
+    """Label + read-only entry + Browse button."""
+
+    def __init__(self, parent=None, label_text="", label_width=100):
+        super().__init__(parent)
+        self._parent_window = parent
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 2, 0, 2)
+        layout.setSpacing(16)
+
+        self._label = QLabel(label_text)
+        self._label.setMinimumWidth(label_width)
+        self._label.setStyleSheet(f"font-weight: 500; font-size: 13pt; color: {theme.TEXT_PRIMARY};")
+        layout.addWidget(self._label)
+
+        self._entry = QLineEdit()
+        layout.addWidget(self._entry, 1)
+
+        self._btn = QPushButton("\U0001F4C1 Browse\u2026")
+        self._btn.clicked.connect(self._browse)
+        layout.addWidget(self._btn)
 
     def _browse(self):
-        current = self.var.get()
-        chosen = filedialog.askdirectory(
-            initialdir=current if current else None,
-            title="Select folder",
-            parent=self._toplevel,
-        )
+        current = self._entry.text()
+        chosen = QFileDialog.getExistingDirectory(self, "Select folder", current)
         if chosen:
-            self.var.set(chosen)
+            self._entry.setText(chosen)
 
     def get(self):
-        return self.var.get()
+        return self._entry.text()
 
     def set(self, value):
-        self.var.set(value if value else "")
+        self._entry.setText(value if value else "")
 
 
-class LabeledEntry(ttk.Frame):
-    """A label + entry pair, optionally masked for passwords."""
+class PlaylistPicker(QWidget):
+    """Playlist link/ID entry + Resolve button + status label."""
 
-    def __init__(self, parent, label_text, show=None, width=40, **kwargs):
-        super().__init__(parent, **kwargs)
-        self.label = ttk.Label(self, text=label_text, width=28, anchor="w")
-        self.label.pack(side="left", padx=(0, 5))
-        self.var = tk.StringVar()
-        self.entry = ttk.Entry(self, textvariable=self.var, width=width)
-        if show:
-            self.entry.configure(show=show)
-        self.entry.pack(side="left", fill="x", expand=True)
+    def __init__(self, parent=None, label_text="Playlist:", description=None):
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        if description:
+            desc = QLabel(description)
+            desc.setWordWrap(True)
+            desc.setStyleSheet(f"color: {theme.TEXT_SECONDARY};")
+            layout.addWidget(desc)
+
+        row = QHBoxLayout()
+        row.setSpacing(16)
+        lbl = QLabel(label_text)
+        lbl.setMinimumWidth(100)
+        lbl.setStyleSheet(f"font-weight: 500; font-size: 13pt; color: {theme.TEXT_PRIMARY};")
+        row.addWidget(lbl)
+
+        self._entry = QLineEdit()
+        row.addWidget(self._entry, 1)
+
+        self._btn = QPushButton("Resolve")
+        self._btn.clicked.connect(self._resolve)
+        row.addWidget(self._btn)
+        layout.addLayout(row)
+
+        self._status = QLabel()
+        self._status.setStyleSheet(f"color: {theme.TEXT_SECONDARY}; font-size: 11pt;")
+        layout.addWidget(self._status)
+
+        self._playlist_id = None
+
+    def _resolve(self):
+        from spotify_auto_skipper.spotify_api import extract_playlist_id, get_playlist_name
+        raw = self._entry.text().strip()
+        if not raw:
+            self._status.setText("")
+            self._playlist_id = None
+            return
+
+        pid = extract_playlist_id(raw)
+        if not pid:
+            self._status.setText("Invalid link or ID")
+            self._playlist_id = None
+            return
+
+        self._playlist_id = pid
+        self._status.setText("Resolving...")
+
+        name = get_playlist_name(pid)
+        if name:
+            self._entry.setText(pid)
+            self._status.setText(f"\u2714 {name}")
+            self._status.setStyleSheet(f"color: {theme.COLOR_SUCCESS}; font-size: 11pt;")
+        else:
+            self._status.setText("Playlist not found")
+            self._status.setStyleSheet(f"color: {theme.COLOR_ERROR}; font-size: 11pt;")
+            self._playlist_id = None
 
     def get(self):
-        return self.var.get()
+        return self._playlist_id or self._entry.text().strip()
 
     def set(self, value):
-        self.var.set(value)
+        self._entry.setText(value if value else "")
+        self._playlist_id = value if value else None
+        self._status.setText("")
+        if value:
+            self._try_resolve_on_load(value)
+
+    def _try_resolve_on_load(self, playlist_id):
+        def _resolve():
+            try:
+                from spotify_auto_skipper.spotify_api import get_playlist_name
+                name = get_playlist_name(playlist_id)
+                if name:
+                    # Signal-safe way to update from thread
+                    self._status.setText(f"\u2714 {name}")
+            except Exception:
+                pass
+
+        threading.Thread(target=_resolve, daemon=True).start()
 
 
-class LabeledSpinbox(ttk.Frame):
-    """A label + spinbox for numeric values."""
+# -----------------------------------------------------------------
+# Image helpers (pure Qt, no PIL needed)
+# -----------------------------------------------------------------
 
-    def __init__(self, parent, label_text, from_=1, to=9999, width=8, **kwargs):
-        super().__init__(parent, **kwargs)
-        self.label = ttk.Label(self, text=label_text, width=28, anchor="w")
-        self.label.pack(side="left", padx=(0, 5))
-        self.var = tk.IntVar()
-        self.spinbox = ttk.Spinbox(
-            self, textvariable=self.var, from_=from_, to=to, width=width
-        )
-        self.spinbox.pack(side="left")
-
-    def get(self):
-        return self.var.get()
-
-    def set(self, value):
-        self.var.set(int(value))
+THUMB_SIZE = 64
 
 
-class LabeledCheckbox(ttk.Frame):
-    """A checkbox with a label."""
+def make_circular_pixmap(data, size=THUMB_SIZE):
+    """Create a circular QPixmap from raw image bytes."""
+    source = QPixmap()
+    source.loadFromData(data)
+    if source.isNull():
+        return make_placeholder_pixmap(size)
 
-    def __init__(self, parent, label_text, **kwargs):
-        super().__init__(parent, **kwargs)
-        self.var = tk.BooleanVar()
-        self.check = ttk.Checkbutton(self, text=label_text, variable=self.var)
-        self.check.pack(side="left")
+    scaled = source.scaled(size, size,
+                           Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                           Qt.TransformationMode.SmoothTransformation)
+    x = (scaled.width() - size) // 2
+    y = (scaled.height() - size) // 2
+    cropped = scaled.copy(x, y, size, size)
 
-    def get(self):
-        return self.var.get()
+    result = QPixmap(size, size)
+    result.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(result)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    path = QPainterPath()
+    path.addEllipse(0, 0, size, size)
+    painter.setClipPath(path)
+    painter.drawPixmap(0, 0, cropped)
+    painter.end()
+    return result
 
-    def set(self, value):
-        self.var.set(bool(value))
+
+def make_placeholder_pixmap(size=THUMB_SIZE):
+    """Create a dark gray circle placeholder."""
+    result = QPixmap(size, size)
+    result.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(result)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setBrush(QColor(*theme.PLACEHOLDER_COLOR))
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.drawEllipse(0, 0, size, size)
+    painter.end()
+    return result
 
 
-class ArtistListWidget(ttk.Frame):
-    """
-    Widget for managing never-skip artists.
-    Displays artists as Material-style chips in a flowing layout.
-    Has a search field + Add button to search Spotify and add artists.
-    Data model: list of {"id": str, "name": str} dicts, sorted alphabetically.
-    """
+def download_thumbnail(url, size=THUMB_SIZE):
+    """Download an image URL and return a circular QPixmap."""
+    try:
+        r = requests.get(url, timeout=5)
+        if r.status_code == 200:
+            return make_circular_pixmap(r.content, size)
+    except Exception:
+        pass
+    return None
 
-    # Search result thumbnail size (pixels)
-    _THUMB_SIZE = 56
+
+# -----------------------------------------------------------------
+# Artist card
+# -----------------------------------------------------------------
+
+class ArtistCard(QFrame):
+    """Single artist row with thumbnail, name, info, and hover remove button."""
+    remove_clicked = Signal(int)
+
+    def __init__(self, index, name, info_text="", pixmap=None, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover)
+        self._index = index
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(12)
+
+        # Thumbnail
+        self._thumb = QLabel()
+        self._thumb.setFixedSize(THUMB_SIZE, THUMB_SIZE)
+        if pixmap:
+            self._thumb.setPixmap(pixmap)
+        else:
+            self._thumb.setPixmap(make_placeholder_pixmap())
+        layout.addWidget(self._thumb)
+
+        # Text column
+        text_widget = QWidget()
+        text_layout = QVBoxLayout(text_widget)
+        text_layout.setContentsMargins(0, 0, 0, 0)
+        text_layout.setSpacing(0)
+
+        name_label = QLabel(name)
+        name_label.setObjectName("artist_name")
+        text_layout.addWidget(name_label)
+
+        if info_text:
+            info_label = QLabel(info_text)
+            info_label.setObjectName("artist_info")
+            text_layout.addWidget(info_label)
+
+        layout.addWidget(text_widget, 1)
+
+        # Remove button
+        remove_btn = QPushButton("\u2715")
+        remove_btn.setObjectName("remove_btn")
+        remove_btn.setFixedSize(32, 32)
+        remove_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        remove_btn.clicked.connect(lambda: self.remove_clicked.emit(self._index))
+        layout.addWidget(remove_btn)
+
+    def set_pixmap(self, pixmap):
+        self._thumb.setPixmap(pixmap)
+
+
+# -----------------------------------------------------------------
+# Search result row
+# -----------------------------------------------------------------
+
+class SearchResultRow(QFrame):
+    """Clickable artist row in the search popup."""
+    clicked = Signal(int)
+    double_clicked = Signal(int)
+
+    def __init__(self, index, name, info_text="", pixmap=None, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover)
+        self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self._index = index
+        self._selected = False
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(12)
+
+        thumb = QLabel()
+        thumb.setFixedSize(THUMB_SIZE, THUMB_SIZE)
+        thumb.setPixmap(pixmap or make_placeholder_pixmap())
+        layout.addWidget(thumb)
+
+        text_widget = QWidget()
+        text_layout = QVBoxLayout(text_widget)
+        text_layout.setContentsMargins(0, 0, 0, 0)
+        text_layout.setSpacing(0)
+
+        name_label = QLabel(name)
+        name_label.setStyleSheet("font-weight: bold; font-size: 13pt;")
+        text_layout.addWidget(name_label)
+
+        if info_text:
+            info_label = QLabel(info_text)
+            info_label.setStyleSheet(f"color: {theme.TEXT_SECONDARY}; font-size: 11pt;")
+            text_layout.addWidget(info_label)
+
+        layout.addWidget(text_widget, 1)
+
+    def set_selected(self, selected):
+        self._selected = selected
+        self.setProperty("selected", "true" if selected else "false")
+        self.style().unpolish(self)
+        self.style().polish(self)
+
+    def mousePressEvent(self, event):
+        self.clicked.emit(self._index)
+
+    def mouseDoubleClickEvent(self, event):
+        self.double_clicked.emit(self._index)
+
+
+# -----------------------------------------------------------------
+# Search artist dialog
+# -----------------------------------------------------------------
+
+class SearchArtistDialog(QDialog):
+    """Modal dialog for searching and selecting a Spotify artist."""
+
     _PAGE_SIZE = 5
 
-    # Chip style constants
-    _CHIP_BG = "#e8e8e8"
-    _CHIP_FG = "#333333"
-    _CHIP_X_FG = "#666666"
-    _CHIP_X_HOVER = "#cc0000"
-    _CHIP_FONT = ("Segoe UI", 9)
-    _CHIP_X_FONT = ("Segoe UI", 8, "bold")
-    _CHIP_PADX = 6
-    _CHIP_PADY = 3
+    def __init__(self, parent, search_fn, query):
+        super().__init__(parent)
+        self.setWindowTitle("Select Artist")
+        self.setModal(True)
+        self.setFixedSize(560, 600)
 
-    def __init__(self, parent, search_fn=None, **kwargs):
-        """
-        search_fn: callable(query) -> list of {"id", "name"} dicts
-                   (defaults to offline-only mode if None)
-        """
-        super().__init__(parent, **kwargs)
-        self._artists = []  # list of {"id": str, "name": str}
         self._search_fn = search_fn
-
-        # --- Chip area (scrollable Text widget for flow layout) ---
-        list_frame = ttk.Frame(self)
-        list_frame.pack(fill="both", expand=True)
-
-        self._text = tk.Text(
-            list_frame, height=5, wrap="word", cursor="arrow",
-            state="disabled", relief="sunken", borderwidth=1,
-            background="#fafafa", highlightthickness=0,
-        )
-        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=self._text.yview)
-        self._text.configure(yscrollcommand=scrollbar.set)
-
-        self._text.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
-        # Mouse-wheel scrolling
-        self._text.bind("<MouseWheel>", self._on_mousewheel)
-        self._text.bind("<Enter>", self._bind_global_mousewheel)
-        self._text.bind("<Leave>", self._unbind_global_mousewheel)
-
-        # --- Search bar ---
-        search_frame = ttk.Frame(self)
-        search_frame.pack(fill="x", pady=(5, 0))
-
-        self._search_var = tk.StringVar()
-        self._search_entry = ttk.Entry(search_frame, textvariable=self._search_var)
-        self._search_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
-        self._search_entry.bind("<Return>", lambda e: self._on_search())
-
-        self._search_btn = ttk.Button(search_frame, text="Search & Add", command=self._on_search)
-        self._search_btn.pack(side="right")
-
-        # --- Search results popup ---
-        self._results_popup = None
-
-    # ----------------------------------------------------------
-    # Mouse-wheel scrolling
-    # ----------------------------------------------------------
-
-    def _on_mousewheel(self, event):
-        self._text.yview_scroll(-1 * (event.delta // 120), "units")
-        return "break"
-
-    def _bind_global_mousewheel(self, event):
-        self._text.bind_all("<MouseWheel>", self._on_mousewheel)
-
-    def _unbind_global_mousewheel(self, event):
-        self._text.unbind_all("<MouseWheel>")
-
-    # ----------------------------------------------------------
-    # Data access
-    # ----------------------------------------------------------
-
-    def get(self):
-        """Return the list of {"id", "name"} dicts (sorted alphabetically)."""
-        return list(self._artists)
-
-    def set(self, artists):
-        """Load a list of {"id", "name"} dicts."""
-        self._artists = list(artists) if artists else []
-        self._sort_artists()
-        self._rebuild_chips()
-
-    def _sort_artists(self):
-        """Sort artists alphabetically by name (case-insensitive)."""
-        self._artists.sort(
-            key=lambda a: (a.get("name") or a.get("id", "")).lower()
-        )
-
-    # ----------------------------------------------------------
-    # Chip rendering
-    # ----------------------------------------------------------
-
-    def _rebuild_chips(self):
-        """Redraw all artist chips in a flowing layout."""
-        self._text.configure(state="normal")
-        self._text.delete("1.0", "end")
-
-        if not self._artists:
-            self._text.insert("1.0", "  No artists added")
-            self._text.configure(state="disabled", foreground="gray")
-            return
-
-        self._text.configure(foreground=self._CHIP_FG)
-
-        for i, artist in enumerate(self._artists):
-            chip = self._create_chip(artist, i)
-            self._text.window_create("end", window=chip, padx=3, pady=3)
-
-        self._text.configure(state="disabled")
-
-    def _create_chip(self, artist, index):
-        """Create a single chip widget for an artist."""
-        name = artist.get("name") or artist.get("id", "Unknown")
-
-        chip = tk.Frame(
-            self._text, background=self._CHIP_BG,
-            padx=self._CHIP_PADX, pady=self._CHIP_PADY,
-        )
-
-        label = tk.Label(
-            chip, text=name, background=self._CHIP_BG,
-            foreground=self._CHIP_FG, font=self._CHIP_FONT,
-            cursor="arrow",
-        )
-        label.pack(side="left", padx=(2, 4))
-
-        x_btn = tk.Label(
-            chip, text="\u2715", background=self._CHIP_BG,
-            foreground=self._CHIP_X_FG, font=self._CHIP_X_FONT,
-            cursor="hand2",
-        )
-        x_btn.pack(side="left", padx=(0, 2))
-
-        # Hover effect on X button
-        x_btn.bind("<Enter>", lambda e: x_btn.configure(foreground=self._CHIP_X_HOVER))
-        x_btn.bind("<Leave>", lambda e: x_btn.configure(foreground=self._CHIP_X_FG))
-        x_btn.bind("<Button-1>", lambda e, idx=index: self._remove_artist(idx))
-
-        # Forward mouse wheel from chip elements to the text widget
-        for w in (chip, label, x_btn):
-            w.bind("<MouseWheel>", self._on_mousewheel)
-
-        return chip
-
-    # ----------------------------------------------------------
-    # Add / Remove
-    # ----------------------------------------------------------
-
-    def _remove_artist(self, index):
-        if 0 <= index < len(self._artists):
-            self._artists.pop(index)
-            self._rebuild_chips()
-
-    def _add_artist(self, artist):
-        """Add an artist (if not duplicate), sort, and rebuild.
-        Only stores id + name — extra search fields are discarded."""
-        if not any(a["id"] == artist["id"] for a in self._artists):
-            self._artists.append({"id": artist["id"], "name": artist["name"]})
-            self._sort_artists()
-            self._rebuild_chips()
-
-    # ----------------------------------------------------------
-    # Search & Results popup
-    # ----------------------------------------------------------
-
-    def _on_search(self):
-        query = self._search_var.get().strip()
-        if not query or not self._search_fn:
-            return
-
-        self._close_results()
-
-        # --- Show loading popup immediately ---
-        popup = tk.Toplevel(self)
-        self._results_popup = popup
-        popup.title("Select Artist")
-        popup.transient(self.winfo_toplevel())
-        popup.grab_set()
-        popup.resizable(False, False)
-
-        popup._loading = ttk.Label(
-            popup, text="  Searching Spotify\u2026  ",
-            font=("Segoe UI", 10), padding=20,
-        )
-        popup._loading.pack()
-
-        self._center_popup(popup)
-        popup.update()
-
-        # --- Fetch first page (blocking) ---
-        results = self._search_fn(query)
-        if not results:
-            self._close_results()
-            self._search_var.set("")
-            return
-
-        popup._loading.configure(text="  Loading images\u2026  ")
-        popup.update()
-
-        placeholder = self._create_placeholder()
-        thumbnails = self._fetch_thumbnails(results, placeholder)
-
-        # --- Build result UI ---
-        popup._loading.destroy()
-
-        popup._state = {
-            "query": query,
-            "pages": [results],
-            "page_thumbs": [thumbnails],
+        self._query = query
+        self._selected_artist = None
+        self._selected_idx = None
+        self._rows = []
+        self._state = {
+            "pages": [],
+            "page_thumbs": [],
             "current_page": 0,
-            "has_more": len(results) >= self._PAGE_SIZE,
-            "placeholder": placeholder,
-            "selected": None,
-            "rows": [],
+            "has_more": False,
         }
 
-        ttk.Label(
-            popup, text=f'Results for "{query}":', padding=5,
-        ).pack(anchor="w")
+        self._setup_ui()
+        self._results_label.setText(f'Searching for "{query}"\u2026')
+        QTimer.singleShot(0, lambda: self._do_search(query))
 
-        popup._results_frame = tk.Frame(
-            popup, bg="white", relief="sunken", bd=1,
-        )
-        popup._results_frame.pack(fill="x", padx=10, pady=(0, 5))
+    def _setup_ui(self):
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.setSpacing(0)
 
-        self._build_page_rows(popup)
+        # Header
+        header = QWidget()
+        header.setStyleSheet(f"background-color: {theme.BG_INPUT};")
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(12, 8, 12, 8)
 
-        # Navigation: [← Back]  Page N  [Next →]
-        nav_frame = tk.Frame(popup)
-        popup._nav_frame = nav_frame
+        self._results_label = QLabel()
+        self._results_label.setStyleSheet("font-size: 13pt;")
+        header_layout.addWidget(self._results_label, 1)
+        self._layout.addWidget(header)
 
-        popup._prev_btn = ttk.Button(
-            nav_frame, text="\u2190 Back",
-            command=lambda: self._go_prev(popup), width=10,
-        )
-        popup._prev_btn.pack(side="left")
+        # Separator
+        sep = QFrame()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet(f"background-color: {theme.BORDER_PRIMARY};")
+        self._layout.addWidget(sep)
 
-        popup._page_label = ttk.Label(
-            nav_frame, text="Page 1", font=("Segoe UI", 9),
-        )
-        popup._page_label.pack(side="left", expand=True)
+        # Scroll area for results
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setStyleSheet(f"background-color: {theme.BG_INPUT};")
+        self._results_widget = QWidget()
+        self._results_layout = QVBoxLayout(self._results_widget)
+        self._results_layout.setContentsMargins(8, 4, 8, 4)
+        self._results_layout.setSpacing(2)
+        self._results_layout.addStretch()
+        self._scroll.setWidget(self._results_widget)
+        self._layout.addWidget(self._scroll, 1)
 
-        popup._next_btn = ttk.Button(
-            nav_frame, text="Next \u2192",
-            command=lambda: self._go_next(popup), width=10,
-        )
-        popup._next_btn.pack(side="right")
+        # Navigation
+        self._nav_widget = QWidget()
+        self._nav_widget.setStyleSheet(f"background-color: {theme.BG_INPUT};")
+        nav_layout = QHBoxLayout(self._nav_widget)
+        nav_layout.setContentsMargins(12, 4, 12, 4)
 
-        if popup._state["has_more"]:
-            nav_frame.pack(fill="x", padx=10, pady=(0, 5))
+        self._prev_btn = QPushButton("\u2190 Back")
+        self._prev_btn.setFixedWidth(90)
+        self._prev_btn.clicked.connect(self._go_prev)
+        nav_layout.addWidget(self._prev_btn)
 
-        self._update_nav(popup)
+        self._page_label = QLabel("Page 1")
+        self._page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        nav_layout.addWidget(self._page_label, 1)
 
-        # Add / Cancel buttons
-        def on_select():
-            s = popup._state
-            if s["selected"] is not None:
-                page = s["pages"][s["current_page"]]
-                self._add_artist(page[s["selected"]])
-            self._close_results()
-            self._search_var.set("")
+        self._next_btn = QPushButton("Next \u2192")
+        self._next_btn.setFixedWidth(90)
+        self._next_btn.clicked.connect(self._go_next)
+        nav_layout.addWidget(self._next_btn)
 
-        popup._on_select = on_select
+        self._nav_widget.setVisible(False)
+        self._layout.addWidget(self._nav_widget)
 
-        btn_frame = ttk.Frame(popup)
-        btn_frame.pack(fill="x", padx=10, pady=(0, 10))
-        ttk.Button(btn_frame, text="Add Selected", command=on_select).pack(
-            side="right", padx=(5, 0),
-        )
-        ttk.Button(btn_frame, text="Cancel", command=self._close_results).pack(
-            side="right",
-        )
+        # Footer
+        sep2 = QFrame()
+        sep2.setFixedHeight(1)
+        sep2.setStyleSheet(f"background-color: {theme.BORDER_PRIMARY};")
+        self._layout.addWidget(sep2)
 
-        self._center_popup(popup)
+        footer = QWidget()
+        footer.setStyleSheet(f"background-color: {theme.BG_INPUT};")
+        footer_layout = QHBoxLayout(footer)
+        footer_layout.setContentsMargins(12, 8, 12, 8)
+        footer_layout.addStretch()
 
-    def _fetch_thumbnails(self, results, placeholder):
-        """Download thumbnails for a batch of search results."""
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(self.reject)
+        footer_layout.addWidget(cancel_btn)
+
+        self._add_btn = AccentButton("Add Selected")
+        self._add_btn.setEnabled(False)
+        self._add_btn.clicked.connect(self._on_add)
+        footer_layout.addWidget(self._add_btn)
+
+        self._layout.addWidget(footer)
+
+    def _do_search(self, query):
+        QCoreApplication.processEvents()
+        results = self._search_fn(query)
+        if not results:
+            self._results_label.setText("No results found.")
+            return
+
+        self._results_label.setText(f'Results for "{query}":')
+        QCoreApplication.processEvents()
+        thumbs = self._fetch_thumbnails(results)
+        self._state["pages"] = [results]
+        self._state["page_thumbs"] = [thumbs]
+        self._state["current_page"] = 0
+        self._state["has_more"] = len(results) >= self._PAGE_SIZE
+
+        self._build_page_rows()
+        self._update_nav()
+
+    def _fetch_thumbnails(self, results):
         thumbnails = []
+        placeholder = make_placeholder_pixmap()
         for r in results:
             url = r.get("image_url", "")
-            thumb = self._download_thumbnail(url) if url else None
+            thumb = download_thumbnail(url) if url else None
             thumbnails.append(thumb or placeholder)
         return thumbnails
 
-    def _build_page_rows(self, popup):
-        """Clear and rebuild result rows for the current page."""
-        frame = popup._results_frame
-        state = popup._state
+    def _build_page_rows(self):
+        # Clear existing rows
+        while self._results_layout.count() > 0:
+            item = self._results_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
 
-        for w in frame.winfo_children():
-            w.destroy()
-        state["rows"] = []
-        state["selected"] = None
+        self._rows = []
+        self._selected_idx = None
+        self._selected_artist = None
+        self._add_btn.setEnabled(False)
 
+        state = self._state
         page_idx = state["current_page"]
         results = state["pages"][page_idx]
         thumbnails = state["page_thumbs"][page_idx]
 
-        _N = "white"
-        _S = "#e3f2fd"
-
-        def select_row(idx):
-            prev = state["selected"]
-            if prev is not None and prev < len(state["rows"]):
-                for w in state["rows"][prev]:
-                    try:
-                        w.configure(background=_N)
-                    except tk.TclError:
-                        pass
-            state["selected"] = idx
-            for w in state["rows"][idx]:
-                try:
-                    w.configure(background=_S)
-                except tk.TclError:
-                    pass
-
         for i, artist in enumerate(results):
-            if i > 0:
-                tk.Frame(frame, bg="#eeeeee", height=1).pack(fill="x")
+            info = _format_result_info(artist)
+            row = SearchResultRow(i, artist["name"], info, thumbnails[i])
+            row.clicked.connect(self._select_row)
+            row.double_clicked.connect(self._double_click_row)
+            self._results_layout.addWidget(row)
+            self._rows.append(row)
 
-            row = tk.Frame(frame, bg=_N, cursor="hand2")
-            row.pack(fill="x")
+        self._results_layout.addStretch()
 
-            img_label = tk.Label(row, image=thumbnails[i], bg=_N)
-            img_label.pack(side="left", padx=(8, 10), pady=6)
+    def _select_row(self, idx):
+        # Deselect previous
+        if self._selected_idx is not None and self._selected_idx < len(self._rows):
+            self._rows[self._selected_idx].set_selected(False)
 
-            text_frame = tk.Frame(row, bg=_N)
-            text_frame.pack(side="left", fill="x", expand=True, pady=6)
+        self._selected_idx = idx
+        self._rows[idx].set_selected(True)
 
-            name_label = tk.Label(
-                text_frame, text=artist["name"], bg=_N,
-                font=("Segoe UI", 10, "bold"), anchor="w",
-            )
-            name_label.pack(fill="x")
+        page_idx = self._state["current_page"]
+        self._selected_artist = self._state["pages"][page_idx][idx]
+        self._add_btn.setEnabled(True)
 
-            info = self._format_result_info(artist)
-            all_widgets = [row, img_label, text_frame, name_label]
-            if info:
-                info_label = tk.Label(
-                    text_frame, text=info, bg=_N,
-                    font=("Segoe UI", 8), fg="#888888", anchor="w",
-                )
-                info_label.pack(fill="x")
-                all_widgets.append(info_label)
+    def _double_click_row(self, idx):
+        self._select_row(idx)
+        self._on_add()
 
-            state["rows"].append(all_widgets)
+    def _on_add(self):
+        if self._selected_artist:
+            self.accept()
 
-            for w in all_widgets:
-                w.bind("<Button-1>", lambda e, idx=i: select_row(idx))
-                w.bind(
-                    "<Double-1>",
-                    lambda e, idx=i: (select_row(idx), popup._on_select()),
-                )
+    def get_selected(self):
+        return self._selected_artist
 
-    def _go_prev(self, popup):
-        """Navigate to the previous page (always cached, instant)."""
-        if not popup.winfo_exists():
-            return
-        state = popup._state
+    def _go_prev(self):
+        state = self._state
         if state["current_page"] > 0:
             state["current_page"] -= 1
-            self._build_page_rows(popup)
-            self._update_nav(popup)
+            self._build_page_rows()
+            self._update_nav()
 
-    def _go_next(self, popup):
-        """Navigate to the next page (fetch from API if not cached)."""
-        if not popup.winfo_exists():
-            return
-        state = popup._state
+    def _go_next(self):
+        state = self._state
         next_page = state["current_page"] + 1
 
         if next_page < len(state["pages"]):
             state["current_page"] = next_page
-            self._build_page_rows(popup)
-            self._update_nav(popup)
+            self._build_page_rows()
+            self._update_nav()
             return
 
-        # Need to fetch from API
-        popup._next_btn.configure(text="Loading\u2026", state="disabled")
-        popup.update()
+        # Fetch from API
+        self._next_btn.setText("Loading\u2026")
+        self._next_btn.setEnabled(False)
+        self.repaint()
 
         offset = sum(len(p) for p in state["pages"])
         try:
-            new_results = self._search_fn(state["query"], offset=offset)
+            new_results = self._search_fn(self._query, offset=offset)
         except TypeError:
             state["has_more"] = False
-            self._update_nav(popup)
+            self._update_nav()
             return
 
         if not new_results:
             state["has_more"] = False
-            self._update_nav(popup)
+            self._update_nav()
             return
 
-        new_thumbs = self._fetch_thumbnails(new_results, state["placeholder"])
+        new_thumbs = self._fetch_thumbnails(new_results)
         state["pages"].append(new_results)
         state["page_thumbs"].append(new_thumbs)
         state["has_more"] = len(new_results) >= self._PAGE_SIZE
         state["current_page"] = next_page
 
-        self._build_page_rows(popup)
-        self._update_nav(popup)
+        self._build_page_rows()
+        self._update_nav()
 
-    def _update_nav(self, popup):
-        """Update navigation button states and page label."""
-        if not popup.winfo_exists():
-            return
-        state = popup._state
+    def _update_nav(self):
+        state = self._state
         page = state["current_page"]
+        show_nav = state["has_more"] or len(state["pages"]) > 1
+        self._nav_widget.setVisible(show_nav)
 
-        # Show nav bar once multiple pages exist (or might)
-        if state["has_more"] or len(state["pages"]) > 1:
-            popup._nav_frame.pack(fill="x", padx=10, pady=(0, 5))
+        self._prev_btn.setEnabled(page > 0)
+        can_next = state["has_more"] or page < len(state["pages"]) - 1
+        self._next_btn.setText("Next \u2192")
+        self._next_btn.setEnabled(can_next)
+        self._page_label.setText(f"Page {page + 1}")
 
-        popup._prev_btn.configure(
-            state="normal" if page > 0 else "disabled",
-        )
 
-        can_go_next = state["has_more"] or page < len(state["pages"]) - 1
-        popup._next_btn.configure(
-            text="Next \u2192",
-            state="normal" if can_go_next else "disabled",
-        )
+# -----------------------------------------------------------------
+# Artist list widget
+# -----------------------------------------------------------------
 
-        popup._page_label.configure(text=f"Page {page + 1}")
+class ArtistListWidget(QWidget):
+    """
+    Full artist management widget: scrollable card list + search bar.
+    """
+    _refresh_needed = Signal()
 
-    def _center_popup(self, popup):
-        """Center the popup over the parent window."""
-        popup.update_idletasks()
-        pw = self.winfo_toplevel()
-        x = pw.winfo_x() + pw.winfo_width() // 2 - popup.winfo_width() // 2
-        y = pw.winfo_y() + pw.winfo_height() // 2 - popup.winfo_height() // 2
-        popup.geometry(f"+{x}+{y}")
+    def __init__(self, parent=None, search_fn=None):
+        super().__init__(parent)
+        self._artists = []
+        self._details = {}
+        self._thumbs = {}
+        self._search_fn = search_fn
+        self._cards = []
+        self._details_loaded = False
 
-    # ----------------------------------------------------------
-    # Formatting & image helpers
-    # ----------------------------------------------------------
+        self._refresh_needed.connect(self._rebuild_cards)
 
-    @staticmethod
-    def _format_followers(n):
-        """Format follower count: 1234567 -> '1.2M', 45000 -> '45K'."""
-        if n >= 1_000_000:
-            return f"{n / 1_000_000:.1f}M"
-        if n >= 1_000:
-            return f"{n / 1_000:.0f}K"
-        return str(n)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
 
-    @classmethod
-    def _format_result_info(cls, artist):
-        """Format the info line: '52.3M followers · Rock, Classic Rock'."""
-        parts = []
-        followers = artist.get("followers", 0)
-        if followers:
-            parts.append(f"{cls._format_followers(followers)} followers")
-        genres = artist.get("genres", [])
-        if genres:
-            parts.append(", ".join(g.title() for g in genres[:3]))
-        return " \u00b7 ".join(parts)
+        # Scrollable card area
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
 
-    @classmethod
-    def _download_thumbnail(cls, url):
-        """Download image URL and return a circular PhotoImage thumbnail."""
-        try:
-            r = requests.get(url, timeout=5)
-            if r.status_code != 200:
-                return None
-            img = Image.open(io.BytesIO(r.content)).convert("RGBA")
-            img = img.resize((cls._THUMB_SIZE, cls._THUMB_SIZE), Image.LANCZOS)
+        self._list_widget = QWidget()
+        self._list_layout = QVBoxLayout(self._list_widget)
+        self._list_layout.setContentsMargins(0, 0, 0, 0)
+        self._list_layout.setSpacing(0)
+        self._list_layout.addStretch()
 
-            # Circular mask
-            mask = Image.new("L", (cls._THUMB_SIZE, cls._THUMB_SIZE), 0)
-            ImageDraw.Draw(mask).ellipse(
-                (0, 0, cls._THUMB_SIZE - 1, cls._THUMB_SIZE - 1), fill=255,
-            )
-            output = Image.new("RGBA", (cls._THUMB_SIZE, cls._THUMB_SIZE), (0, 0, 0, 0))
-            output.paste(img, mask=mask)
-            return ImageTk.PhotoImage(output)
-        except Exception:
-            return None
+        self._scroll.setWidget(self._list_widget)
+        layout.addWidget(self._scroll, 1)
 
-    @classmethod
-    def _create_placeholder(cls):
-        """Create a gray circle placeholder thumbnail."""
-        img = Image.new("RGBA", (cls._THUMB_SIZE, cls._THUMB_SIZE), (0, 0, 0, 0))
-        ImageDraw.Draw(img).ellipse(
-            (0, 0, cls._THUMB_SIZE - 1, cls._THUMB_SIZE - 1), fill=(200, 200, 200, 255),
-        )
-        return ImageTk.PhotoImage(img)
+        # Search bar
+        search_layout = QHBoxLayout()
+        search_layout.setContentsMargins(0, 5, 0, 0)
 
-    def _close_results(self):
-        if self._results_popup and self._results_popup.winfo_exists():
-            self._results_popup.destroy()
-        self._results_popup = None
+        self._search_input = QLineEdit()
+        self._search_input.setPlaceholderText("Search for an artist\u2026")
+        self._search_input.returnPressed.connect(self._on_search)
+        search_layout.addWidget(self._search_input, 1)
+
+        self._search_btn = QPushButton("Search && Add")
+        self._search_btn.clicked.connect(self._on_search)
+        search_layout.addWidget(self._search_btn)
+
+        layout.addLayout(search_layout)
+
+    # --- Data API ---
+
+    def get(self):
+        result = []
+        for a in self._artists:
+            entry = {"id": a["id"], "name": a["name"]}
+            detail = self._details.get(a["id"])
+            if detail:
+                entry["image_url"] = detail.get("image_url", "")
+                entry["followers"] = detail.get("followers", 0)
+                entry["genres"] = detail.get("genres", [])
+            result.append(entry)
+        return result
+
+    def set(self, artists):
+        self._artists = []
+        for a in (artists or []):
+            self._artists.append({"id": a["id"], "name": a["name"]})
+            if a.get("image_url") or a.get("followers") or a.get("genres"):
+                self._details[a["id"]] = a
+        self._sort_artists()
+        self._details_loaded = False
+        self._rebuild_cards()
+
+    def _sort_artists(self):
+        self._artists.sort(key=lambda a: (a.get("name") or a.get("id", "")).lower())
+
+    # --- Card management ---
+
+    def _rebuild_cards(self):
+        # Clear layout
+        while self._list_layout.count() > 0:
+            item = self._list_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        self._cards = []
+
+        if not self._artists:
+            empty = QLabel("  No artists added")
+            empty.setStyleSheet(f"color: {theme.TEXT_SECONDARY}; padding: 10px;")
+            self._list_layout.addWidget(empty)
+            self._list_layout.addStretch()
+            return
+
+        for i, artist in enumerate(self._artists):
+            if i > 0:
+                sep = QFrame()
+                sep.setFixedHeight(1)
+                sep.setStyleSheet(f"background-color: {theme.BORDER_PRIMARY};")
+                self._list_layout.addWidget(sep)
+
+            info = _format_result_info(self._details.get(artist["id"], {}))
+            pixmap = self._thumbs.get(artist["id"])
+            card = ArtistCard(i, artist.get("name", "Unknown"), info, pixmap)
+            card.remove_clicked.connect(self._remove_artist)
+            self._list_layout.addWidget(card)
+            self._cards.append(card)
+
+        self._list_layout.addStretch()
+
+        if not self._details_loaded:
+            threading.Thread(target=self._load_details_async, daemon=True).start()
+
+    def _load_details_async(self):
+        missing_ids = [a["id"] for a in self._artists if a["id"] not in self._details]
+        if missing_ids:
+            try:
+                from spotify_auto_skipper.spotify_api import get_artist_details
+                details = get_artist_details(missing_ids)
+                for d in details:
+                    self._details[d["id"]] = d
+            except Exception:
+                pass
+
+        needs_refresh = False
+        for a in self._artists:
+            if a["id"] not in self._thumbs:
+                detail = self._details.get(a["id"])
+                url = detail.get("image_url", "") if detail else ""
+                if url:
+                    thumb = download_thumbnail(url)
+                    if thumb:
+                        self._thumbs[a["id"]] = thumb
+                        needs_refresh = True
+
+        self._details_loaded = True
+
+        if needs_refresh:
+            try:
+                self._refresh_needed.emit()
+            except Exception:
+                pass
+
+    def _remove_artist(self, index):
+        if 0 <= index < len(self._artists):
+            self._artists.pop(index)
+            self._rebuild_cards()
+
+    def _add_artist(self, artist):
+        if not any(a["id"] == artist["id"] for a in self._artists):
+            self._artists.append({"id": artist["id"], "name": artist["name"]})
+            self._details[artist["id"]] = artist
+            url = artist.get("image_url", "")
+            if url and artist["id"] not in self._thumbs:
+                thumb = download_thumbnail(url)
+                if thumb:
+                    self._thumbs[artist["id"]] = thumb
+            self._sort_artists()
+            self._rebuild_cards()
+
+    def _on_search(self):
+        query = self._search_input.text().strip()
+        if not query or not self._search_fn:
+            return
+
+        dialog = SearchArtistDialog(self.window(), self._search_fn, query)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            artist = dialog.get_selected()
+            if artist:
+                self._add_artist(artist)
+        self._search_input.clear()
+
+
+# -----------------------------------------------------------------
+# Helpers
+# -----------------------------------------------------------------
+
+def _format_followers(n):
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if n >= 1_000:
+        return f"{n / 1_000:.0f}K"
+    return str(n)
+
+
+def _format_result_info(artist):
+    parts = []
+    followers = artist.get("followers", 0)
+    if followers:
+        parts.append(f"{_format_followers(followers)} followers")
+    genres = artist.get("genres", [])
+    if genres:
+        parts.append(", ".join(g.title() for g in genres[:3]))
+    return " \u00b7 ".join(parts)
