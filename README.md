@@ -4,9 +4,13 @@ A Windows tray app that automatically skips songs on Spotify that you've already
 
 ## Screenshots
 
-<!-- TODO: Add screenshots -->
-![Settings Window](screenshots/settings.png)
-![Setup Wizard](screenshots/wizard.png)
+| Settings | Never-skip Artists | Restart Pattern |
+|:---:|:---:|:---:|
+| ![Settings](screenshots/settings.png) | ![Never-skip Artists](screenshots/never-skip-artists.png) | ![Restart Pattern](screenshots/restart-pattern.png) |
+
+| Remote Control | Credentials |
+|:---:|:---:|
+| ![Remote Control](screenshots/remote-control.png) | ![Credentials](screenshots/credentials.png) |
 
 ---
 
