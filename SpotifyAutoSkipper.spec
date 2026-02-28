@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['spotify_skip_recently_played_song.py'],
+    ['spotify_auto_skipper/__main__.py'],
     pathex=[],
     binaries=[],
     datas=[

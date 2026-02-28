@@ -11,3 +11,5 @@ key.bin
 __pycache__/
 *.pyc
 *.pyo
+
+.claude/
