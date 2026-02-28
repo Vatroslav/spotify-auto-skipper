@@ -172,4 +172,4 @@ cryptography>=41.0.0
 
 ## Credits
 
-Created by [**Vatroslav Mileusnić**](https://www.linkedin.com/in/vatroslavmileusnic)
+Created by [**Vatroslav Mileusnić**](https://www.linkedin.com/in/vatroslavmileusnic) with ChatGPT, Copilot, Claude Code, Figma AI, Canvas AI
