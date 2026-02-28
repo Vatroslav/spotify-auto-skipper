@@ -44,7 +44,7 @@ import threading
 
 import builtins # builtins needed to print timestamps with every print
 
-APP_VERSION = "v1.9.0"
+APP_VERSION = "v1.9.1"
 
 # -------------------------------------------------------------
 # SETTINGS FROM config.ini
@@ -664,12 +664,9 @@ def is_track_liked(track_id):
     """
     Check if a track is in the user's Liked Songs (Saved Tracks).
     Returns True if the track is liked, False otherwise.
-    Endpoint: GET /v1/me/library/contains?ids=spotify:track:{track_id}
-    Note: Uses the generic /me/library/contains endpoint with Spotify URI format
-    (migrated from /me/tracks/contains per Spotify Web API February 2026 changes).
     """
     try:
-        r = spotify_get("https://api.spotify.com/v1/me/library/contains", params={"ids": f"spotify:track:{track_id}"})
+        r = spotify_get("https://api.spotify.com/v1/me/tracks/contains", params={"ids": track_id})
         if r is None or r.status_code != 200:
             print(f"⚠️ [Spotify] Failed to check liked status (HTTP {r.status_code}): {r.text}")
             return False
