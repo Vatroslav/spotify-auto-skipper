@@ -2,24 +2,30 @@
 
 A Windows tray app that automatically skips songs on Spotify that you've already listened to recently, based on your Last.fm scrobble history.
 
+## Screenshots
+
+<!-- TODO: Add screenshots -->
+![Settings Window](screenshots/settings.png)
+![Setup Wizard](screenshots/wizard.png)
+
 ---
 
-## What it does
+## Features
 
-* Checks which song is currently playing on your Spotify account
-* Asks **Last.fm** when that same song was last scrobbled
-* If it was played within a configurable number of days (default: 60), it automatically **skips it** on Spotify
-* Runs quietly in the background with a **system tray icon**
-* Logs all activity to daily log files
-
-### v2.0 highlights
-
-* **Setup Wizard** guides you through first-run configuration
-* **Settings GUI** accessible from the tray menu (no more editing config files by hand)
-* **Encrypted credentials** (Spotify secret, refresh token, Last.fm API key)
-* **Start with Windows** toggle
-* **Never-skip artists** with searchable names instead of raw Spotify IDs
-* Config stored in `%APPDATA%\SpotifyAutoSkipper\spotify-auto-skipper-config.json`
+- Checks your currently playing Spotify track against Last.fm scrobble history
+- Skips songs played within a configurable window (default 60 days)
+- **Dark Spotify-themed GUI** built with PySide6
+- **Setup wizard** guides you through first-run configuration
+- **Settings window** with 3 tabs — accessible from the tray menu
+- **Artist search with images** — search Spotify and add artists to the never-skip list
+- **Custom app icon** and system tray integration (double-click to open Settings)
+- **Encrypted credentials** (Fernet) — secrets never stored in plain text
+- **Start with Windows** toggle
+- **Never-skip artists** — protect favorite artists from being skipped
+- **Always play liked songs** option
+- **Playlist restart detection** — breaks repeating skip loops
+- **Configurable config/log directories** with Browse pickers
+- Logs all activity to daily log files with automatic purge
 
 ---
 
@@ -34,25 +40,23 @@ A Windows tray app that automatically skips songs on Spotify that you've already
    - **Settings** (skip window, poll interval)
 3. Click **Finish** and the app starts running in the tray
 
-If you already have a config file, the wizard is skipped entirely.
+If you already have a config file, the wizard is skipped.
 
 ### Spotify API scopes
 
 When generating your Spotify refresh token, include these scopes:
 
-* `user-read-currently-playing` — detect what's playing
-* `user-read-playback-state` — check playback status
-* `user-modify-playback-state` — skip tracks
-* `user-library-read` — required if you enable "Always play liked songs"
-* `user-read-private` — required for artist search in the never-skip feature
-
-If you get `Insufficient client scope`, regenerate your refresh token with the correct scopes.
+- `user-read-currently-playing` — detect what's playing
+- `user-read-playback-state` — check playback status
+- `user-modify-playback-state` — skip tracks
+- `user-library-read` — required if you enable "Always play liked songs"
+- `user-read-private` — required for artist search
 
 ---
 
 ## Configuration
 
-Config is stored as JSON in `%APPDATA%\SpotifyAutoSkipper\spotify-auto-skipper-config.json`. You can edit it through the **Settings GUI** (right-click the tray icon) or manually.
+Config is stored as JSON in `%APPDATA%\SpotifyAutoSkipper\spotify-auto-skipper-config.json`. Edit it through the **Settings GUI** (right-click the tray icon) or manually.
 
 ### Key settings
 
@@ -70,30 +74,20 @@ Config is stored as JSON in `%APPDATA%\SpotifyAutoSkipper\spotify-auto-skipper-c
 
 The fields `spotify_client_secret`, `spotify_refresh_token`, and `lastfm_api_key` are encrypted automatically using Fernet. The encryption key is stored in `%APPDATA%\SpotifyAutoSkipper\key.bin`.
 
-### Legacy config.ini migration
-
-If a `config.ini` file exists next to the app but no JSON config is found, the app automatically migrates it to the new format on first launch.
-
 ---
 
 ## Running the app
 
-### Option 1: Run as Python script
+### Option 1: Pre-built EXE
+
+Download `SpotifyAutoSkipper.exe` from the [Releases](https://github.com/Vatroslav/spotify-auto-skipper/releases) page and run it. No installation needed.
+
+### Option 2: Run from source
 
 ```
 pip install -r requirements.txt
 python -m spotify_auto_skipper
 ```
-
-Or via the legacy wrapper:
-
-```
-python spotify_skip_recently_played_song.py
-```
-
-### Option 2: Use the pre-built EXE
-
-Download `SpotifyAutoSkipper.exe` from the [Releases](https://github.com/Vatroslav/spotify-auto-skipper/releases) page and run it. No installation needed.
 
 ### Option 3: Build the EXE yourself
 
@@ -109,7 +103,7 @@ The output is `dist/SpotifyAutoSkipper.exe`.
 
 ## System tray controls
 
-When the app is running, a green Spotify-like icon appears in your system tray. Right-click it for:
+Right-click the tray icon for:
 
 | Menu item | Description |
 |-----------|-------------|
@@ -120,33 +114,23 @@ When the app is running, a green Spotify-like icon appears in your system tray. 
 | **Open Logs** | Opens the log folder |
 | **Exit** | Stops the app |
 
+Double-click the tray icon to open Settings directly.
+
 ---
 
 ## Logs
 
-Logs are stored in a `logs` subfolder next to the app, e.g.:
-
-```
-C:\Users\<you>\Tools\spotify-auto-skipper\logs\2025-10-24.txt
-```
-
-Each line includes a timestamp. Old logs are automatically purged based on `log_retention_days` (default 30).
-
----
-
-## Preventing multiple instances
-
-The app uses a Windows mutex (`SpotifyAutoSkipperMutex`) to ensure only one instance runs at a time. If you try to start it again, it shows a popup and exits.
+Logs are stored in a configurable directory (default: `logs` subfolder next to the app). Each line includes a timestamp. Old logs are automatically purged based on `log_retention_days`.
 
 ---
 
 ## Tech details
 
-* **Spotify API** — current track detection, skip, playback control, artist search
-* **Last.fm API** — last scrobble time lookup
-* **Token refresh** — handled automatically using your permanent `refresh_token`
-* **Encryption** — Fernet (from `cryptography`) for credential storage
-* **Built with** — `requests`, `pystray`, `Pillow`, `cryptography`, `tkinter`
+- **GUI** — PySide6 with dark Spotify-inspired theme
+- **Spotify API** — current track, skip, playback control, artist search with images
+- **Last.fm API** — scrobble history lookup
+- **Encryption** — Fernet (from `cryptography`) for credential storage
+- **Tray** — `pystray` + `Pillow` for system tray integration
 
 ### Project structure
 
@@ -164,15 +148,17 @@ spotify_auto_skipper/
   utils.py                 # Shared helpers and state
   gui/
     __init__.py
+    theme.py               # Dark Spotify theme (colors, fonts, stylesheets)
     settings_window.py     # Settings GUI (3 tabs)
     setup_wizard.py        # First-run setup wizard
-    widgets.py             # Reusable tkinter widgets
+    widgets.py             # ArtistListWidget, search popup
 ```
 
 ### Dependencies
 
 ```
 requests>=2.28.0
+PySide6>=6.5.0
 Pillow>=9.0.0
 pystray>=0.19.0
 cryptography>=41.0.0
