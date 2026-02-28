@@ -485,12 +485,14 @@ class SettingsWindow(QWidget):
 
     def _test_remote_control(self):
         import requests
+        from spotify_auto_skipper.spotify_api import _normalize_remote_url
         url = self._fields["remote_control_url"].get().strip()
         if not url:
             self._rc_result.setText("No URL set.")
             self._rc_result.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 11pt;")
             return
 
+        url = _normalize_remote_url(url)
         self._rc_result.setText("Testing...")
         self._rc_result.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 11pt;")
         QCoreApplication.processEvents()
