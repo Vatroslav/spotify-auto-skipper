@@ -73,6 +73,9 @@ def _load_paths():
                 or os.path.exists(os.path.join(exe_dir, "config.json"))):
             defaults["config_dir"] = exe_dir
 
+    # Normalize all paths to use consistent OS separators
+    defaults = {k: os.path.normpath(v) for k, v in defaults.items()}
+
     _paths_cache = defaults
     return _paths_cache
 
@@ -80,6 +83,7 @@ def _load_paths():
 def _save_paths(paths):
     """Save paths.json to %APPDATA%."""
     global _paths_cache
+    paths = {k: os.path.normpath(v) for k, v in paths.items()}
     _paths_cache = dict(paths)
     paths_file = _get_paths_file()
     with open(paths_file, "w", encoding="utf-8") as f:
@@ -93,7 +97,7 @@ def _save_paths(paths):
 def get_config_dir():
     """Returns the directory where the config file is stored."""
     paths = _load_paths()
-    d = paths["config_dir"]
+    d = os.path.normpath(paths["config_dir"])
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -101,13 +105,14 @@ def get_config_dir():
 def get_log_dir():
     """Returns the directory where log files are stored."""
     paths = _load_paths()
-    d = paths["log_dir"]
+    d = os.path.normpath(paths["log_dir"])
     os.makedirs(d, exist_ok=True)
     return d
 
 
 def set_config_dir(new_dir):
     """Change the config directory and persist to paths.json."""
+    new_dir = os.path.normpath(new_dir)
     os.makedirs(new_dir, exist_ok=True)
     paths = _load_paths()
     paths["config_dir"] = new_dir
@@ -116,6 +121,7 @@ def set_config_dir(new_dir):
 
 def set_log_dir(new_dir):
     """Change the log directory and persist to paths.json."""
+    new_dir = os.path.normpath(new_dir)
     os.makedirs(new_dir, exist_ok=True)
     paths = _load_paths()
     paths["log_dir"] = new_dir

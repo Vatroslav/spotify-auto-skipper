@@ -317,19 +317,18 @@ def main_loop():
 def _idle_loop():
     """
     Main-thread idle loop. Checks for GUI events (e.g. open settings)
-    and dispatches tkinter windows. Tkinter requires the main thread.
+    and dispatches PySide6 windows. Qt requires the main thread.
     """
-    import tkinter as tk
+    from spotify_auto_skipper.gui.theme import ensure_app
+    app = ensure_app()
 
     while not utils.should_exit.is_set():
         if open_settings_event.wait(timeout=1):
             open_settings_event.clear()
             try:
-                root = tk.Tk()
-                root.withdraw()
                 from spotify_auto_skipper.gui.settings_window import SettingsWindow
-                SettingsWindow.open(root)
-                root.mainloop()
+                SettingsWindow.open()
+                app.exec()
             except Exception as e:
                 print(f"\u2757 Error opening settings: {e}")
             # Drain any clicks that arrived while the window was open
@@ -339,9 +338,10 @@ def _idle_loop():
 def main():
     _mutex = _check_single_instance()
 
-    # First-run wizard (before logging, needs console stdout for tkinter)
+    # First-run wizard (before logging, needs console stdout for Qt)
+    import sys
     cfg = config.Config()
-    if not cfg.exists():
+    if "--wizard" in sys.argv or not cfg.exists():
         from spotify_auto_skipper.gui.setup_wizard import SetupWizard
         wizard = SetupWizard()
         wizard.run()  # Blocks until complete or exits if cancelled

@@ -286,10 +286,9 @@ def is_skipping_enabled():
 def is_track_liked(track_id):
     """
     Check if a track is in the user's Liked Songs.
-    Uses the generic /me/library/contains endpoint with Spotify URI format.
     """
     try:
-        r = spotify_get("https://api.spotify.com/v1/me/library/contains", params={"ids": f"spotify:track:{track_id}"})
+        r = spotify_get("https://api.spotify.com/v1/me/tracks/contains", params={"ids": track_id})
         if r is None or r.status_code != 200:
             print(f"\u26a0\ufe0f [Spotify] Failed to check liked status (HTTP {r.status_code}): {r.text}")
             return False
@@ -328,6 +327,59 @@ def get_artist_names_from_ids(artist_ids):
             artist_names.append(f"Unknown ({artist_id})")
 
     return artist_names
+
+
+def get_artist_details(artist_ids):
+    """Fetch full artist details (name, image, followers, genres) from Spotify API.
+    Returns list of dicts matching the search_artists() result format."""
+    if not artist_ids:
+        return []
+
+    results = []
+    for artist_id in artist_ids:
+        try:
+            r = spotify_get(f"https://api.spotify.com/v1/artists/{artist_id}")
+            if r and r.status_code == 200:
+                data = r.json()
+                images = data.get("images", [])
+                results.append({
+                    "id": data["id"],
+                    "name": data.get("name", f"Unknown ({artist_id})"),
+                    "image_url": images[0]["url"] if images else "",
+                    "followers": data.get("followers", {}).get("total", 0),
+                    "genres": data.get("genres", []),
+                })
+            else:
+                results.append({"id": artist_id, "name": f"Unknown ({artist_id})",
+                                "image_url": "", "followers": 0, "genres": []})
+        except Exception:
+            results.append({"id": artist_id, "name": f"Unknown ({artist_id})",
+                            "image_url": "", "followers": 0, "genres": []})
+    return results
+
+
+def extract_playlist_id(text):
+    """Extract a Spotify playlist ID from a URL or plain ID string."""
+    import re
+    text = text.strip()
+    m = re.search(r'playlist[/:]([A-Za-z0-9]+)', text)
+    if m:
+        return m.group(1)
+    if re.fullmatch(r'[A-Za-z0-9]{22}', text):
+        return text
+    return None
+
+
+def get_playlist_name(playlist_id):
+    """Fetch a playlist's name from Spotify API. Returns None on failure."""
+    try:
+        r = spotify_get(f"https://api.spotify.com/v1/playlists/{playlist_id}",
+                        params={"fields": "name"})
+        if r and r.status_code == 200:
+            return r.json().get("name")
+    except Exception:
+        pass
+    return None
 
 
 def search_artists(query, limit=5, offset=0):
