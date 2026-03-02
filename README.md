@@ -44,7 +44,7 @@ A Windows tray app that automatically skips songs on Spotify that you've already
    - **Settings** (skip window, poll interval)
 3. Click **Finish** and the app starts running in the tray
 
-If you already have a config file, the wizard is skipped.
+If you already have a config file from a 1.x version, the wizard is skipped.
 
 ### Spotify API scopes
 
