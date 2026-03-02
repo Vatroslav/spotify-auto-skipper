@@ -82,4 +82,5 @@ def create_tray_icon():
     # RUN TRAY IN BACKGROUND THREAD
     # ---------------------------------------------------------
     icon = pystray.Icon("spotify_skipper", img, f"Spotify Auto-Skipper {APP_VERSION}", menu)
+    utils.tray_icon = icon
     threading.Thread(target=icon.run, daemon=False).start()

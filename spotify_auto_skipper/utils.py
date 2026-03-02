@@ -138,6 +138,11 @@ temp_pause_track_id = None
 last_checked_track_id = None
 last_checked_timestamp = None
 
+# Smart Shuffle recommendation detection
+cached_playlist_id = None
+cached_playlist_track_ids = None   # set of track IDs
+tray_icon = None                   # pystray.Icon instance, set by tray.py
+
 
 def interruptible_sleep(seconds):
     """Sleep that can be interrupted by the Check Now tray action."""

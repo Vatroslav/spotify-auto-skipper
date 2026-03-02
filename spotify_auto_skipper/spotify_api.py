@@ -210,8 +210,12 @@ def get_current_track():
     track_name = item.get("name")
     track_id = item.get("id")
 
+    context = data.get("context") or {}
+    context_uri = context.get("uri")
+
     if track_id and artist_name and track_name:
-        return {"id": track_id, "name": track_name, "artist": artist_name, "artist_ids": artist_ids}
+        return {"id": track_id, "name": track_name, "artist": artist_name,
+                "artist_ids": artist_ids, "context_uri": context_uri}
 
     return None
 
@@ -405,6 +409,41 @@ def get_playlist_name(playlist_id):
     except Exception:
         pass
     return None
+
+
+def extract_playlist_id_from_uri(uri):
+    """Extract playlist ID from a Spotify URI like 'spotify:playlist:XXXXX'. Returns None if not a playlist."""
+    if uri and uri.startswith("spotify:playlist:"):
+        return uri[len("spotify:playlist:"):]
+    return None
+
+
+def get_playlist_track_ids(playlist_id):
+    """
+    Fetch all track IDs from a Spotify playlist.
+    Handles pagination (API returns max 100 tracks per request).
+    Returns a set of track ID strings, or None on failure.
+    """
+    track_ids = set()
+    url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
+    params = {"fields": "items.track.id,next", "limit": 100}
+
+    while url:
+        r = spotify_get(url, params=params)
+        if r is None or r.status_code != 200:
+            print(f"\u26a0\ufe0f [Spotify] Failed to fetch playlist tracks (HTTP {r.status_code if r else 'None'})")
+            return None
+
+        data = r.json()
+        for item in data.get("items", []):
+            track = item.get("track")
+            if track and track.get("id"):
+                track_ids.add(track["id"])
+
+        url = data.get("next")
+        params = None  # next URL already includes query params
+
+    return track_ids
 
 
 def search_artists(query, limit=5, offset=0):

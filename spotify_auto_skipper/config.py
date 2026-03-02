@@ -24,6 +24,7 @@ CONFIG_DEFAULTS = {
     "never_skip_artists": [],
     "log_retention_days": 30,
     "start_with_windows": False,
+    "enable_recommendation_notifications": True,
 }
 
 # Keys that hold sensitive credentials (for future encryption, Issue #21)
@@ -58,6 +59,7 @@ _INT_KEYS = {
 # Keys that should be parsed as bool
 _BOOL_KEYS = {
     "enable_restart_pattern", "always_play_liked_songs", "start_with_windows",
+    "enable_recommendation_notifications",
 }
 
 
@@ -244,6 +246,7 @@ REMOTE_CONTROL_URL = "ON"
 ALWAYS_PLAY_LIKED_SONGS = True
 NEVER_SKIP_ARTISTS = []
 LOG_RETENTION_DAYS = 30
+ENABLE_RECOMMENDATION_NOTIFICATIONS = True
 NEVER_SKIP_ARTIST_IDS_LIST = []
 NEVER_SKIP_ARTIST_IDS_SET = set()
 
@@ -256,6 +259,7 @@ def load_config():
     global ENABLE_RESTART_PATTERN, RESTART_PATTERN_SONG_COUNT, RESTART_PATTERN_DAY_DIFF
     global DUMMY_PLAYLIST_ID, REMOTE_CONTROL_URL
     global ALWAYS_PLAY_LIKED_SONGS, NEVER_SKIP_ARTISTS, LOG_RETENTION_DAYS
+    global ENABLE_RECOMMENDATION_NOTIFICATIONS
     global NEVER_SKIP_ARTIST_IDS_LIST, NEVER_SKIP_ARTIST_IDS_SET
 
     cfg = Config()
@@ -276,6 +280,7 @@ def load_config():
     ALWAYS_PLAY_LIKED_SONGS = cfg.get("always_play_liked_songs")
     NEVER_SKIP_ARTISTS = cfg.get("never_skip_artists", [])
     LOG_RETENTION_DAYS = cfg.get("log_retention_days")
+    ENABLE_RECOMMENDATION_NOTIFICATIONS = cfg.get("enable_recommendation_notifications")
 
     # Build ID list/set from the artists list
     NEVER_SKIP_ARTIST_IDS_LIST = [a["id"] for a in NEVER_SKIP_ARTISTS if isinstance(a, dict) and a.get("id")]
