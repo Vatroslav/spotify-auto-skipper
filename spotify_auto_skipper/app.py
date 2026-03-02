@@ -197,14 +197,16 @@ def _check_recommendation(track):
     if track["id"] not in utils.cached_playlist_track_ids:
         print(f"\u2728 Smart Shuffle recommendation: {track['artist']} \u2013 {track['name']}")
         try:
-            from winotify import Notification
+            from winotify import Notification, audio
             toast = Notification(
                 app_id="Spotify Auto-Skipper",
                 title="Smart Shuffle Recommendation",
                 msg=f"{track['artist']} \u2013 {track['name']}",
                 duration="long",
                 icon=os.path.abspath(utils.resource_path("assets/app.ico")),
+                launch="spotify:",
             )
+            toast.set_audio(audio.Default, loop=False)
             toast.show()
         except Exception as e:
             print(f"\u26a0\ufe0f Failed to show notification: {e}")

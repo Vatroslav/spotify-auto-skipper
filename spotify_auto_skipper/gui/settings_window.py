@@ -243,9 +243,16 @@ class SettingsWindow(QWidget):
         layout.addWidget(f)
         self._fields["start_with_windows"] = f
 
+        notif_row = QHBoxLayout()
         f = LabeledCheckbox(label_text="Notify when Smart Shuffle recommends a song not in the current playlist")
-        layout.addWidget(f)
+        notif_row.addWidget(f, 1)
         self._fields["enable_recommendation_notifications"] = f
+
+        test_notif_btn = QPushButton("Test")
+        test_notif_btn.setFixedWidth(70)
+        test_notif_btn.clicked.connect(self._test_notification)
+        notif_row.addWidget(test_notif_btn)
+        layout.addLayout(notif_row)
 
         layout.addWidget(create_separator())
 
@@ -517,6 +524,26 @@ class SettingsWindow(QWidget):
         except Exception as e:
             self._rc_result.setText(f"\u2716 Failed: {e}")
             self._rc_result.setStyleSheet(f"color: {theme.COLOR_ERROR}; font-size: 11pt;")
+
+    # ----------------------------------------------------------
+    # Test notification
+    # ----------------------------------------------------------
+
+    def _test_notification(self):
+        try:
+            from winotify import Notification, audio
+            toast = Notification(
+                app_id="Spotify Auto-Skipper",
+                title="Smart Shuffle Recommendation",
+                msg="This is a test notification.",
+                duration="long",
+                icon=os.path.abspath(resource_path("assets/app.ico")),
+                launch="spotify:",
+            )
+            toast.set_audio(audio.Default, loop=False)
+            toast.show()
+        except Exception as e:
+            QMessageBox.warning(self, "Notification Error", f"Failed to show notification: {e}")
 
     # ----------------------------------------------------------
     # Load / Save
