@@ -14,6 +14,7 @@ from spotify_auto_skipper.spotify_api import (
     is_spotify_paused, pause_spotify_playback, restart_playlist,
     is_skipping_enabled, is_track_liked, is_artist_never_skipped,
     get_artist_names_from_ids,
+    get_playlist_track_ids, extract_playlist_id_from_uri,
 )
 from spotify_auto_skipper.lastfm_api import get_last_play_date
 from spotify_auto_skipper.tray import create_tray_icon, open_settings_event
@@ -167,6 +168,48 @@ def _resolve_missing_artist_names():
 # Main loop
 # -----------------------------------------------------------------
 
+def _check_recommendation(track):
+    """
+    Check if the currently playing track is a Smart Shuffle recommendation
+    (i.e., not in the original playlist). If so, show a desktop notification.
+    """
+    if not config.ENABLE_RECOMMENDATION_NOTIFICATIONS:
+        return
+
+    context_uri = track.get("context_uri")
+    playlist_id = extract_playlist_id_from_uri(context_uri)
+
+    if not playlist_id:
+        return  # not playing from a playlist
+
+    # If playlist changed, fetch and cache the new track list
+    if playlist_id != utils.cached_playlist_id:
+        print(f"\U0001f4cb Playlist context changed ({playlist_id}), fetching track list...")
+        track_ids = get_playlist_track_ids(playlist_id)
+        if track_ids is None:
+            print("\u26a0\ufe0f Could not fetch playlist tracks, skipping recommendation check")
+            return
+        utils.cached_playlist_id = playlist_id
+        utils.cached_playlist_track_ids = track_ids
+        print(f"\u2705 Cached {len(track_ids)} tracks from playlist")
+
+    # Check if current track is NOT in the playlist (= Smart Shuffle recommendation)
+    if track["id"] not in utils.cached_playlist_track_ids:
+        print(f"\u2728 Smart Shuffle recommendation: {track['artist']} \u2013 {track['name']}")
+        try:
+            from winotify import Notification
+            toast = Notification(
+                app_id="Spotify Auto-Skipper",
+                title="Smart Shuffle Recommendation",
+                msg=f"{track['artist']} \u2013 {track['name']}",
+                duration="long",
+                icon=os.path.abspath(utils.resource_path("assets/app.ico")),
+            )
+            toast.show()
+        except Exception as e:
+            print(f"\u26a0\ufe0f Failed to show notification: {e}")
+
+
 def main_loop():
     """
     Continuously check what's playing, ask Last.fm if it was scrobbled recently,
@@ -193,6 +236,11 @@ def main_loop():
         print(f"   \u2022 Will restart the playlist if a repeated pattern is detected ({config.RESTART_PATTERN_SONG_COUNT} skips within \u00b1{config.RESTART_PATTERN_DAY_DIFF} days).")
     else:
         print("   \u2022 Won't restart the playlist if a repeated pattern is detected.")
+
+    if config.ENABLE_RECOMMENDATION_NOTIFICATIONS:
+        print("   \u2022 Will notify when Smart Shuffle recommendations play.")
+    else:
+        print("   \u2022 Smart Shuffle recommendation notifications are disabled.")
 
     _original_print("")
 
@@ -248,6 +296,9 @@ def main_loop():
                 utils.temp_pause_track_id = None
 
             print(f"\U0001f3b5 Currently playing: {track['artist']} \u2013 {track['name']}")
+
+            # Check for Smart Shuffle recommendations
+            _check_recommendation(track)
 
             # Temporarily paused for this specific song
             if utils.temp_pause_track_id == track['id']:

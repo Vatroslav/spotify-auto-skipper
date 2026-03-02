@@ -243,6 +243,10 @@ class SettingsWindow(QWidget):
         layout.addWidget(f)
         self._fields["start_with_windows"] = f
 
+        f = LabeledCheckbox(label_text="Notify when Smart Shuffle recommends a song not in the current playlist")
+        layout.addWidget(f)
+        self._fields["enable_recommendation_notifications"] = f
+
         layout.addWidget(create_separator())
 
         heading = QLabel("Storage Locations:")
