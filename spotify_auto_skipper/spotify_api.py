@@ -187,7 +187,8 @@ def spotify_put(url, params=None, data=None):
 def get_current_track():
     """
     Returns a dict with info about the currently playing song:
-    {"id", "name", "artist", "artist_ids"}, or None if nothing is playing.
+    {"id", "name", "artist", "artist_ids", "context_uri", "progress_ms", "duration_ms"},
+    or None if nothing is playing.
     """
     r = spotify_get("https://api.spotify.com/v1/me/player/currently-playing")
     if r is None:
@@ -213,9 +214,13 @@ def get_current_track():
     context = data.get("context") or {}
     context_uri = context.get("uri")
 
+    progress_ms = data.get("progress_ms", 0)
+    duration_ms = item.get("duration_ms", 0)
+
     if track_id and artist_name and track_name:
         return {"id": track_id, "name": track_name, "artist": artist_name,
-                "artist_ids": artist_ids, "context_uri": context_uri}
+                "artist_ids": artist_ids, "context_uri": context_uri,
+                "progress_ms": progress_ms, "duration_ms": duration_ms}
 
     return None
 
