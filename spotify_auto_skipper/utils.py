@@ -143,6 +143,10 @@ cached_playlist_id = None
 cached_playlist_track_ids = None   # set of track IDs
 tray_icon = None                   # pystray.Icon instance, set by tray.py
 
+# Pending Smart Shuffle recommendation (delayed notification until 50% played)
+pending_recommendation_track = None
+pending_recommendation_duration_ms = 0
+
 
 def interruptible_sleep(seconds):
     """Sleep that can be interrupted by the Check Now tray action."""

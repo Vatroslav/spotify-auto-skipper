@@ -168,10 +168,30 @@ def _resolve_missing_artist_names():
 # Main loop
 # -----------------------------------------------------------------
 
+def _show_recommendation_notification(track):
+    """Show the desktop notification for a Smart Shuffle recommendation."""
+    print(f"\u2728 Smart Shuffle recommendation: {track['artist']} \u2013 {track['name']}")
+    try:
+        from winotify import Notification, audio
+        toast = Notification(
+            app_id="Spotify Auto-Skipper",
+            title="Smart Shuffle Recommendation",
+            msg=f"{track['artist']} \u2013 {track['name']}",
+            duration="long",
+            icon=os.path.abspath(utils.resource_path("assets/app.ico")),
+            launch="spotify:",
+        )
+        toast.set_audio(audio.Default, loop=False)
+        toast.show()
+    except Exception as e:
+        print(f"\u26a0\ufe0f Failed to show notification: {e}")
+
+
 def _check_recommendation(track):
     """
     Check if the currently playing track is a Smart Shuffle recommendation
-    (i.e., not in the original playlist). If so, show a desktop notification.
+    (i.e., not in the original playlist). If so, queue a pending notification
+    that will be shown after 50% of the song has played.
     """
     if not config.ENABLE_RECOMMENDATION_NOTIFICATIONS:
         return
@@ -195,21 +215,49 @@ def _check_recommendation(track):
 
     # Check if current track is NOT in the playlist (= Smart Shuffle recommendation)
     if track["id"] not in utils.cached_playlist_track_ids:
-        print(f"\u2728 Smart Shuffle recommendation: {track['artist']} \u2013 {track['name']}")
-        try:
-            from winotify import Notification, audio
-            toast = Notification(
-                app_id="Spotify Auto-Skipper",
-                title="Smart Shuffle Recommendation",
-                msg=f"{track['artist']} \u2013 {track['name']}",
-                duration="long",
-                icon=os.path.abspath(utils.resource_path("assets/app.ico")),
-                launch="spotify:",
-            )
-            toast.set_audio(audio.Default, loop=False)
-            toast.show()
-        except Exception as e:
-            print(f"\u26a0\ufe0f Failed to show notification: {e}")
+        duration_ms = track.get("duration_ms", 0)
+        print(f"\u23f3 Smart Shuffle recommendation detected: {track['artist']} \u2013 {track['name']} (notification after 50%)")
+        utils.pending_recommendation_track = dict(track)
+        utils.pending_recommendation_duration_ms = duration_ms
+
+
+def _check_pending_recommendation(track):
+    """
+    Check if a pending Smart Shuffle recommendation has reached 50% playback.
+    If so, show the notification and clear the pending state.
+    Returns True if a recommendation is still pending (caller should use shorter sleep).
+    """
+    if utils.pending_recommendation_track is None:
+        return False
+
+    # Song changed — cancel pending notification
+    if track["id"] != utils.pending_recommendation_track["id"]:
+        print("\u274c Pending recommendation cancelled (song changed)")
+        utils.pending_recommendation_track = None
+        utils.pending_recommendation_duration_ms = 0
+        return False
+
+    duration_ms = utils.pending_recommendation_duration_ms
+    progress_ms = track.get("progress_ms", 0)
+
+    # Unknown duration — show immediately as fallback
+    if duration_ms <= 0:
+        _show_recommendation_notification(utils.pending_recommendation_track)
+        utils.pending_recommendation_track = None
+        utils.pending_recommendation_duration_ms = 0
+        return False
+
+    if progress_ms >= duration_ms / 2:
+        _show_recommendation_notification(utils.pending_recommendation_track)
+        utils.pending_recommendation_track = None
+        utils.pending_recommendation_duration_ms = 0
+        return False
+
+    # Still pending
+    pct = progress_ms / duration_ms * 100
+    remaining_s = (duration_ms / 2 - progress_ms) / 1000
+    print(f"\u23f3 Recommendation pending: {pct:.0f}% played, ~{remaining_s:.0f}s until 50%")
+    return True
 
 
 def main_loop():
@@ -284,8 +332,15 @@ def main_loop():
 
             # Same song as last time
             if track['id'] == utils.last_checked_track_id:
-                print(f"\u23f8\ufe0f Same song as last time ({track['name']}) \u2014 skipping the check.")
-                utils.interruptible_sleep(config.POLL_INTERVAL_SECONDS)
+                has_pending = _check_pending_recommendation(track)
+                if has_pending:
+                    remaining_ms = (utils.pending_recommendation_duration_ms / 2) - track.get("progress_ms", 0)
+                    wait_s = max(5, min(config.POLL_INTERVAL_SECONDS, remaining_ms / 1000 + 2))
+                    print(f"\u23f8\ufe0f Same song ({track['name']}) \u2014 rechecking in {wait_s:.0f}s for recommendation")
+                    utils.interruptible_sleep(wait_s)
+                else:
+                    print(f"\u23f8\ufe0f Same song as last time ({track['name']}) \u2014 skipping the check.")
+                    utils.interruptible_sleep(config.POLL_INTERVAL_SECONDS)
                 continue
 
             # New song — remember it
@@ -301,6 +356,7 @@ def main_loop():
 
             # Check for Smart Shuffle recommendations
             _check_recommendation(track)
+            _check_pending_recommendation(track)
 
             # Temporarily paused for this specific song
             if utils.temp_pause_track_id == track['id']:
@@ -359,8 +415,13 @@ def main_loop():
             print(f"\u2757 Unexpected error: {e}")
             utils.interruptible_sleep(config.POLL_INTERVAL_SECONDS)
 
-        # Standard pause between check cycles
-        utils.interruptible_sleep(config.POLL_INTERVAL_SECONDS)
+        # Standard pause between check cycles (shorter if a recommendation notification is pending)
+        if utils.pending_recommendation_track is not None and utils.pending_recommendation_duration_ms > 0:
+            remaining_ms = (utils.pending_recommendation_duration_ms / 2) - track.get("progress_ms", 0)
+            wait_s = max(5, min(config.POLL_INTERVAL_SECONDS, remaining_ms / 1000 + 2))
+            utils.interruptible_sleep(wait_s)
+        else:
+            utils.interruptible_sleep(config.POLL_INTERVAL_SECONDS)
 
 
 # -----------------------------------------------------------------
