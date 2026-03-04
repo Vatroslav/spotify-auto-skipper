@@ -215,6 +215,14 @@ def _check_recommendation(track):
 
     # Check if current track is NOT in the playlist (= Smart Shuffle recommendation)
     if track["id"] not in utils.cached_playlist_track_ids:
+        # Re-fetch playlist to avoid false positives (e.g. user added song after cache)
+        track_ids = get_playlist_track_ids(playlist_id)
+        if track_ids is not None:
+            utils.cached_playlist_track_ids = track_ids
+            if track["id"] in track_ids:
+                print(f"\u2705 {track['artist']} \u2013 {track['name']} was added to playlist since last cache \u2014 not a recommendation")
+                return
+
         duration_ms = track.get("duration_ms", 0)
         print(f"\u23f3 Smart Shuffle recommendation detected: {track['artist']} \u2013 {track['name']} (notification after 50%)")
         utils.pending_recommendation_track = dict(track)
