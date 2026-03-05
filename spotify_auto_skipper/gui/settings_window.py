@@ -208,6 +208,7 @@ class SettingsWindow(QWidget):
 
     def _create_tabs(self):
         tabs = QTabWidget()
+        tabs.addTab(self._create_insights_tab(), "\U0001F4CA  Insights")
         tabs.addTab(self._create_settings_tab(), "\u2699  Settings")
         tabs.addTab(self._create_never_skip_tab(), "\u266B  Never-skip Artists")
         tabs.addTab(self._create_restart_pattern_tab(), "\u21BB  Restart Pattern")
@@ -427,6 +428,10 @@ class SettingsWindow(QWidget):
 
         layout.addStretch()
         return tab
+
+    def _create_insights_tab(self):
+        from spotify_auto_skipper.gui.insights_tab import create_insights_tab
+        return create_insights_tab()
 
     # ----------------------------------------------------------
     # Footer
