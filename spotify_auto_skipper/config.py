@@ -21,6 +21,7 @@ CONFIG_DEFAULTS = {
     "dummy_playlist_id": "37i9dQZF1DX0XUsuxWHRQd",
     "remote_control_url": "ON",
     "always_play_liked_songs": True,
+    "enable_never_skip_artists": True,
     "never_skip_artists": [],
     "log_retention_days": 30,
     "start_with_windows": False,
@@ -258,7 +259,7 @@ def load_config():
     global SKIP_WINDOW_DAYS, POLL_INTERVAL_SECONDS
     global ENABLE_RESTART_PATTERN, RESTART_PATTERN_SONG_COUNT, RESTART_PATTERN_DAY_DIFF
     global DUMMY_PLAYLIST_ID, REMOTE_CONTROL_URL
-    global ALWAYS_PLAY_LIKED_SONGS, NEVER_SKIP_ARTISTS, LOG_RETENTION_DAYS
+    global ALWAYS_PLAY_LIKED_SONGS, ENABLE_NEVER_SKIP_ARTISTS, NEVER_SKIP_ARTISTS, LOG_RETENTION_DAYS
     global ENABLE_RECOMMENDATION_NOTIFICATIONS
     global NEVER_SKIP_ARTIST_IDS_LIST, NEVER_SKIP_ARTIST_IDS_SET
 
@@ -278,6 +279,7 @@ def load_config():
     DUMMY_PLAYLIST_ID = cfg.get("dummy_playlist_id")
     REMOTE_CONTROL_URL = cfg.get("remote_control_url")
     ALWAYS_PLAY_LIKED_SONGS = cfg.get("always_play_liked_songs")
+    ENABLE_NEVER_SKIP_ARTISTS = cfg.get("enable_never_skip_artists")
     NEVER_SKIP_ARTISTS = cfg.get("never_skip_artists", [])
     LOG_RETENTION_DAYS = cfg.get("log_retention_days")
     ENABLE_RECOMMENDATION_NOTIFICATIONS = cfg.get("enable_recommendation_notifications")

@@ -142,6 +142,7 @@ last_checked_timestamp = None
 cached_playlist_id = None
 cached_playlist_track_ids = None   # set of track IDs
 tray_icon = None                   # pystray.Icon instance, set by tray.py
+open_settings_tab = None           # int tab index to open, or None for default
 
 # Pending Smart Shuffle recommendation (delayed notification until 50% played)
 pending_recommendation_track = None
