@@ -28,12 +28,16 @@ class SettingsWindow(QWidget):
     _instance = None
 
     @classmethod
-    def open(cls):
+    def open(cls, tab_index=None):
         if cls._instance is not None and cls._instance.isVisible():
+            if tab_index is not None:
+                cls._instance._tabs.setCurrentIndex(tab_index)
             cls._bring_to_front(cls._instance)
             return cls._instance
         inst = cls()
         cls._instance = inst
+        if tab_index is not None:
+            inst._tabs.setCurrentIndex(tab_index)
         inst.show()
         cls._bring_to_front(inst)
         return inst
@@ -85,7 +89,8 @@ class SettingsWindow(QWidget):
 
         self._header = self._create_header()
         layout.addWidget(self._header)
-        layout.addWidget(self._create_tabs(), 1)
+        self._tabs = self._create_tabs()
+        layout.addWidget(self._tabs, 1)
         layout.addWidget(self._create_footer())
 
     # ----------------------------------------------------------
@@ -276,6 +281,10 @@ class SettingsWindow(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(12)
 
+        f = LabeledCheckbox(label_text="Enable never-skip artists")
+        layout.addWidget(f)
+        self._fields["enable_never_skip_artists"] = f
+
         desc = QLabel("Songs by these artists will never be skipped, regardless of how recently they were played.")
         desc.setWordWrap(True)
         desc.setStyleSheet(f"color: {theme.TEXT_SECONDARY};")
@@ -408,8 +417,8 @@ class SettingsWindow(QWidget):
         desc_row2.addStretch()
         layout.addLayout(desc_row2)
 
-        extra_desc = QLabel("and copy the Client ID and Secret. The refresh token "
-                            "is generated automatically during the first-run setup.")
+        extra_desc = QLabel("and copy the Client ID and Secret. Use the button below "
+                            "to generate a new refresh token.")
         extra_desc.setWordWrap(True)
         extra_desc.setStyleSheet(f"color: {theme.TEXT_SECONDARY};")
         layout.addWidget(extra_desc)
@@ -425,6 +434,21 @@ class SettingsWindow(QWidget):
         f = LabeledEntry(label_text="Refresh Token:", show="*", label_width=120)
         layout.addWidget(f)
         self._fields["spotify_refresh_token"] = f
+
+        token_row = QHBoxLayout()
+        token_row.addStretch()
+        token_btn = QPushButton("Get New Refresh Token")
+        token_btn.clicked.connect(self._open_token_generator)
+        token_row.addWidget(token_btn)
+        layout.addLayout(token_row)
+
+        scopes_hint = QLabel("Select these scopes on the generator site: "
+                             "user-read-playback-state, user-modify-playback-state, "
+                             "user-library-read, playlist-read-private")
+        scopes_hint.setWordWrap(True)
+        scopes_hint.setMinimumHeight(40)
+        scopes_hint.setStyleSheet(f"color: {theme.TEXT_SECONDARY};")
+        layout.addWidget(scopes_hint)
 
         layout.addStretch()
         return tab
@@ -549,6 +573,14 @@ class SettingsWindow(QWidget):
             toast.show()
         except Exception as e:
             QMessageBox.warning(self, "Notification Error", f"Failed to show notification: {e}")
+
+    # ----------------------------------------------------------
+    # Refresh token generator
+    # ----------------------------------------------------------
+
+    def _open_token_generator(self):
+        import webbrowser
+        webbrowser.open("https://spotify-refresh-token-generator.netlify.app")
 
     # ----------------------------------------------------------
     # Load / Save

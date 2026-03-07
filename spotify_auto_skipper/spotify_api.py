@@ -7,6 +7,10 @@ import requests
 
 from spotify_auto_skipper import config
 
+class CredentialError(Exception):
+    """Raised when Spotify credentials are invalid or expired."""
+    pass
+
 # Token state
 SPOTIFY_TOKEN = None
 TOKEN_EXPIRES_AT = datetime.now(timezone.utc)
@@ -50,7 +54,20 @@ def refresh_access_token():
         return
 
     if r.status_code != 200:
-        raise RuntimeError(f"Failed to refresh token (HTTP {r.status_code}): {r.text}")
+        # Parse error type for user-friendly messaging
+        try:
+            err = r.json()
+            err_type = err.get("error", "")
+            err_desc = err.get("error_description", "")
+        except Exception:
+            err_type, err_desc = "", ""
+
+        if err_type == "invalid_client":
+            raise CredentialError(f"Invalid Spotify client ID or client secret. Please check your credentials. ({err_desc})")
+        elif err_type == "invalid_grant":
+            raise CredentialError(f"Invalid or expired refresh token. Please re-authorize. ({err_desc})")
+        else:
+            raise RuntimeError(f"Failed to refresh token (HTTP {r.status_code}): {r.text}")
 
     data = r.json()
     if "access_token" not in data:
@@ -338,6 +355,8 @@ def is_track_liked(track_id):
 
 def is_artist_never_skipped(artist_ids):
     """Check if any of the track's artists are in the never-skip list."""
+    if not config.ENABLE_NEVER_SKIP_ARTISTS:
+        return False
     if not config.NEVER_SKIP_ARTIST_IDS_SET:
         return False
     return any(artist_id in config.NEVER_SKIP_ARTIST_IDS_SET for artist_id in artist_ids)

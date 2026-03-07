@@ -15,6 +15,7 @@ from spotify_auto_skipper.spotify_api import (
     is_skipping_enabled, is_track_liked, is_artist_never_skipped,
     get_artist_names_from_ids,
     get_playlist_track_ids, extract_playlist_id_from_uri,
+    CredentialError,
 )
 from spotify_auto_skipper.lastfm_api import get_last_play_date
 from spotify_auto_skipper.tray import create_tray_icon, open_settings_event
@@ -168,6 +169,26 @@ def _resolve_missing_artist_names():
 # Main loop
 # -----------------------------------------------------------------
 
+def _show_credential_error_notification(message):
+    """Show a Windows notification for credential errors. Clicking opens the Credentials tab."""
+    try:
+        from winotify import Notification, audio
+        toast = Notification(
+            app_id="Spotify Auto-Skipper",
+            title="Credential Error",
+            msg=message,
+            duration="long",
+            icon=os.path.abspath(utils.resource_path("assets/app.ico")),
+        )
+        toast.set_audio(audio.Default, loop=False)
+        toast.show()
+    except Exception as e:
+        print(f"\u26a0\ufe0f Failed to show credential error notification: {e}")
+    # Signal the main thread to open the Credentials tab
+    utils.open_settings_tab = 5  # Credentials is tab index 5
+    open_settings_event.set()
+
+
 def _show_recommendation_notification(track):
     """Show the desktop notification for a Smart Shuffle recommendation."""
     print(f"\u2728 Smart Shuffle recommendation: {track['artist']} \u2013 {track['name']}")
@@ -275,7 +296,12 @@ def main_loop():
     """
     recent_skip_days = []
 
-    get_spotify_token()
+    try:
+        get_spotify_token()
+    except CredentialError as e:
+        print(f"\u274c [Credentials] {e}")
+        _show_credential_error_notification(str(e))
+        return
 
     # Resolve missing artist names (one-time migration from old ID-only format)
     _resolve_missing_artist_names()
@@ -302,11 +328,13 @@ def main_loop():
 
     _original_print("")
 
-    if config.NEVER_SKIP_ARTISTS:
+    if config.ENABLE_NEVER_SKIP_ARTISTS and config.NEVER_SKIP_ARTISTS:
         print("   \u2022 The following artists will never be skipped:")
         for artist in config.NEVER_SKIP_ARTISTS:
             name = artist.get("name") or artist.get("id", "Unknown")
             print(f"     - {name}")
+    elif not config.ENABLE_NEVER_SKIP_ARTISTS:
+        print("   \u2022 Never-skip artists is disabled.")
     else:
         print("   \u2022 No artists are configured to never be skipped.")
 
@@ -416,6 +444,10 @@ def main_loop():
             else:
                 print("\u2139\ufe0f There's no scrobble for this song \u2014 not skipping.")
 
+        except CredentialError as e:
+            print(f"\u274c [Credentials] {e}")
+            _show_credential_error_notification(str(e))
+            return
         except KeyboardInterrupt:
             print("\n\U0001f44b Stopped by user.")
             break
@@ -447,9 +479,11 @@ def _idle_loop():
     while not utils.should_exit.is_set():
         if open_settings_event.wait(timeout=1):
             open_settings_event.clear()
+            tab_index = utils.open_settings_tab
+            utils.open_settings_tab = None
             try:
                 from spotify_auto_skipper.gui.settings_window import SettingsWindow
-                SettingsWindow.open()
+                SettingsWindow.open(tab_index=tab_index)
                 app.exec()
             except Exception as e:
                 print(f"\u2757 Error opening settings: {e}")
