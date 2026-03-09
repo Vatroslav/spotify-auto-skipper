@@ -240,8 +240,7 @@ class PlaylistPicker(QWidget):
                 from spotify_auto_skipper.spotify_api import get_playlist_name
                 name = get_playlist_name(playlist_id)
                 if name:
-                    # Signal-safe way to update from thread
-                    self._status.setText(f"\u2714 {name}")
+                    QTimer.singleShot(0, lambda: self._status.setText(f"\u2714 {name}"))
             except Exception:
                 pass
 

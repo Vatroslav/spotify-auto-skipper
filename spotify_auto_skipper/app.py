@@ -454,6 +454,7 @@ def main_loop():
         except Exception as e:
             print(f"\u2757 Unexpected error: {e}")
             utils.interruptible_sleep(config.POLL_INTERVAL_SECONDS)
+            continue
 
         # Standard pause between check cycles (shorter if a recommendation notification is pending)
         if utils.pending_recommendation_track is not None and utils.pending_recommendation_duration_ms > 0:

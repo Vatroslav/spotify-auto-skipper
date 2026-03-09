@@ -117,7 +117,7 @@ def spotify_get(url, params=None):
                 retry_after = int(response.headers.get("Retry-After", RATE_LIMIT_RETRY_DELAYS[delay_index]))
             except (ValueError, TypeError):
                 retry_after = RATE_LIMIT_RETRY_DELAYS[delay_index]
-            wait_time = min(retry_after, RATE_LIMIT_RETRY_DELAYS[delay_index])
+            wait_time = max(retry_after, RATE_LIMIT_RETRY_DELAYS[delay_index])
             print(f"\u26a0\ufe0f [Spotify] Rate limited (429). Waiting {wait_time}s before retry {attempt + 1}/{RATE_LIMIT_MAX_RETRIES}...")
             time.sleep(wait_time)
             continue
@@ -152,7 +152,7 @@ def spotify_post(url, params=None, data=None):
                 retry_after = int(response.headers.get("Retry-After", RATE_LIMIT_RETRY_DELAYS[delay_index]))
             except (ValueError, TypeError):
                 retry_after = RATE_LIMIT_RETRY_DELAYS[delay_index]
-            wait_time = min(retry_after, RATE_LIMIT_RETRY_DELAYS[delay_index])
+            wait_time = max(retry_after, RATE_LIMIT_RETRY_DELAYS[delay_index])
             print(f"\u26a0\ufe0f [Spotify] Rate limited (429). Waiting {wait_time}s before retry {attempt + 1}/{RATE_LIMIT_MAX_RETRIES}...")
             time.sleep(wait_time)
             continue
@@ -187,7 +187,7 @@ def spotify_put(url, params=None, data=None):
                 retry_after = int(response.headers.get("Retry-After", RATE_LIMIT_RETRY_DELAYS[delay_index]))
             except (ValueError, TypeError):
                 retry_after = RATE_LIMIT_RETRY_DELAYS[delay_index]
-            wait_time = min(retry_after, RATE_LIMIT_RETRY_DELAYS[delay_index])
+            wait_time = max(retry_after, RATE_LIMIT_RETRY_DELAYS[delay_index])
             print(f"\u26a0\ufe0f [Spotify] Rate limited (429). Waiting {wait_time}s before retry {attempt + 1}/{RATE_LIMIT_MAX_RETRIES}...")
             time.sleep(wait_time)
             continue
@@ -321,14 +321,19 @@ def _normalize_remote_url(url):
 
 def is_skipping_enabled():
     """Checks the Dropbox remote_control.txt file; returns True if ON."""
-    if not config.REMOTE_CONTROL_URL:
-        print("\u26a0\ufe0f [Remote Control] No REMOTE_CONTROL_URL set.")
+    if not config.REMOTE_CONTROL_URL or config.REMOTE_CONTROL_URL.upper() == "OFF":
         return True
     try:
         url = _normalize_remote_url(config.REMOTE_CONTROL_URL)
         r = requests.get(url, timeout=10)
-        first_line = r.text.strip().splitlines()[0].strip().lower()
-        return first_line == "on"
+        if r.status_code != 200:
+            print(f"\u26a0\ufe0f [Remote Control] HTTP {r.status_code}")
+            return True
+        lines = r.text.strip().splitlines()
+        if not lines:
+            print("\u26a0\ufe0f [Remote Control] Empty response body")
+            return True
+        return lines[0].strip().lower() == "on"
     except Exception as e:
         print(f"\u26a0\ufe0f [Remote Control] Failed to check status: {e}")
         return True
@@ -340,7 +345,10 @@ def is_track_liked(track_id):
     """
     try:
         r = spotify_get("https://api.spotify.com/v1/me/tracks/contains", params={"ids": track_id})
-        if r is None or r.status_code != 200:
+        if r is None:
+            print("\u26a0\ufe0f [Spotify] Failed to check liked status (no response)")
+            return False
+        if r.status_code != 200:
             print(f"\u26a0\ufe0f [Spotify] Failed to check liked status (HTTP {r.status_code}): {r.text}")
             return False
 

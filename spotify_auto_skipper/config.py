@@ -19,7 +19,7 @@ CONFIG_DEFAULTS = {
     "restart_pattern_song_count": 5,
     "restart_pattern_day_diff": 2,
     "dummy_playlist_id": "37i9dQZF1DX0XUsuxWHRQd",
-    "remote_control_url": "ON",
+    "remote_control_url": "OFF",
     "always_play_liked_songs": True,
     "enable_never_skip_artists": True,
     "never_skip_artists": [],
