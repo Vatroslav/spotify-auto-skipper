@@ -539,7 +539,16 @@ class SettingsWindow(QWidget):
 
         try:
             r = requests.get(url, timeout=10)
-            first_line = r.text.strip().splitlines()[0].strip()
+            if r.status_code != 200:
+                self._rc_result.setText(f"\u2716 HTTP {r.status_code}")
+                self._rc_result.setStyleSheet(f"color: {theme.COLOR_ERROR}; font-size: 11pt;")
+                return
+            lines = r.text.strip().splitlines()
+            if not lines:
+                self._rc_result.setText("\u26a0 Empty response body")
+                self._rc_result.setStyleSheet(f"color: {theme.COLOR_ERROR}; font-size: 11pt;")
+                return
+            first_line = lines[0].strip()
             value = first_line.lower()
             if value == "on":
                 self._rc_result.setText(f"\u2714 File says ON \u2014 skipping is enabled")
