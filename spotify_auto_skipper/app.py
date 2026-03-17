@@ -185,7 +185,7 @@ def _show_credential_error_notification(message):
     except Exception as e:
         print(f"\u26a0\ufe0f Failed to show credential error notification: {e}")
     # Signal the main thread to open the Credentials tab
-    utils.open_settings_tab = 5  # Credentials is tab index 5
+    utils.open_settings_tab = 6  # Credentials is tab index 6
     open_settings_event.set()
 
 

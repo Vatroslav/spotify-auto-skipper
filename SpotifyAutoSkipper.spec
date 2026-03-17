@@ -26,6 +26,7 @@ a = Analysis(
         'spotify_auto_skipper.gui.widgets',
         'spotify_auto_skipper.gui.theme',
         'spotify_auto_skipper.gui.insights_tab',
+        'spotify_auto_skipper.gui.logs_tab',
         'spotify_auto_skipper.insights',
         'pystray._win32',
     ],

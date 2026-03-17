@@ -63,7 +63,7 @@ class SettingsWindow(QWidget):
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self._maximized = False
         self._normal_geometry = None
-        self.setFixedSize(1000, 750)
+        self.setFixedSize(1100, 750)
 
         self._setup_ui()
         self._load_values()
@@ -122,7 +122,7 @@ class SettingsWindow(QWidget):
     def _toggle_maximize(self):
         if self._maximized:
             # Restore
-            self.setFixedSize(1000, 750)
+            self.setFixedSize(1100, 750)
             if self._normal_geometry:
                 self.setGeometry(self._normal_geometry)
             else:
@@ -214,6 +214,7 @@ class SettingsWindow(QWidget):
     def _create_tabs(self):
         tabs = QTabWidget()
         tabs.addTab(self._create_insights_tab(), "\U0001F4CA  Insights")
+        tabs.addTab(self._create_logs_tab(), "\U0001F4DC  Logs")
         tabs.addTab(self._create_settings_tab(), "\u2699  Settings")
         tabs.addTab(self._create_never_skip_tab(), "\u266B  Never-skip Artists")
         tabs.addTab(self._create_restart_pattern_tab(), "\u21BB  Restart Pattern")
@@ -456,6 +457,10 @@ class SettingsWindow(QWidget):
     def _create_insights_tab(self):
         from spotify_auto_skipper.gui.insights_tab import create_insights_tab
         return create_insights_tab()
+
+    def _create_logs_tab(self):
+        from spotify_auto_skipper.gui.logs_tab import create_logs_tab
+        return create_logs_tab()
 
     # ----------------------------------------------------------
     # Footer
