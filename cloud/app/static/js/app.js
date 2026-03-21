@@ -201,22 +201,37 @@ function initSettings() {
             if (!q) return;
             resolveBtn.disabled = true;
             resolveBtn.textContent = "...";
-            const data = await API.get(`/api/settings/resolve-playlist?q=${encodeURIComponent(q)}`);
-            resolveBtn.disabled = false;
-            resolveBtn.textContent = "Resolve";
-            if (data.name) {
+            try {
+                const data = await API.get(`/api/settings/resolve-playlist?q=${encodeURIComponent(q)}`);
                 playlistStatus.textContent = formatPlaylistInfo(data);
                 playlistStatus.className = "help-text text-success";
                 playlistInput.value = data.id;
-            } else {
-                playlistStatus.textContent = `\u2717 ${data.error || "Not found"}`;
+            } catch (err) {
+                playlistStatus.textContent = `\u2717 ${err.message || "Not found"}`;
                 playlistStatus.className = "help-text text-error";
             }
+            resolveBtn.disabled = false;
+            resolveBtn.textContent = "Resolve";
         });
+        bindLogout();
         return; // loadSettings already called above
     }
 
     loadSettings();
+    bindLogout();
+}
+
+function bindLogout() {
+    const logoutBtn = document.getElementById("logout-btn");
+    if (logoutBtn && !logoutBtn._bound) {
+        logoutBtn._bound = true;
+        logoutBtn.addEventListener("click", async () => {
+            try {
+                await API.post("/auth/logout");
+            } catch { /* ignore */ }
+            location.href = "/";
+        });
+    }
 }
 
 
