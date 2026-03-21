@@ -491,7 +491,7 @@ input:focus, select:focus {
     transition: background 0.15s;
 }
 
-.login-btn:hover { background: var(--accent-hover); }
+.login-btn:hover { background: var(--accent-hover); color: #000; }
 
 /* ── Utilities ───────────────────────────────────── */
 
