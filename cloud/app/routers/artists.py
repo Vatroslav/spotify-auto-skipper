@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
 from app.database import get_never_skip_artists, add_never_skip_artist, remove_never_skip_artist
+from app.spotify_api import CredentialError
 from app.state import app_state
 from app.routers.deps import require_auth
 
@@ -84,5 +85,8 @@ async def search_artists(request: Request, q: str = ""):
     if not q.strip():
         return {"artists": []}
     client = app_state.spotify_client
-    results = await client.search_artists(q, limit=5)
+    try:
+        results = await client.search_artists(q, limit=5)
+    except CredentialError:
+        raise HTTPException(status_code=401, detail="Spotify credentials expired. Please re-authorize via /auth/login.")
     return {"artists": results}
