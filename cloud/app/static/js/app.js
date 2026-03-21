@@ -23,6 +23,7 @@ function showToast(message, duration = 2000) {
 function initDashboard() {
     const trackName = document.getElementById("track-name");
     const artistName = document.getElementById("artist-name");
+    const albumArt = document.getElementById("album-art");
     const nothingPlaying = document.getElementById("nothing-playing");
     const trackInfo = document.getElementById("track-info");
     const statusBadge = document.getElementById("status-badge");
@@ -30,6 +31,8 @@ function initDashboard() {
     const checkNowBtn = document.getElementById("check-now-btn");
 
     if (!trackName) return; // Not on dashboard
+
+    let nextCheckAt = null; // epoch ms when next check fires
 
     async function updatePlayback() {
         try {
@@ -39,9 +42,30 @@ function initDashboard() {
                 artistName.textContent = data.track.artist;
                 trackInfo.classList.remove("hidden");
                 nothingPlaying.classList.add("hidden");
+                const lastCheck = document.getElementById("last-check");
+                if (lastCheck) {
+                    lastCheck.textContent = data.last_check_message || "";
+                }
+                if (albumArt && data.track.album_art) {
+                    albumArt.src = data.track.album_art;
+                    albumArt.classList.remove("hidden");
+                } else if (albumArt) {
+                    albumArt.classList.add("hidden");
+                }
             } else {
                 trackInfo.classList.add("hidden");
                 nothingPlaying.classList.remove("hidden");
+                if (albumArt) albumArt.classList.add("hidden");
+            }
+
+            // Last checked time + compute next check
+            const lastCheckedEl = document.getElementById("last-checked-time");
+            if (lastCheckedEl && data.last_checked) {
+                const d = new Date(data.last_checked);
+                lastCheckedEl.textContent = `Last checked at ${d.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false})}`;
+                if (data.poll_interval) {
+                    nextCheckAt = d.getTime() + data.poll_interval * 1000;
+                }
             }
 
             // Status badge
@@ -49,10 +73,10 @@ function initDashboard() {
                 statusBadge.textContent = "Worker Offline";
                 statusBadge.className = "status-badge offline";
             } else if (data.skipping_paused) {
-                statusBadge.textContent = "Paused";
+                statusBadge.textContent = "Skipping Paused";
                 statusBadge.className = "status-badge paused";
             } else {
-                statusBadge.textContent = "Active";
+                statusBadge.textContent = "Skipping Active";
                 statusBadge.className = "status-badge active";
             }
 
@@ -86,6 +110,16 @@ function initDashboard() {
             }, 3000);
         });
     }
+
+    // Countdown ticker (every second)
+    const nextCheckEl = document.getElementById("next-check");
+    setInterval(() => {
+        if (!nextCheckEl || !nextCheckAt) return;
+        const remaining = Math.max(0, Math.round((nextCheckAt - Date.now()) / 1000));
+        const mins = Math.floor(remaining / 60);
+        const secs = remaining % 60;
+        nextCheckEl.textContent = `Next check in ${mins}:${secs.toString().padStart(2, "0")}`;
+    }, 1000);
 
     // Poll every 5 seconds
     updatePlayback();

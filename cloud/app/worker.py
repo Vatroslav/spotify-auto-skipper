@@ -89,6 +89,7 @@ async def polling_loop():
             # New song — remember it
             app_state.last_checked_track_id = track["id"]
             app_state.last_checked_timestamp = datetime.now(timezone.utc)
+            app_state.last_check_message = "Checking..."
 
             await _log(f"Currently playing: {track['artist']} \u2013 {track['name']}")
 
@@ -98,6 +99,7 @@ async def polling_loop():
             if last_played:
                 days_since = (datetime.now(timezone.utc) - last_played).days
                 await _log(f"Last scrobble: {last_played.strftime('%Y-%m-%d')} - {days_since} days ago")
+                app_state.last_check_message = f"Last heard {days_since} day{'s' if days_since != 1 else ''} ago"
 
                 cutoff = datetime.now(timezone.utc) - timedelta(days=settings["skip_window_days"])
 
@@ -155,6 +157,7 @@ async def polling_loop():
                     )
             else:
                 await _log("No scrobble for this song \u2014 not skipping.")
+                app_state.last_check_message = "Never heard before"
                 await add_track_event(
                     track["id"], track["name"], track["artist"],
                     "no_scrobble", None, track.get("context_uri"),
