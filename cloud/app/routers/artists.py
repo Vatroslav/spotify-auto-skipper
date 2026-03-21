@@ -2,7 +2,7 @@
 Never-skip artists API routes.
 """
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.database import get_never_skip_artists, add_never_skip_artist, remove_never_skip_artist
 from app.config import get_spotify_client_id, get_spotify_client_secret
@@ -27,7 +27,7 @@ async def add_artist(request: Request):
     name = body.get("name", "").strip()
     image_url = body.get("image_url", "").strip()
     if not artist_id or not name:
-        return {"error": "id and name are required"}, 400
+        raise HTTPException(status_code=400, detail="id and name are required")
     await add_never_skip_artist(artist_id, name, image_url)
     return {"ok": True}
 

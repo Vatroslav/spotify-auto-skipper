@@ -2,7 +2,7 @@
 Insights API routes.
 """
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.database import get_track_events, get_track_event_dates
 from app.config import load_settings
@@ -23,7 +23,7 @@ async def available_dates(request: Request):
 async def get_insights(request: Request, date: str = ""):
     """Return metrics and insights for a specific date."""
     if not date:
-        return {"error": "date parameter required (YYYY-MM-DD)"}, 400
+        raise HTTPException(status_code=400, detail="date parameter required (YYYY-MM-DD)")
 
     rows = await get_track_events(date)
     events = events_from_db_rows(rows)
