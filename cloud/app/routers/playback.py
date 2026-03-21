@@ -23,7 +23,8 @@ async def get_playback(request: Request):
         "worker_running": app_state.worker_running,
         "last_checked": app_state.last_checked_timestamp.isoformat() if app_state.last_checked_timestamp else None,
         "last_check_message": app_state.last_check_message,
-        "poll_interval": settings["poll_interval_seconds"],
+        "poll_interval": settings["idle_poll_interval_seconds"] if app_state.idle_mode else settings["poll_interval_seconds"],
+        "idle_mode": app_state.idle_mode,
     }
 
 
