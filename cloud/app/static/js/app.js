@@ -333,7 +333,11 @@ function initInsights() {
             currentIdx = dates.length - 1; // Latest date
             loadInsights(dates[currentIdx]);
         } else {
-            dateText.textContent = "No data";
+            dateText.textContent = "No data yet";
+            metricsGrid.innerHTML = '<p class="text-muted text-center">Start playing music and the skipper will track activity here.</p>';
+            insightsList.innerHTML = "";
+            const dg = document.getElementById("details-grid");
+            if (dg) dg.innerHTML = "";
         }
     }
 
@@ -425,7 +429,8 @@ function initLogs() {
             currentIdx = dates.length - 1;
             loadLogs(dates[currentIdx]);
         } else {
-            dateText.textContent = "No data";
+            dateText.textContent = "No data yet";
+            logsContainer.innerHTML = '<p class="text-muted text-center">Logs will appear here once the skipper starts checking.</p>';
         }
     }
 
