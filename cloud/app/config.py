@@ -1,0 +1,105 @@
+"""
+Configuration: env vars for secrets, SQLite for user-adjustable settings.
+"""
+
+import os
+from app.database import get_all_settings, set_many_settings
+
+# Settings that live in the database (user-adjustable)
+CONFIG_DEFAULTS = {
+    "skip_window_days": 60,
+    "poll_interval_seconds": 120,
+    "enable_restart_pattern": True,
+    "restart_pattern_song_count": 5,
+    "restart_pattern_day_diff": 2,
+    "dummy_playlist_id": "37i9dQZF1DX0XUsuxWHRQd",
+    "always_play_liked_songs": True,
+    "enable_never_skip_artists": True,
+    "log_retention_days": 30,
+}
+
+# Type mappings
+_INT_KEYS = {
+    "skip_window_days", "poll_interval_seconds",
+    "restart_pattern_song_count", "restart_pattern_day_diff",
+    "log_retention_days",
+}
+_BOOL_KEYS = {
+    "enable_restart_pattern", "always_play_liked_songs",
+    "enable_never_skip_artists",
+}
+
+
+def _parse_value(key: str, raw: str):
+    """Parse a string value from the DB into its proper Python type."""
+    if key in _INT_KEYS:
+        try:
+            return int(raw)
+        except (ValueError, TypeError):
+            return CONFIG_DEFAULTS.get(key, 0)
+    if key in _BOOL_KEYS:
+        return raw.lower() in ("true", "1", "yes") if isinstance(raw, str) else bool(raw)
+    return raw
+
+
+def _serialize_value(key: str, value) -> str:
+    """Serialize a Python value for DB storage."""
+    if key in _BOOL_KEYS:
+        return "true" if value else "false"
+    return str(value)
+
+
+# ── Environment variables (secrets) ──────────────────────────────
+
+def get_spotify_client_id() -> str:
+    return os.environ.get("SPOTIFY_CLIENT_ID", "")
+
+def get_spotify_client_secret() -> str:
+    return os.environ.get("SPOTIFY_CLIENT_SECRET", "")
+
+def get_lastfm_username() -> str:
+    return os.environ.get("LASTFM_USERNAME", "")
+
+def get_lastfm_api_key() -> str:
+    return os.environ.get("LASTFM_API_KEY", "")
+
+def get_secret_key() -> str:
+    return os.environ.get("SECRET_KEY", "change-me-in-production")
+
+def get_base_url() -> str:
+    return os.environ.get("BASE_URL", "http://localhost:8000")
+
+
+# ── Settings (from SQLite) ───────────────────────────────────────
+
+async def load_settings() -> dict:
+    """Load all settings, merging DB values with defaults."""
+    stored = await get_all_settings()
+    result = {}
+    for key, default in CONFIG_DEFAULTS.items():
+        if key in stored:
+            result[key] = _parse_value(key, stored[key])
+        else:
+            result[key] = default
+    return result
+
+
+async def save_settings(updates: dict):
+    """Save partial settings update to DB."""
+    to_store = {}
+    for key, value in updates.items():
+        if key in CONFIG_DEFAULTS:
+            to_store[key] = _serialize_value(key, value)
+    if to_store:
+        await set_many_settings(to_store)
+
+
+async def seed_defaults():
+    """Seed default settings into DB if they don't exist."""
+    stored = await get_all_settings()
+    missing = {}
+    for key, value in CONFIG_DEFAULTS.items():
+        if key not in stored:
+            missing[key] = _serialize_value(key, value)
+    if missing:
+        await set_many_settings(missing)

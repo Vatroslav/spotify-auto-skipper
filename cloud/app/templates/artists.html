@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Never-Skip Artists - Spotify Auto-Skipper{% endblock %}
+{% block content %}
+<div class="container">
+    <h1 class="page-title">Never-Skip Artists</h1>
+
+    <div class="card">
+        <div class="card-title">Add Artist</div>
+        <input type="text" id="artist-search" placeholder="Search for an artist...">
+        <div id="search-results" class="search-results hidden"></div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Your Artists</div>
+        <div id="artist-list"></div>
+    </div>
+</div>
+{% endblock %}

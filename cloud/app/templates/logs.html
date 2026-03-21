@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Logs - Spotify Auto-Skipper{% endblock %}
+{% block content %}
+<div class="container">
+    <h1 class="page-title">Logs</h1>
+
+    <div class="date-nav">
+        <button id="log-date-prev" class="btn">&lsaquo; Prev</button>
+        <span id="log-date-text" class="date-text">Loading...</span>
+        <button id="log-date-next" class="btn">Next &rsaquo;</button>
+    </div>
+
+    <div class="filter-chips">
+        <button class="chip active" data-level="all">All</button>
+        <button class="chip" data-level="info">Info</button>
+        <button class="chip" data-level="warning">Warning</button>
+        <button class="chip" data-level="error">Error</button>
+    </div>
+
+    <div class="card">
+        <div id="logs-container">
+            <p class="text-muted text-center">Loading...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

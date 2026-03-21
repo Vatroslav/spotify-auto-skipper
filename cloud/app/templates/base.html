@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Spotify Auto-Skipper{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+</head>
+<body>
+    {% block content %}{% endblock %}
+
+    <nav class="bottom-nav">
+        <a href="/" class="nav-item {% if request.url.path == '/' %}active{% endif %}">
+            <span class="nav-icon">&#127925;</span>
+            <span>Now Playing</span>
+        </a>
+        <a href="/insights" class="nav-item {% if request.url.path == '/insights' %}active{% endif %}">
+            <span class="nav-icon">&#128200;</span>
+            <span>Insights</span>
+        </a>
+        <a href="/artists" class="nav-item {% if request.url.path == '/artists' %}active{% endif %}">
+            <span class="nav-icon">&#127908;</span>
+            <span>Artists</span>
+        </a>
+        <a href="/logs" class="nav-item {% if request.url.path == '/logs' %}active{% endif %}">
+            <span class="nav-icon">&#128196;</span>
+            <span>Logs</span>
+        </a>
+        <a href="/settings" class="nav-item {% if request.url.path == '/settings' %}active{% endif %}">
+            <span class="nav-icon">&#9881;</span>
+            <span>Settings</span>
+        </a>
+    </nav>
+
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
