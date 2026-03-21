@@ -5,12 +5,13 @@ Spotify OAuth Authorization Code Flow.
 import secrets
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 import httpx
 
 from app.config import get_spotify_client_id, get_spotify_client_secret, get_base_url
 from app.database import save_oauth_tokens, clear_oauth_tokens
+from app.routers.deps import require_auth
 from app.state import app_state
 from datetime import datetime, timedelta, timezone
 
@@ -88,7 +89,7 @@ async def callback(request: Request, code: str = "", state: str = "", error: str
     return RedirectResponse("/")
 
 
-@router.post("/auth/logout")
+@router.post("/auth/logout", dependencies=[Depends(require_auth)])
 async def logout(request: Request):
     """End session, clear stored OAuth tokens, and reset the shared client."""
     request.session.clear()
