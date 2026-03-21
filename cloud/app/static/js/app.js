@@ -245,24 +245,39 @@ async function initArtists() {
         data.artists.forEach(a => {
             const div = document.createElement("div");
             div.className = "artist-item";
-            const imgHtml = a.image_url
-                ? `<img src="${a.image_url}" class="artist-img" alt="">`
-                : '<div class="artist-img artist-img-placeholder"></div>';
-            div.innerHTML = `
-                <div class="artist-info">
-                    ${imgHtml}
-                    <span class="artist-name-text">${escapeHtml(a.name)}</span>
-                </div>
-                <button class="artist-remove" data-id="${a.id}" title="Remove">&times;</button>
-            `;
-            list.appendChild(div);
-        });
-        // Bind remove buttons
-        list.querySelectorAll(".artist-remove").forEach(btn => {
-            btn.addEventListener("click", async () => {
-                await API.del(`/api/artists/${btn.dataset.id}`);
+
+            const info = document.createElement("div");
+            info.className = "artist-info";
+
+            if (a.image_url) {
+                const img = document.createElement("img");
+                img.className = "artist-img";
+                img.alt = "";
+                img.src = a.image_url;
+                info.appendChild(img);
+            } else {
+                const placeholder = document.createElement("div");
+                placeholder.className = "artist-img artist-img-placeholder";
+                info.appendChild(placeholder);
+            }
+
+            const nameSpan = document.createElement("span");
+            nameSpan.className = "artist-name-text";
+            nameSpan.textContent = a.name;
+            info.appendChild(nameSpan);
+
+            const removeBtn = document.createElement("button");
+            removeBtn.className = "artist-remove";
+            removeBtn.title = "Remove";
+            removeBtn.textContent = "\u00d7";
+            removeBtn.addEventListener("click", async () => {
+                await API.del(`/api/artists/${encodeURIComponent(a.id)}`);
                 loadArtists();
             });
+
+            div.appendChild(info);
+            div.appendChild(removeBtn);
+            list.appendChild(div);
         });
     }
 
@@ -285,17 +300,31 @@ async function initArtists() {
                 data.artists.forEach(a => {
                     const div = document.createElement("div");
                     div.className = "search-result-item";
-                    const imgHtml = a.image_url
-                        ? `<img src="${a.image_url}" class="artist-img" alt="">`
-                        : '<div class="artist-img"></div>';
-                    const followers = a.followers > 0 ? `${(a.followers / 1000).toFixed(0)}K followers` : "";
-                    div.innerHTML = `
-                        ${imgHtml}
-                        <div class="search-result-info">
-                            <div class="search-result-name">${escapeHtml(a.name)}</div>
-                            <div class="search-result-meta">${followers}</div>
-                        </div>
-                    `;
+
+                    if (a.image_url) {
+                        const img = document.createElement("img");
+                        img.className = "artist-img";
+                        img.alt = "";
+                        img.src = a.image_url;
+                        div.appendChild(img);
+                    } else {
+                        const placeholder = document.createElement("div");
+                        placeholder.className = "artist-img";
+                        div.appendChild(placeholder);
+                    }
+
+                    const infoDiv = document.createElement("div");
+                    infoDiv.className = "search-result-info";
+                    const nameDiv = document.createElement("div");
+                    nameDiv.className = "search-result-name";
+                    nameDiv.textContent = a.name;
+                    infoDiv.appendChild(nameDiv);
+                    const metaDiv = document.createElement("div");
+                    metaDiv.className = "search-result-meta";
+                    metaDiv.textContent = a.followers > 0 ? `${(a.followers / 1000).toFixed(0)}K followers` : "";
+                    infoDiv.appendChild(metaDiv);
+                    div.appendChild(infoDiv);
+
                     div.addEventListener("click", async () => {
                         await API.post("/api/artists", { id: a.id, name: a.name, image_url: a.image_url || "" });
                         searchInput.value = "";
