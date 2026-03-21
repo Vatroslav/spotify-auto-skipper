@@ -2,13 +2,14 @@
 Never-skip artists API routes.
 """
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 
 from app.database import get_never_skip_artists, add_never_skip_artist, remove_never_skip_artist
 from app.config import get_spotify_client_id, get_spotify_client_secret
 from app.spotify_api import SpotifyClient
+from app.routers.deps import require_auth
 
-router = APIRouter(prefix="/api/artists", tags=["artists"])
+router = APIRouter(prefix="/api/artists", tags=["artists"], dependencies=[Depends(require_auth)])
 
 
 @router.get("")

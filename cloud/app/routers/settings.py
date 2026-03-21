@@ -3,12 +3,13 @@ Settings API routes.
 """
 
 import re
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 
 from app.config import load_settings, save_settings, CONFIG_DEFAULTS, get_spotify_client_id, get_spotify_client_secret
 from app.spotify_api import SpotifyClient
+from app.routers.deps import require_auth
 
-router = APIRouter(prefix="/api/settings", tags=["settings"])
+router = APIRouter(prefix="/api/settings", tags=["settings"], dependencies=[Depends(require_auth)])
 
 
 @router.get("")

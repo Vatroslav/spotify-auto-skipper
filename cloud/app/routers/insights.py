@@ -2,13 +2,14 @@
 Insights API routes.
 """
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 
 from app.database import get_track_events, get_track_event_dates
 from app.config import load_settings
 from app.insights import events_from_db_rows, compute_metrics, generate_insights
+from app.routers.deps import require_auth
 
-router = APIRouter(prefix="/api/insights", tags=["insights"])
+router = APIRouter(prefix="/api/insights", tags=["insights"], dependencies=[Depends(require_auth)])
 
 
 @router.get("/dates")
