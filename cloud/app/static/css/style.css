@@ -519,7 +519,7 @@ input:focus, select:focus {
     margin-bottom: 16px;
 }
 
-.date-input, .search-input {
+.date-input {
     background: var(--bg-input);
     color: var(--text-primary);
     border: 1px solid var(--border-primary);
@@ -528,12 +528,9 @@ input:focus, select:focus {
     font-size: 0.9rem;
     font-family: inherit;
     color-scheme: dark;
+    width: 160px;
+    text-align: center;
 }
-
-.date-input { width: 100px; max-width: 100px; text-align: center; flex-shrink: 0; flex-grow: 0; }
-
-.search-input { width: 200px; max-width: 200px; flex-shrink: 1; flex-grow: 0; }
-.search-input::placeholder { color: var(--text-muted); }
 
 /* ── Bottom Navigation ───────────────────────────── */
 
