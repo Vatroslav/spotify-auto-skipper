@@ -31,6 +31,7 @@ class SpotifyClient:
         self._access_token: str | None = None
         self._token_expires_at: datetime = datetime.now(timezone.utc)
         self._http = httpx.AsyncClient(timeout=15)
+        self._refresh_lock = asyncio.Lock()
 
     async def close(self):
         await self._http.aclose()
@@ -107,12 +108,13 @@ class SpotifyClient:
         )
 
     async def get_token(self) -> str:
-        """Returns a valid access token, refreshing if needed."""
-        if self._access_token is None:
-            await self._load_tokens_from_db()
-        if self._access_token is None or datetime.now(timezone.utc) >= self._token_expires_at:
-            await self.refresh_access_token()
-        return self._access_token
+        """Returns a valid access token, refreshing if needed (lock-protected)."""
+        async with self._refresh_lock:
+            if self._access_token is None:
+                await self._load_tokens_from_db()
+            if self._access_token is None or datetime.now(timezone.utc) >= self._token_expires_at:
+                await self.refresh_access_token()
+            return self._access_token
 
     # ── HTTP wrappers with rate-limit retry ──────────────────────
 
@@ -130,6 +132,12 @@ class SpotifyClient:
                     await asyncio.sleep(self.RATE_LIMIT_RETRY_DELAYS[min(attempt, 2)])
                     continue
                 return None
+
+            if r.status_code == 401 and attempt < self.RATE_LIMIT_MAX_RETRIES:
+                # Token expired mid-flight — force a refresh and retry once
+                self._access_token = None
+                self._token_expires_at = datetime.now(timezone.utc)
+                continue
 
             if r.status_code == 429 and attempt < self.RATE_LIMIT_MAX_RETRIES:
                 delay_index = min(attempt, 2)
