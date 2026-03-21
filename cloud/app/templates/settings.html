@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Settings - Spotify Auto-Skipper{% endblock %}
+{% block content %}
+<div class="container">
+    <h1 class="page-title">Settings</h1>
+
+    <form id="settings-form">
+        <div class="card">
+            <div class="card-title">Skip Behavior</div>
+
+            <div class="form-group">
+                <label for="skip-window">Skip Window (days)</label>
+                <input type="number" id="skip-window" data-setting="skip_window_days" min="1" max="365">
+                <div class="help-text">Songs listened to within this many days will be skipped.</div>
+            </div>
+
+            <div class="form-group">
+                <label for="poll-interval">Poll Interval (seconds)</label>
+                <input type="number" id="poll-interval" data-setting="poll_interval_seconds" min="5" max="600">
+                <div class="help-text">How often to check what's playing on Spotify.</div>
+            </div>
+
+            <div class="toggle">
+                <span class="toggle-label">Always play Liked Songs</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" data-setting="always_play_liked_songs">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            <div class="toggle">
+                <span class="toggle-label">Enable never-skip artists</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" data-setting="enable_never_skip_artists">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Restart Pattern</div>
+
+            <div class="toggle">
+                <span class="toggle-label">Enable restart pattern detection</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" data-setting="enable_restart_pattern">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            <div class="form-group mt-8">
+                <label for="restart-count">Song count threshold</label>
+                <input type="number" id="restart-count" data-setting="restart_pattern_song_count" min="2" max="20">
+            </div>
+
+            <div class="form-group">
+                <label for="restart-diff">Day difference threshold</label>
+                <input type="number" id="restart-diff" data-setting="restart_pattern_day_diff" min="0" max="30">
+            </div>
+
+            <div class="form-group">
+                <label for="dummy-playlist">Dummy playlist ID</label>
+                <input type="text" id="dummy-playlist" data-setting="dummy_playlist_id">
+                <div class="help-text">Used to reset shuffle. Any playlist works.</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Data</div>
+
+            <div class="form-group">
+                <label for="log-retention">Log retention (days)</label>
+                <input type="number" id="log-retention" data-setting="log_retention_days" min="1" max="365">
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-accent btn-full mt-16">Save Settings</button>
+        <div id="save-msg" class="text-success text-center mt-8 hidden"></div>
+    </form>
+
+    <div class="card mt-16">
+        <div class="card-title">Account</div>
+        <button id="logout-btn" class="btn btn-danger btn-full" onclick="fetch('/auth/logout',{method:'POST'}).then(()=>location.href='/')">
+            Disconnect Spotify
+        </button>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Insights - Spotify Auto-Skipper{% endblock %}
+{% block content %}
+<div class="container">
+    <h1 class="page-title">Insights</h1>
+
+    <div class="date-nav">
+        <button id="date-prev" class="btn">&lsaquo; Prev</button>
+        <span id="date-text" class="date-text">Loading...</span>
+        <button id="date-next" class="btn">Next &rsaquo;</button>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Metrics</div>
+        <div id="metrics-grid" class="metrics-grid">
+            <p class="text-muted text-center">Loading...</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Observations</div>
+        <div id="insights-list"></div>
+    </div>
+</div>
+{% endblock %}
