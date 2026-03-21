@@ -576,8 +576,17 @@ function initLogs() {
     }
     if (searchInput) searchInput.addEventListener("input", applySearch);
 
-    // Date picker change
-    if (datePicker) datePicker.addEventListener("change", loadLogs);
+    // Date input — reload when valid yyyy-mm-dd or empty (today)
+    if (datePicker) {
+        let debounceTimer;
+        datePicker.addEventListener("input", () => {
+            clearTimeout(debounceTimer);
+            const v = datePicker.value.trim();
+            if (v === "" || /^\d{4}-\d{2}-\d{2}$/.test(v)) {
+                debounceTimer = setTimeout(loadLogs, 300);
+            }
+        });
+    }
 
     // Level filter chips
     document.querySelectorAll("[data-level]").forEach(chip => {
