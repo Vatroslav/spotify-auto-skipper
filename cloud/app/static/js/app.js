@@ -524,7 +524,9 @@ function initLogs() {
     async function loadLogs() {
         const date = datePicker ? datePicker.value : "";
         const dateParam = date ? `&date=${date}` : "";
-        const data = await API.get(`/api/logs?level=${currentLevel}${dateParam}`);
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const tzParam = `&tz=${encodeURIComponent(tz)}`;
+        const data = await API.get(`/api/logs?level=${currentLevel}${dateParam}${tzParam}`);
         if (!data.logs || data.logs.length === 0) {
             logsContainer.innerHTML = '<p class="text-muted text-center mt-16">No log entries.</p>';
             return;
