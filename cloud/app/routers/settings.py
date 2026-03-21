@@ -18,6 +18,8 @@ router = APIRouter(prefix="/api/settings", tags=["settings"], dependencies=[Depe
 class SettingsUpdate(BaseModel):
     skip_window_days: Optional[int] = None
     poll_interval_seconds: Optional[int] = None
+    idle_threshold: Optional[int] = None
+    idle_poll_interval_seconds: Optional[int] = None
     enable_restart_pattern: Optional[bool] = None
     restart_pattern_song_count: Optional[int] = None
     restart_pattern_day_diff: Optional[int] = None

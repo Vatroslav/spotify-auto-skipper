@@ -28,6 +28,7 @@ async def polling_loop():
     and skip if within the configured window.
     """
     recent_skip_days: list[int] = []
+    consecutive_idle: int = 0
 
     # Wait for OAuth tokens to be available
     while True:
@@ -50,6 +51,8 @@ async def polling_loop():
     settings = await load_settings()
     await _log(f"Configuration: skip_window={settings['skip_window_days']}d, "
                f"poll_interval={settings['poll_interval_seconds']}s, "
+               f"idle_threshold={settings['idle_threshold']}, "
+               f"idle_poll_interval={settings['idle_poll_interval_seconds']}s, "
                f"liked_songs={'on' if settings['always_play_liked_songs'] else 'off'}, "
                f"restart_pattern={'on' if settings['enable_restart_pattern'] else 'off'}")
 
@@ -71,6 +74,10 @@ async def polling_loop():
             # Update poll timestamp every cycle (for countdown timer)
             app_state.last_checked_timestamp = datetime.now(timezone.utc)
 
+            # Adaptive polling: determine sleep interval
+            idle_threshold = settings["idle_threshold"]
+            idle_poll_interval = settings["idle_poll_interval_seconds"]
+
             # Manual pause
             if app_state.skipping_paused:
                 await _log("Skipping is paused.")
@@ -82,13 +89,25 @@ async def polling_loop():
 
             # Nothing playing
             if not track or not track.get("artist") or not track.get("id"):
-                await _log("Nothing is playing right now.")
+                consecutive_idle += 1
+                if not app_state.idle_mode and consecutive_idle >= idle_threshold:
+                    app_state.idle_mode = True
+                    await _log(f"Nothing playing for {consecutive_idle} checks — switching to slow polling ({idle_poll_interval}s).")
+                else:
+                    await _log("Nothing is playing right now.")
                 app_state.current_track = None
-                await app_state.interruptible_sleep(poll_interval)
+                sleep_interval = idle_poll_interval if app_state.idle_mode else poll_interval
+                await app_state.interruptible_sleep(sleep_interval)
                 continue
 
             # Update cached current track for the dashboard
             app_state.current_track = track
+
+            # Playback detected — exit idle mode
+            if app_state.idle_mode:
+                await _log("Playback detected — resuming normal polling.")
+                app_state.idle_mode = False
+            consecutive_idle = 0
 
             # Same song as last time
             if track["id"] == app_state.last_checked_track_id:

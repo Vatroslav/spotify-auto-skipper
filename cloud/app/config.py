@@ -9,6 +9,8 @@ from app.database import get_all_settings, set_many_settings
 CONFIG_DEFAULTS = {
     "skip_window_days": 60,
     "poll_interval_seconds": 120,
+    "idle_threshold": 3,
+    "idle_poll_interval_seconds": 600,
     "enable_restart_pattern": True,
     "restart_pattern_song_count": 5,
     "restart_pattern_day_diff": 2,
@@ -21,6 +23,7 @@ CONFIG_DEFAULTS = {
 # Type mappings
 _INT_KEYS = {
     "skip_window_days", "poll_interval_seconds",
+    "idle_threshold", "idle_poll_interval_seconds",
     "restart_pattern_song_count", "restart_pattern_day_diff",
     "log_retention_days",
 }
@@ -100,6 +103,8 @@ async def load_settings() -> dict:
 _RANGES = {
     "skip_window_days": (1, 365),
     "poll_interval_seconds": (5, 600),
+    "idle_threshold": (1, 20),
+    "idle_poll_interval_seconds": (60, 3600),
     "log_retention_days": (1, 365),
     "restart_pattern_song_count": (2, 20),
     "restart_pattern_day_diff": (0, 30),

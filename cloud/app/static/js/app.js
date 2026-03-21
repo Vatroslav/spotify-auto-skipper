@@ -74,6 +74,9 @@ function initDashboard() {
             } else if (data.skipping_paused) {
                 statusBadge.textContent = "Skipping Paused";
                 statusBadge.className = "status-badge paused";
+            } else if (data.idle_mode) {
+                statusBadge.textContent = "Idle Mode";
+                statusBadge.className = "status-badge paused";
             } else {
                 statusBadge.textContent = "Skipping Active";
                 statusBadge.className = "status-badge active";
