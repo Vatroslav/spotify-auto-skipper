@@ -3,9 +3,13 @@
 {% block content %}
 <div class="container">
     <div class="card now-playing">
+        <div id="last-checked-time" class="last-checked-time"></div>
+        <div id="next-check" class="next-check"></div>
+        <img id="album-art" class="album-art hidden" src="" alt="">
         <div id="track-info" class="hidden">
             <div id="track-name" class="track-name"></div>
             <div id="artist-name" class="artist-name"></div>
+            <div id="last-check" class="last-check"></div>
         </div>
         <div id="nothing-playing" class="nothing-playing">Nothing is playing</div>
         <div id="status-badge" class="status-badge offline">Connecting...</div>

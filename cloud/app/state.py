@@ -16,6 +16,7 @@ class AppState:
         self.worker_running: bool = False
         self.check_now_event: asyncio.Event = asyncio.Event()
         self.recent_skip_days: list[int] = []
+        self.last_check_message: str | None = None
 
     async def interruptible_sleep(self, seconds: float):
         """Sleep that can be interrupted by check_now_event."""

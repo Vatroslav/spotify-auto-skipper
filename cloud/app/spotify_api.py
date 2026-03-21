@@ -178,11 +178,23 @@ class SpotifyClient:
         progress_ms = data.get("progress_ms", 0)
         duration_ms = item.get("duration_ms", 0)
 
+        album = item.get("album") or {}
+        album_images = album.get("images") or []
+        # Pick medium-size image (300px) or fallback to first available
+        album_art = ""
+        for img in album_images:
+            if img.get("height", 0) == 300:
+                album_art = img["url"]
+                break
+        if not album_art and album_images:
+            album_art = album_images[0]["url"]
+
         if track_id and artist_name and track_name:
             return {
                 "id": track_id, "name": track_name, "artist": artist_name,
                 "artist_ids": artist_ids, "context_uri": context_uri,
                 "progress_ms": progress_ms, "duration_ms": duration_ms,
+                "album_art": album_art,
             }
         return None
 

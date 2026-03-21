@@ -6,6 +6,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from app.state import app_state
+from app.config import load_settings
 
 router = APIRouter(prefix="/api/playback", tags=["playback"])
 
@@ -14,11 +15,14 @@ router = APIRouter(prefix="/api/playback", tags=["playback"])
 async def get_playback(request: Request):
     """Return current track info and worker status."""
     track = app_state.current_track
+    settings = await load_settings()
     return {
         "track": track,
         "skipping_paused": app_state.skipping_paused,
         "worker_running": app_state.worker_running,
         "last_checked": app_state.last_checked_timestamp.isoformat() if app_state.last_checked_timestamp else None,
+        "last_check_message": app_state.last_check_message,
+        "poll_interval": settings["poll_interval_seconds"],
     }
 
 
