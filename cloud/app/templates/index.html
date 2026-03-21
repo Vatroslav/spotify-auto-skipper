@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Spotify Auto-Skipper{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="card now-playing">
+        <div id="last-checked-time" class="last-checked-time">&nbsp;</div>
+        <div id="next-check" class="next-check">&nbsp;</div>
+        <img id="album-art" class="album-art hidden" src="" alt="">
+        <div id="track-info" class="hidden">
+            <div id="track-name" class="track-name"></div>
+            <div id="artist-name" class="artist-name"></div>
+            <div id="last-check" class="last-check"></div>
+        </div>
+        <div id="nothing-playing" class="nothing-playing">Nothing is playing</div>
+        <div id="status-badge" class="status-badge offline">Connecting...</div>
+    </div>
+
+    <div class="btn-group">
+        <button id="pause-btn" class="btn btn-full">Pause Skipping</button>
+        <button id="check-now-btn" class="btn btn-accent btn-full">Check Now</button>
+    </div>
+
+    <div class="version-text"><a href="https://github.com/Vatroslav/spotify-auto-skipper" target="_blank" rel="noopener">{{ version }}</a></div>
+</div>
+{% endblock %}
