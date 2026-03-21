@@ -4,10 +4,11 @@ Settings API routes.
 
 import re
 from typing import Optional
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from app.config import load_settings, save_settings, CONFIG_DEFAULTS
+from app.spotify_api import CredentialError
 from app.state import app_state
 from app.routers.deps import require_auth
 
@@ -50,7 +51,7 @@ async def update_settings(body: SettingsUpdate):
 async def resolve_playlist(request: Request, q: str = ""):
     """Resolve a Spotify playlist link or ID to its name."""
     if not q.strip():
-        return {"error": "No playlist ID or link provided"}
+        raise HTTPException(status_code=400, detail="No playlist ID or link provided")
     # Extract playlist ID from various formats
     playlist_id = q.strip()
     # Handle full URLs like https://open.spotify.com/playlist/37i9dQZF1DX0XUsuxWHRQd?si=...
@@ -61,7 +62,10 @@ async def resolve_playlist(request: Request, q: str = ""):
     if playlist_id.startswith("spotify:playlist:"):
         playlist_id = playlist_id.split(":")[-1]
     client = app_state.spotify_client
-    info = await client.get_playlist_info(playlist_id)
+    try:
+        info = await client.get_playlist_info(playlist_id)
+    except CredentialError:
+        raise HTTPException(status_code=401, detail="Spotify credentials expired. Please re-authorize via /auth/login.")
     if info:
         return {"id": playlist_id, **info}
-    return {"error": "Playlist not found"}
+    raise HTTPException(status_code=404, detail="Playlist not found")
