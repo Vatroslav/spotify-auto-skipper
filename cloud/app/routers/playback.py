@@ -2,13 +2,14 @@
 Playback API routes — current track, check now, pause/resume.
 """
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from app.state import app_state
 from app.config import load_settings
+from app.routers.deps import require_auth
 
-router = APIRouter(prefix="/api/playback", tags=["playback"])
+router = APIRouter(prefix="/api/playback", tags=["playback"], dependencies=[Depends(require_auth)])
 
 
 @router.get("")

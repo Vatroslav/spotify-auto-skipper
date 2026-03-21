@@ -2,11 +2,12 @@
 Logs API routes.
 """
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 
 from app.database import get_logs, get_log_dates
+from app.routers.deps import require_auth
 
-router = APIRouter(prefix="/api/logs", tags=["logs"])
+router = APIRouter(prefix="/api/logs", tags=["logs"], dependencies=[Depends(require_auth)])
 
 
 @router.get("/dates")
