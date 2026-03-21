@@ -18,7 +18,7 @@ async def available_dates(request: Request):
 
 
 @router.get("")
-async def get_log_entries(request: Request, date: str = "", level: str = "all"):
+async def get_log_entries(request: Request, date: str = "", level: str = "all", tz: str = ""):
     """Return log entries for a specific date, or today if omitted."""
-    logs = await get_logs(date, level)
+    logs = await get_logs(date, level, tz)
     return {"date": date, "logs": logs}

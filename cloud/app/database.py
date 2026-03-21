@@ -6,7 +6,8 @@ All data persists at DATA_DIR/skipper.db (default: /app/data/skipper.db).
 import os
 import json
 import aiosqlite
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 from app.encryption import encrypt, decrypt
 
@@ -240,35 +241,52 @@ async def add_log(message: str, level: str = "info"):
         await db.close()
 
 
-async def get_logs(date_str: str = "", level: str = "all") -> list[dict]:
+def _date_to_utc_range(date_str: str, tz_name: str) -> tuple[str, str]:
+    """Convert a local date + timezone into a UTC start/end range."""
+    try:
+        tz = ZoneInfo(tz_name)
+    except Exception:
+        # Fallback to UTC if timezone is invalid
+        return date_str + " 00:00:00", date_str + " 23:59:59"
+    local_start = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=tz)
+    local_end = local_start + timedelta(days=1)
+    utc_start = local_start.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    utc_end = local_end.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    return utc_start, utc_end
+
+
+def _today_utc_range(tz_name: str) -> tuple[str, str]:
+    """Get UTC range for 'today' in the user's timezone."""
+    try:
+        tz = ZoneInfo(tz_name)
+    except Exception:
+        # Fallback: use UTC today
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        return today + " 00:00:00", today + " 23:59:59"
+    now_local = datetime.now(tz)
+    today_str = now_local.strftime("%Y-%m-%d")
+    return _date_to_utc_range(today_str, tz_name)
+
+
+async def get_logs(date_str: str = "", level: str = "all", tz: str = "") -> list[dict]:
     db = await get_db()
     try:
         if date_str:
-            if level in ("all", "skipped", "kept"):
-                cursor = await db.execute(
-                    """SELECT id, timestamp, level, message FROM logs
-                       WHERE date(timestamp) = ? ORDER BY timestamp""",
-                    (date_str,),
-                )
-            else:
-                cursor = await db.execute(
-                    """SELECT id, timestamp, level, message FROM logs
-                       WHERE date(timestamp) = ? AND level = ? ORDER BY timestamp""",
-                    (date_str, level),
-                )
+            utc_start, utc_end = _date_to_utc_range(date_str, tz)
         else:
-            # No date filter — return today's logs (UTC)
-            if level in ("all", "skipped", "kept"):
-                cursor = await db.execute(
-                    """SELECT id, timestamp, level, message FROM logs
-                       WHERE date(timestamp) = date('now') ORDER BY timestamp""",
-                )
-            else:
-                cursor = await db.execute(
-                    """SELECT id, timestamp, level, message FROM logs
-                       WHERE date(timestamp) = date('now') AND level = ? ORDER BY timestamp""",
-                    (level,),
-                )
+            utc_start, utc_end = _today_utc_range(tz)
+
+        base_where = "WHERE timestamp >= ? AND timestamp < ?"
+        params: list = [utc_start, utc_end]
+
+        if level not in ("all", "skipped", "kept"):
+            base_where += " AND level = ?"
+            params.append(level)
+
+        cursor = await db.execute(
+            f"SELECT id, timestamp, level, message FROM logs {base_where} ORDER BY timestamp",
+            params,
+        )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
     finally:
