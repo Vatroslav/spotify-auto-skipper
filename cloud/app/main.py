@@ -40,7 +40,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Spotify Auto-Skipper", version=APP_VERSION, lifespan=lifespan)
 
 # Session middleware for auth
-app.add_middleware(SessionMiddleware, secret_key=get_secret_key())
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=get_secret_key(),
+    https_only=True,
+    same_site="lax",
+)
 
 # Static files and templates
 import os
