@@ -62,6 +62,13 @@ def compute_metrics(events: list[TrackEvent]) -> dict:
     skip_days = [e.days_ago for e in skipped if e.days_ago is not None]
     avg_skip_days = (sum(skip_days) / len(skip_days)) if skip_days else None
 
+    # most_common(1) returns [((artist, song), count)] — unpack to a stable dict
+    def _top_track(entries):
+        if not entries:
+            return None
+        (artist, song), count = entries[0]
+        return {"artist": artist, "song": song, "count": count}
+
     return {
         "songs_played": total,
         "songs_skipped": skip_count,
@@ -69,8 +76,8 @@ def compute_metrics(events: list[TrackEvent]) -> dict:
         "skip_rate": skip_rate,
         "unique_songs": unique_songs,
         "unique_artists": unique_artists,
-        "most_skipped": (most_skipped[0][0], most_skipped[0][1]) if most_skipped else None,
-        "most_played": (most_played[0][0], most_played[0][1]) if most_played else None,
+        "most_skipped": _top_track(most_skipped),
+        "most_played": _top_track(most_played),
         "longest_skip_streak": longest_skip_streak,
         "avg_skip_days": avg_skip_days,
     }
@@ -122,12 +129,11 @@ def generate_insights(metrics: dict, skip_window_days: int = 60) -> list[dict]:
         })
 
     ms = metrics["most_skipped"]
-    if ms and ms[1] >= 3:
-        artist, song = ms[0]
+    if ms and ms["count"] >= 3:
         insights.append({
             "icon": "warning",
             "title": "Frequently skipped song",
-            "detail": f'"{song}" by {artist} was skipped {ms[1]} times.',
+            "detail": f'"{ms["song"]}" by {ms["artist"]} was skipped {ms["count"]} times.',
         })
 
     avg = metrics["avg_skip_days"]
