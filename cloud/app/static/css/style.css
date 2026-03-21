@@ -514,7 +514,6 @@ input:focus, select:focus {
 .date-nav {
     display: flex;
     align-items: center;
-    justify-content: center;
     gap: 16px;
     margin-bottom: 16px;
 }
@@ -529,7 +528,6 @@ input:focus, select:focus {
     font-family: inherit;
     color-scheme: dark;
     width: 160px;
-    text-align: center;
 }
 
 /* ── Bottom Navigation ───────────────────────────── */
