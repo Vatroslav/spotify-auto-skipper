@@ -101,11 +101,18 @@ async def polling_loop():
 
             await _log(f"Currently playing: {track['artist']} \u2013 {track['name']}")
 
-            # Get latest scrobble date from Last.fm
-            last_played = await get_last_play_date(track["artist"], track["name"])
+            # Get latest scrobble date from Last.fm (retry up to 3 times)
+            last_played = None
+            for attempt in range(3):
+                last_played = await get_last_play_date(track["artist"], track["name"])
+                if last_played is not LASTFM_ERROR:
+                    break
+                if attempt < 2:
+                    await _log(f"Last.fm unavailable — retrying ({attempt + 2}/3)...", "warning")
+                    await asyncio.sleep(5)
 
             if last_played is LASTFM_ERROR:
-                await _log("Last.fm unavailable — skipping check for this song.", "warning")
+                await _log("Last.fm unavailable after 3 attempts — skipping check for this song.", "warning")
                 app_state.last_check_message = "Last.fm error"
                 await app_state.interruptible_sleep(poll_interval)
                 continue
