@@ -8,14 +8,13 @@ from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
 
-from app.config import get_secret_key
-
 _fernet: Fernet | None = None
 
 
 def _get_fernet() -> Fernet:
     global _fernet
     if _fernet is None:
+        from app.config import get_secret_key
         kdf = HKDF(
             algorithm=hashes.SHA256(),
             length=32,
