@@ -530,9 +530,9 @@ input:focus, select:focus {
     color-scheme: dark;
 }
 
-.date-input { width: 100px; text-align: center; flex-shrink: 0; }
+.date-input { width: 100px; max-width: 100px; text-align: center; flex-shrink: 0; flex-grow: 0; }
 
-.search-input { width: 200px; }
+.search-input { width: 200px; max-width: 200px; flex-shrink: 1; flex-grow: 0; }
 .search-input::placeholder { color: var(--text-muted); }
 
 /* ── Bottom Navigation ───────────────────────────── */
