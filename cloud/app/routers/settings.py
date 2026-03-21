@@ -7,8 +7,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
-from app.config import load_settings, save_settings, CONFIG_DEFAULTS, get_spotify_client_id, get_spotify_client_secret
-from app.spotify_api import SpotifyClient
+from app.config import load_settings, save_settings, CONFIG_DEFAULTS
+from app.state import app_state
 from app.routers.deps import require_auth
 
 router = APIRouter(prefix="/api/settings", tags=["settings"], dependencies=[Depends(require_auth)])
@@ -60,11 +60,8 @@ async def resolve_playlist(request: Request, q: str = ""):
     # Handle spotify:playlist:ID format
     if playlist_id.startswith("spotify:playlist:"):
         playlist_id = playlist_id.split(":")[-1]
-    client = SpotifyClient(get_spotify_client_id(), get_spotify_client_secret())
-    try:
-        info = await client.get_playlist_info(playlist_id)
-    finally:
-        await client.close()
+    client = app_state.spotify_client
+    info = await client.get_playlist_info(playlist_id)
     if info:
         return {"id": playlist_id, **info}
     return {"error": "Playlist not found"}

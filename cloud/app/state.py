@@ -17,6 +17,7 @@ class AppState:
         self.check_now_event: asyncio.Event = asyncio.Event()
         self.recent_skip_days: list[int] = []
         self.last_check_message: str | None = None
+        self.spotify_client = None  # Shared SpotifyClient, set during lifespan
 
     async def interruptible_sleep(self, seconds: float):
         """Sleep that can be interrupted by check_now_event."""

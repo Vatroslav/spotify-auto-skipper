@@ -11,8 +11,9 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from app import APP_VERSION
-from app.config import get_secret_key, seed_defaults
+from app.config import get_secret_key, get_spotify_client_id, get_spotify_client_secret, seed_defaults
 from app.database import init_db
+from app.spotify_api import SpotifyClient
 from app.state import app_state
 
 
@@ -21,6 +22,9 @@ async def lifespan(app: FastAPI):
     # Startup
     await init_db()
     await seed_defaults()
+
+    # Create a single shared SpotifyClient for the entire process
+    app_state.spotify_client = SpotifyClient(get_spotify_client_id(), get_spotify_client_secret())
 
     from app.worker import polling_loop
     task = asyncio.create_task(polling_loop())
@@ -35,6 +39,9 @@ async def lifespan(app: FastAPI):
         await task
     except asyncio.CancelledError:
         pass
+    if app_state.spotify_client:
+        await app_state.spotify_client.close()
+        app_state.spotify_client = None
 
 
 app = FastAPI(title="Spotify Auto-Skipper", version=APP_VERSION, lifespan=lifespan)

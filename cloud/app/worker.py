@@ -6,12 +6,12 @@ Runs as an asyncio task within FastAPI's lifespan.
 import asyncio
 from datetime import datetime, timedelta, timezone
 
-from app.config import load_settings, get_spotify_client_id, get_spotify_client_secret
+from app.config import load_settings
 from app.database import (
     add_log, add_track_event, get_oauth_tokens,
     is_artist_never_skipped, purge_old_logs,
 )
-from app.spotify_api import SpotifyClient, CredentialError
+from app.spotify_api import CredentialError
 from app.lastfm_api import get_last_play_date, LASTFM_ERROR
 from app.state import app_state
 
@@ -37,7 +37,7 @@ async def polling_loop():
         await _log("Waiting for Spotify authorization... Visit /auth/login to connect.", "warning")
         await asyncio.sleep(10)
 
-    client = SpotifyClient(get_spotify_client_id(), get_spotify_client_secret())
+    client = app_state.spotify_client
 
     try:
         await client.get_token()
@@ -188,5 +188,3 @@ async def polling_loop():
             await _log(f"Unexpected error: {e}", "error")
 
         await app_state.interruptible_sleep(poll_interval)
-
-    await client.close()
