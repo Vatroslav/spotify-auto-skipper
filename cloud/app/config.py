@@ -64,7 +64,13 @@ def get_lastfm_api_key() -> str:
     return os.environ.get("LASTFM_API_KEY", "")
 
 def get_secret_key() -> str:
-    return os.environ.get("SECRET_KEY", "change-me-in-production")
+    key = os.environ.get("SECRET_KEY", "")
+    if not key or len(key) < 16:
+        raise RuntimeError(
+            "SECRET_KEY env var must be set and at least 16 characters. "
+            "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+        )
+    return key
 
 def get_base_url() -> str:
     return os.environ.get("BASE_URL", "http://localhost:8000")
