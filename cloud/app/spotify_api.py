@@ -244,6 +244,18 @@ class SpotifyClient:
             return data[0]
         return False
 
+    async def get_playlist_info(self, playlist_id: str) -> dict | None:
+        """Resolve a playlist ID to its info. Returns None if not found."""
+        r = await self._get(f"https://api.spotify.com/v1/playlists/{playlist_id}", params={"fields": "name,description,owner(display_name)"})
+        if r is None or r.status_code != 200:
+            return None
+        data = r.json()
+        return {
+            "name": data.get("name", ""),
+            "description": data.get("description", ""),
+            "owner": (data.get("owner") or {}).get("display_name", ""),
+        }
+
     async def search_artists(self, query: str, limit: int = 5) -> list[dict]:
         if not query or not query.strip():
             return []

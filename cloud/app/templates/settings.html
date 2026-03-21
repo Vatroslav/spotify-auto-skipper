@@ -59,9 +59,12 @@
             </div>
 
             <div class="form-group">
-                <label for="dummy-playlist">Dummy playlist ID</label>
-                <input type="text" id="dummy-playlist" data-setting="dummy_playlist_id">
-                <div class="help-text">Used to reset shuffle. Any playlist works.</div>
+                <label for="dummy-playlist">Dummy playlist &mdash; Used to reset shuffle. Any playlist works.</label>
+                <div class="input-with-btn">
+                    <input type="text" id="dummy-playlist" data-setting="dummy_playlist_id" placeholder="Playlist ID or Spotify link">
+                    <button type="button" id="resolve-playlist-btn" class="btn">Resolve</button>
+                </div>
+                <div id="playlist-status" class="help-text"></div>
             </div>
         </div>
 

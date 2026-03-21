@@ -4,16 +4,15 @@
 
 // ── Toast notification ──────────────────────────────────────────
 
-function showToast(message, duration = 2000) {
+function showToast(message, duration = 2000, type = "success") {
     let toast = document.getElementById("toast");
     if (!toast) {
         toast = document.createElement("div");
         toast.id = "toast";
-        toast.className = "toast";
         document.body.appendChild(toast);
     }
     toast.textContent = message;
-    toast.classList.add("show");
+    toast.className = "toast show " + (type === "error" ? "toast-error" : "");
     clearTimeout(toast._timeout);
     toast._timeout = setTimeout(() => toast.classList.remove("show"), duration);
 }
@@ -161,9 +160,57 @@ function initSettings() {
                 updates[key] = el.value;
             }
         });
-        await API.put("/api/settings", updates);
-        showToast("Settings saved!");
+        const result = await API.put("/api/settings", updates);
+        if (result._warnings && result._warnings.length > 0) {
+            showToast(result._warnings[0], 3000, "error");
+        } else {
+            showToast("Settings saved!");
+        }
     });
+
+    // Resolve playlist button
+    const resolveBtn = document.getElementById("resolve-playlist-btn");
+    const playlistInput = document.getElementById("dummy-playlist");
+    const playlistStatus = document.getElementById("playlist-status");
+    if (resolveBtn && playlistInput) {
+        function formatPlaylistInfo(data) {
+            let text = `\u2713 ${data.name}`;
+            if (data.owner) text += ` \u2014 by ${data.owner}`;
+            if (data.description) text += `\n${data.description}`;
+            return text;
+        }
+
+        // Auto-resolve on load
+        loadSettings().then(async () => {
+            if (playlistInput.value) {
+                const data = await API.get(`/api/settings/resolve-playlist?q=${encodeURIComponent(playlistInput.value)}`);
+                if (data.name) {
+                    playlistStatus.textContent = formatPlaylistInfo(data);
+                    playlistStatus.className = "help-text text-success";
+                    playlistInput.value = data.id;
+                }
+            }
+        });
+
+        resolveBtn.addEventListener("click", async () => {
+            const q = playlistInput.value.trim();
+            if (!q) return;
+            resolveBtn.disabled = true;
+            resolveBtn.textContent = "...";
+            const data = await API.get(`/api/settings/resolve-playlist?q=${encodeURIComponent(q)}`);
+            resolveBtn.disabled = false;
+            resolveBtn.textContent = "Resolve";
+            if (data.name) {
+                playlistStatus.textContent = formatPlaylistInfo(data);
+                playlistStatus.className = "help-text text-success";
+                playlistInput.value = data.id;
+            } else {
+                playlistStatus.textContent = `\u2717 ${data.error || "Not found"}`;
+                playlistStatus.className = "help-text text-error";
+            }
+        });
+        return; // loadSettings already called above
+    }
 
     loadSettings();
 }
