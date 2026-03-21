@@ -134,9 +134,9 @@ class SpotifyClient:
                 return None
 
             if r.status_code == 401 and attempt < self.RATE_LIMIT_MAX_RETRIES:
-                # Token expired mid-flight — force a refresh and retry once
-                self._access_token = None
-                self._token_expires_at = datetime.now(timezone.utc)
+                # Token expired/revoked mid-flight — force a real refresh
+                async with self._refresh_lock:
+                    await self.refresh_access_token()
                 continue
 
             if r.status_code == 429 and attempt < self.RATE_LIMIT_MAX_RETRIES:
