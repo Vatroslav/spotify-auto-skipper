@@ -65,10 +65,17 @@ def get_lastfm_api_key() -> str:
 
 def get_secret_key() -> str:
     key = os.environ.get("SECRET_KEY", "")
-    if not key or len(key) < 16:
+    if not key or len(key) < 32:
         raise RuntimeError(
-            "SECRET_KEY env var must be set and at least 16 characters. "
+            "SECRET_KEY env var must be set and at least 32 characters. "
             "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+        )
+    # Check for sufficient character diversity (reject low-entropy strings)
+    unique_chars = len(set(key))
+    if unique_chars < 10:
+        raise RuntimeError(
+            "SECRET_KEY has too little entropy (only %d unique characters). "
+            "Generate a random one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\"" % unique_chars
         )
     return key
 
