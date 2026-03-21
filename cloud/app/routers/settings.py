@@ -3,13 +3,27 @@ Settings API routes.
 """
 
 import re
+from typing import Optional
 from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel
 
 from app.config import load_settings, save_settings, CONFIG_DEFAULTS, get_spotify_client_id, get_spotify_client_secret
 from app.spotify_api import SpotifyClient
 from app.routers.deps import require_auth
 
 router = APIRouter(prefix="/api/settings", tags=["settings"], dependencies=[Depends(require_auth)])
+
+
+class SettingsUpdate(BaseModel):
+    skip_window_days: Optional[int] = None
+    poll_interval_seconds: Optional[int] = None
+    enable_restart_pattern: Optional[bool] = None
+    restart_pattern_song_count: Optional[int] = None
+    restart_pattern_day_diff: Optional[int] = None
+    dummy_playlist_id: Optional[str] = None
+    always_play_liked_songs: Optional[bool] = None
+    enable_never_skip_artists: Optional[bool] = None
+    log_retention_days: Optional[int] = None
 
 
 @router.get("")
@@ -20,11 +34,10 @@ async def get_settings(request: Request):
 
 
 @router.put("")
-async def update_settings(request: Request):
+async def update_settings(body: SettingsUpdate):
     """Partial update of settings."""
-    body = await request.json()
-    # Only accept known keys
-    valid = {k: v for k, v in body.items() if k in CONFIG_DEFAULTS}
+    # Only accept non-None fields that are known keys
+    valid = {k: v for k, v in body.model_dump(exclude_none=True).items() if k in CONFIG_DEFAULTS}
     warnings = []
     if valid:
         warnings = await save_settings(valid)
