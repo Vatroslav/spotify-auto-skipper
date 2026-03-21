@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from app import APP_VERSION
@@ -55,6 +56,22 @@ app.add_middleware(
     https_only=True,
     same_site="lax",
 )
+
+# Content Security Policy middleware
+class CSPMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "img-src 'self' https://i.scdn.co https://mosaic.scdn.co https://image-cdn-ak.spotifycdn.com "
+            "https://image-cdn-fa.spotifycdn.com https://wrapped-images.spotifycdn.com; "
+            "style-src 'self' 'unsafe-inline'; "
+            "script-src 'self'; "
+            "connect-src 'self'"
+        )
+        return response
+
+app.add_middleware(CSPMiddleware)
 
 # Static files and templates
 import os
