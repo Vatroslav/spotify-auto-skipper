@@ -471,13 +471,6 @@ function initLogs() {
 
     let currentLevel = "all";
 
-    // Default to today (local time)
-    const today = new Date();
-    const localDate = today.getFullYear() + "-" +
-        String(today.getMonth() + 1).padStart(2, "0") + "-" +
-        String(today.getDate()).padStart(2, "0");
-    if (datePicker) datePicker.value = localDate;
-
     function init() {
         loadLogs();
     }
@@ -608,9 +601,9 @@ function initLogs() {
         });
     }
 
-    // Auto-refresh every 5 seconds (only for today)
+    // Auto-refresh every 5 seconds (only when no date is selected = today)
     setInterval(() => {
-        if (datePicker && datePicker.value === localDate) {
+        if (!datePicker || !datePicker.value) {
             loadLogs();
         }
     }, 5000);
