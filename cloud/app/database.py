@@ -55,9 +55,12 @@ CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
 
 
 async def get_db() -> aiosqlite.Connection:
-    """Open a connection with row_factory enabled."""
+    """Open a connection with row_factory, WAL mode, and busy timeout."""
     db = await aiosqlite.connect(DB_PATH)
     db.row_factory = aiosqlite.Row
+    await db.execute("PRAGMA journal_mode=WAL")
+    await db.execute("PRAGMA busy_timeout=5000")
+    await db.execute("PRAGMA foreign_keys=ON")
     return db
 
 
