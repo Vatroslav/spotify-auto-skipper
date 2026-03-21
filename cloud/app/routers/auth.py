@@ -46,25 +46,37 @@ async def callback(request: Request, code: str = "", state: str = "", error: str
         return RedirectResponse("/?error=invalid_state")
 
     # Exchange code for tokens
-    async with httpx.AsyncClient(timeout=15) as client:
-        r = await client.post(
-            "https://accounts.spotify.com/api/token",
-            data={
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": f"{get_base_url()}/auth/callback",
-                "client_id": get_spotify_client_id(),
-                "client_secret": get_spotify_client_secret(),
-            },
-        )
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.post(
+                "https://accounts.spotify.com/api/token",
+                data={
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "redirect_uri": f"{get_base_url()}/auth/callback",
+                    "client_id": get_spotify_client_id(),
+                    "client_secret": get_spotify_client_secret(),
+                },
+            )
+    except httpx.RequestError:
+        return RedirectResponse("/?error=spotify_unreachable")
 
     if r.status_code != 200:
         return RedirectResponse("/?error=token_exchange_failed")
 
-    data = r.json()
-    access_token = data["access_token"]
+    try:
+        data = r.json()
+    except (ValueError, KeyError):
+        return RedirectResponse("/?error=invalid_token_response")
+
+    access_token = data.get("access_token")
+    if not access_token:
+        return RedirectResponse("/?error=missing_access_token")
     refresh_token = data.get("refresh_token", "")
-    expires_in = int(data.get("expires_in", 3600))
+    try:
+        expires_in = int(data.get("expires_in", 3600))
+    except (ValueError, TypeError):
+        expires_in = 3600
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=max(0, expires_in - 100))
 
     await save_oauth_tokens(access_token, refresh_token, expires_at.isoformat())
