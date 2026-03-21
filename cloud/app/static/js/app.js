@@ -2,6 +2,22 @@
  * Dashboard interactivity — polling, button handlers, page logic.
  */
 
+// ── Toast notification ──────────────────────────────────────────
+
+function showToast(message, duration = 2000) {
+    let toast = document.getElementById("toast");
+    if (!toast) {
+        toast = document.createElement("div");
+        toast.id = "toast";
+        toast.className = "toast";
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.classList.add("show");
+    clearTimeout(toast._timeout);
+    toast._timeout = setTimeout(() => toast.classList.remove("show"), duration);
+}
+
 // ── Dashboard (index.html) ──────────────────────────────────────
 
 function initDashboard() {
@@ -112,12 +128,7 @@ function initSettings() {
             }
         });
         await API.put("/api/settings", updates);
-        const msg = document.getElementById("save-msg");
-        if (msg) {
-            msg.textContent = "Settings saved!";
-            msg.classList.remove("hidden");
-            setTimeout(() => msg.classList.add("hidden"), 2000);
-        }
+        showToast("Settings saved!");
     });
 
     loadSettings();
@@ -126,11 +137,22 @@ function initSettings() {
 
 // ── Artists (artists.html) ──────────────────────────────────────
 
-function initArtists() {
+async function initArtists() {
     const list = document.getElementById("artist-list");
     const searchInput = document.getElementById("artist-search");
     const searchResults = document.getElementById("search-results");
+    const toggleNeverSkip = document.getElementById("toggle-never-skip");
     if (!list) return;
+
+    // Load and bind the enable toggle
+    if (toggleNeverSkip) {
+        const settings = await API.get("/api/settings");
+        toggleNeverSkip.checked = settings.enable_never_skip_artists;
+        toggleNeverSkip.addEventListener("change", async () => {
+            await API.put("/api/settings", { enable_never_skip_artists: toggleNeverSkip.checked });
+            showToast(toggleNeverSkip.checked ? "Never-skip enabled" : "Never-skip disabled");
+        });
+    }
 
     async function loadArtists() {
         const data = await API.get("/api/artists");
@@ -142,8 +164,12 @@ function initArtists() {
         data.artists.forEach(a => {
             const div = document.createElement("div");
             div.className = "artist-item";
+            const imgHtml = a.image_url
+                ? `<img src="${a.image_url}" class="artist-img" alt="">`
+                : '<div class="artist-img artist-img-placeholder"></div>';
             div.innerHTML = `
                 <div class="artist-info">
+                    ${imgHtml}
                     <span class="artist-name-text">${escapeHtml(a.name)}</span>
                 </div>
                 <button class="artist-remove" data-id="${a.id}" title="Remove">&times;</button>
@@ -190,7 +216,7 @@ function initArtists() {
                         </div>
                     `;
                     div.addEventListener("click", async () => {
-                        await API.post("/api/artists", { id: a.id, name: a.name });
+                        await API.post("/api/artists", { id: a.id, name: a.name, image_url: a.image_url || "" });
                         searchInput.value = "";
                         searchResults.classList.add("hidden");
                         loadArtists();
@@ -243,6 +269,34 @@ function initInsights() {
             <div class="metric-card"><div class="metric-value">${m.unique_songs}</div><div class="metric-label">Unique Songs</div></div>
             <div class="metric-card"><div class="metric-value">${m.unique_artists}</div><div class="metric-label">Unique Artists</div></div>
         `;
+
+        // Details section
+        const detailsGrid = document.getElementById("details-grid");
+        if (detailsGrid) {
+            const mostSkipped = m.most_skipped;
+            const mostPlayed = m.most_played;
+            const streak = m.longest_skip_streak;
+            const avgDays = m.avg_skip_days;
+
+            detailsGrid.innerHTML = `
+                <div class="detail-row">
+                    <span class="detail-label">Most skipped</span>
+                    <span class="detail-value">${mostSkipped ? `${escapeHtml(mostSkipped[0][1])} — ${escapeHtml(mostSkipped[0][0])} (${mostSkipped[1]}x)` : "—"}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Most played</span>
+                    <span class="detail-value">${mostPlayed ? `${escapeHtml(mostPlayed[0][1])} — ${escapeHtml(mostPlayed[0][0])} (${mostPlayed[1]}x)` : "—"}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Longest skip streak</span>
+                    <span class="detail-value">${streak > 0 ? `${streak} songs` : "—"}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Avg skip age</span>
+                    <span class="detail-value">${avgDays !== null ? `${avgDays.toFixed(0)} days` : "—"}</span>
+                </div>
+            `;
+        }
 
         insightsList.innerHTML = "";
         (data.insights || []).forEach(i => {
