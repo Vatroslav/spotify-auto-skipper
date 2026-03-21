@@ -90,6 +90,18 @@ app.include_router(insights.router)
 app.include_router(logs.router)
 
 
+# ── Health check ─────────────────────────────────────────────────
+
+@app.get("/health")
+async def health():
+    return {
+        "status": "ok",
+        "version": APP_VERSION,
+        "worker_running": app_state.worker_running,
+        "worker_alive": app_state.worker_task is not None and not app_state.worker_task.done(),
+    }
+
+
 # ── Page routes ──────────────────────────────────────────────────
 
 def _is_authenticated(request: Request) -> bool:
