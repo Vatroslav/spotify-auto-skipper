@@ -429,15 +429,13 @@ function initLogs() {
         }
     }
 
-    async function loadLogs(date) {
-        dateText.textContent = date;
-        const data = await API.get(`/api/logs?date=${date}&level=${currentLevel}`);
+    function renderLogEntries(logs) {
         logsContainer.innerHTML = "";
-        if (!data.logs || data.logs.length === 0) {
+        if (!logs || logs.length === 0) {
             logsContainer.innerHTML = '<p class="text-muted text-center mt-16">No log entries.</p>';
             return;
         }
-        data.logs.forEach(log => {
+        logs.forEach(log => {
             const ts = log.timestamp ? log.timestamp.substring(11, 19) : "";
             const levelClass = `log-level-${log.level}`;
             logsContainer.innerHTML += `
@@ -447,6 +445,67 @@ function initLogs() {
                 </div>
             `;
         });
+    }
+
+    function groupIntoBlocks(logs) {
+        const blocks = [];
+        let current = null;
+        for (const log of logs) {
+            if (log.message.startsWith("Currently playing:")) {
+                if (current) blocks.push(current);
+                current = { entries: [log], outcome: null };
+            } else if (current) {
+                current.entries.push(log);
+                const msg = log.message;
+                if (msg.includes("\u2014 skipping") && !msg.includes("not skipping")) {
+                    current.outcome = "skipped";
+                } else if (msg.includes("not skipping") || msg.includes("never-skip")) {
+                    current.outcome = "kept";
+                }
+            }
+        }
+        if (current) blocks.push(current);
+        return blocks;
+    }
+
+    async function loadLogs(date) {
+        dateText.textContent = date;
+        const data = await API.get(`/api/logs?date=${date}&level=${currentLevel}`);
+        if (!data.logs || data.logs.length === 0) {
+            logsContainer.innerHTML = '<p class="text-muted text-center mt-16">No log entries.</p>';
+            return;
+        }
+
+        if (currentLevel === "skipped" || currentLevel === "kept") {
+            const blocks = groupIntoBlocks(data.logs);
+            const filtered = blocks.filter(b => b.outcome === currentLevel);
+            const flatLogs = filtered.flatMap(b => b.entries);
+            // Add separators between blocks
+            logsContainer.innerHTML = "";
+            if (filtered.length === 0) {
+                logsContainer.innerHTML = '<p class="text-muted text-center mt-16">No matching entries.</p>';
+                return;
+            }
+            filtered.forEach((block, i) => {
+                block.entries.forEach(log => {
+                    const ts = log.timestamp ? log.timestamp.substring(11, 19) : "";
+                    const levelClass = `log-level-${log.level}`;
+                    logsContainer.innerHTML += `
+                        <div class="log-entry">
+                            <span class="log-time">${ts}</span>
+                            <span class="${levelClass}">${escapeHtml(log.message)}</span>
+                        </div>
+                    `;
+                });
+                if (i < filtered.length - 1) {
+                    logsContainer.innerHTML += '<div class="log-separator"></div>';
+                }
+            });
+        } else {
+            renderLogEntries(data.logs);
+        }
+        // Auto-scroll to bottom
+        logsContainer.scrollTop = logsContainer.scrollHeight;
     }
 
     // Date navigation
@@ -468,6 +527,16 @@ function initLogs() {
     });
 
     loadDates();
+
+    // Copy to clipboard
+    const copyBtn = document.getElementById("copy-logs-btn");
+    if (copyBtn) {
+        copyBtn.addEventListener("click", () => {
+            const entries = logsContainer.querySelectorAll(".log-entry");
+            const text = Array.from(entries).map(e => e.textContent.trim()).join("\n");
+            navigator.clipboard.writeText(text).then(() => showToast("Copied to clipboard"));
+        });
+    }
 
     // Auto-refresh every 5 seconds
     setInterval(() => {
