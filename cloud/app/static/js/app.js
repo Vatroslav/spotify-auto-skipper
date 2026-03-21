@@ -576,16 +576,9 @@ function initLogs() {
     }
     if (searchInput) searchInput.addEventListener("input", applySearch);
 
-    // Date input — reload when valid yyyy-mm-dd or empty (today)
+    // Date picker — reload on date change
     if (datePicker) {
-        let debounceTimer;
-        datePicker.addEventListener("input", () => {
-            clearTimeout(debounceTimer);
-            const v = datePicker.value.trim();
-            if (v === "" || /^\d{4}-\d{2}-\d{2}$/.test(v)) {
-                debounceTimer = setTimeout(loadLogs, 300);
-            }
-        });
+        datePicker.addEventListener("change", () => loadLogs());
     }
 
     // Level filter chips
