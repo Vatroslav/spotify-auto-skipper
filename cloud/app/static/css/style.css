@@ -519,14 +519,19 @@ input:focus, select:focus {
     margin-bottom: 16px;
 }
 
-.date-nav .date-text {
+.date-input, .search-input {
+    background: var(--bg-input);
+    color: var(--text-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: 6px;
+    padding: 6px 12px;
     font-size: 0.9rem;
-    font-weight: 500;
-    min-width: 120px;
-    text-align: center;
+    font-family: inherit;
+    color-scheme: dark;
 }
 
-.date-nav .btn { padding: 6px 12px; font-size: 0.85rem; }
+.search-input { flex: 1; max-width: 300px; }
+.search-input::placeholder { color: var(--text-muted); }
 
 /* ── Bottom Navigation ───────────────────────────── */
 

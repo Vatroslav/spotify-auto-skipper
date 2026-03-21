@@ -2,7 +2,7 @@
 Logs API routes.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 
 from app.database import get_logs, get_log_dates
 from app.routers.deps import require_auth
@@ -19,9 +19,6 @@ async def available_dates(request: Request):
 
 @router.get("")
 async def get_log_entries(request: Request, date: str = "", level: str = "all"):
-    """Return log entries for a specific date."""
-    if not date:
-        raise HTTPException(status_code=400, detail="date parameter required (YYYY-MM-DD)")
-
+    """Return log entries for a specific date, or today if omitted."""
     logs = await get_logs(date, level)
     return {"date": date, "logs": logs}
