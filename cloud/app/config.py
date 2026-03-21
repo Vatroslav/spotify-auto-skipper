@@ -84,14 +84,37 @@ async def load_settings() -> dict:
     return result
 
 
-async def save_settings(updates: dict):
-    """Save partial settings update to DB."""
+_RANGES = {
+    "skip_window_days": (1, 365),
+    "poll_interval_seconds": (5, 600),
+    "log_retention_days": (1, 365),
+    "restart_pattern_song_count": (2, 20),
+    "restart_pattern_day_diff": (0, 30),
+}
+
+
+async def save_settings(updates: dict) -> list[str]:
+    """Save partial settings update to DB. Returns list of validation warnings."""
+    warnings = []
     to_store = {}
     for key, value in updates.items():
-        if key in CONFIG_DEFAULTS:
-            to_store[key] = _serialize_value(key, value)
+        if key not in CONFIG_DEFAULTS:
+            continue
+        if key in _INT_KEYS:
+            try:
+                value = int(value)
+            except (ValueError, TypeError):
+                warnings.append(f"{key}: must be a number")
+                continue
+            if key in _RANGES:
+                lo, hi = _RANGES[key]
+                if value < lo or value > hi:
+                    warnings.append(f"{key}: must be between {lo} and {hi}")
+                    continue
+        to_store[key] = _serialize_value(key, value)
     if to_store:
         await set_many_settings(to_store)
+    return warnings
 
 
 async def seed_defaults():

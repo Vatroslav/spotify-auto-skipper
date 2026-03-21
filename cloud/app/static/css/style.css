@@ -74,12 +74,14 @@ a:hover { color: var(--accent-hover); }
     font-size: 0.75rem;
     color: var(--text-muted);
     margin-bottom: 2px;
+    min-height: 1.2em;
 }
 
 .next-check {
     font-size: 0.75rem;
     color: var(--text-muted);
     margin-bottom: 12px;
+    min-height: 1.2em;
 }
 
 .album-art {
@@ -204,6 +206,17 @@ input:focus, select:focus {
     color: var(--text-muted);
     margin-top: 4px;
 }
+
+/* Input with button */
+.input-with-btn {
+    display: flex;
+    gap: 8px;
+}
+
+.input-with-btn input { flex: 1; }
+.input-with-btn .btn { flex-shrink: 0; padding: 10px 16px; }
+
+#playlist-status { white-space: pre-line; }
 
 /* Toggle switch */
 .toggle {
@@ -607,6 +620,11 @@ input:focus, select:focus {
 .toast.show {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
+}
+
+.toast-error {
+    background: var(--color-error);
+    color: #fff;
 }
 
 /* ── Responsive ──────────────────────────────────── */

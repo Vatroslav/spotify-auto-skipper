@@ -62,6 +62,9 @@ async def polling_loop():
             settings = await load_settings()
             poll_interval = settings["poll_interval_seconds"]
 
+            # Update poll timestamp every cycle (for countdown timer)
+            app_state.last_checked_timestamp = datetime.now(timezone.utc)
+
             # Manual pause
             if app_state.skipping_paused:
                 await _log("Skipping is paused.")
@@ -88,7 +91,6 @@ async def polling_loop():
 
             # New song — remember it
             app_state.last_checked_track_id = track["id"]
-            app_state.last_checked_timestamp = datetime.now(timezone.utc)
             app_state.last_check_message = "Checking..."
 
             await _log(f"Currently playing: {track['artist']} \u2013 {track['name']}")
