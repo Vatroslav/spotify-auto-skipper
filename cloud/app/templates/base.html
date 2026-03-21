@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Spotify Auto-Skipper{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v={{ version }}">
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
 </head>
 <body>
@@ -33,7 +33,7 @@
         </a>
     </nav>
 
-    <script src="/static/js/api.js"></script>
-    <script src="/static/js/app.js"></script>
+    <script src="/static/js/api.js?v={{ version }}"></script>
+    <script src="/static/js/app.js?v={{ version }}"></script>
 </body>
 </html>
