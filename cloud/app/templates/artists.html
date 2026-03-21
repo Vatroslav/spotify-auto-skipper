@@ -5,6 +5,16 @@
     <h1 class="page-title">Never-Skip Artists</h1>
 
     <div class="card">
+        <div class="toggle">
+            <span class="toggle-label">Enable never-skip artists</span>
+            <label class="toggle-switch">
+                <input type="checkbox" id="toggle-never-skip" data-setting="enable_never_skip_artists">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <div class="card">
         <div class="card-title">Add Artist</div>
         <input type="text" id="artist-search" placeholder="Search for an artist...">
         <div id="search-results" class="search-results hidden"></div>

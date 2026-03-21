@@ -24,9 +24,10 @@ async def add_artist(request: Request):
     body = await request.json()
     artist_id = body.get("id", "").strip()
     name = body.get("name", "").strip()
+    image_url = body.get("image_url", "").strip()
     if not artist_id or not name:
         return {"error": "id and name are required"}, 400
-    await add_never_skip_artist(artist_id, name)
+    await add_never_skip_artist(artist_id, name, image_url)
     return {"ok": True}
 
 

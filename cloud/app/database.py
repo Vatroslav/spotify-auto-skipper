@@ -18,9 +18,10 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 
 CREATE TABLE IF NOT EXISTS never_skip_artists (
-    id       TEXT PRIMARY KEY,
-    name     TEXT NOT NULL,
-    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id        TEXT PRIMARY KEY,
+    name      TEXT NOT NULL,
+    image_url TEXT DEFAULT '',
+    added_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS track_events (
@@ -66,6 +67,11 @@ async def init_db():
     db = await get_db()
     try:
         await db.executescript(_CREATE_TABLES)
+        # Migrate: add image_url column if missing
+        cursor = await db.execute("PRAGMA table_info(never_skip_artists)")
+        columns = {row[1] for row in await cursor.fetchall()}
+        if "image_url" not in columns:
+            await db.execute("ALTER TABLE never_skip_artists ADD COLUMN image_url TEXT DEFAULT ''")
         await db.commit()
     finally:
         await db.close()
@@ -125,19 +131,19 @@ async def set_many_settings(settings: dict):
 async def get_never_skip_artists() -> list[dict]:
     db = await get_db()
     try:
-        cursor = await db.execute("SELECT id, name, added_at FROM never_skip_artists ORDER BY name")
+        cursor = await db.execute("SELECT id, name, image_url, added_at FROM never_skip_artists ORDER BY name")
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
     finally:
         await db.close()
 
 
-async def add_never_skip_artist(artist_id: str, name: str):
+async def add_never_skip_artist(artist_id: str, name: str, image_url: str = ""):
     db = await get_db()
     try:
         await db.execute(
-            "INSERT OR IGNORE INTO never_skip_artists (id, name) VALUES (?, ?)",
-            (artist_id, name),
+            "INSERT OR IGNORE INTO never_skip_artists (id, name, image_url) VALUES (?, ?, ?)",
+            (artist_id, name, image_url),
         )
         await db.commit()
     finally:
