@@ -160,11 +160,15 @@ function initSettings() {
                 updates[key] = el.value;
             }
         });
-        const result = await API.put("/api/settings", updates);
-        if (result._warnings && result._warnings.length > 0) {
-            showToast(result._warnings[0], 3000, "error");
-        } else {
-            showToast("Settings saved!");
+        try {
+            const result = await API.put("/api/settings", updates);
+            if (result._warnings && result._warnings.length > 0) {
+                showToast(result._warnings[0], 3000, "error");
+            } else {
+                showToast("Settings saved!");
+            }
+        } catch (err) {
+            showToast(err.message || "Failed to save settings", 3000, "error");
         }
     });
 
@@ -230,8 +234,13 @@ async function initArtists() {
         const settings = await API.get("/api/settings");
         toggleNeverSkip.checked = settings.enable_never_skip_artists;
         toggleNeverSkip.addEventListener("change", async () => {
-            await API.put("/api/settings", { enable_never_skip_artists: toggleNeverSkip.checked });
-            showToast(toggleNeverSkip.checked ? "Never-skip enabled" : "Never-skip disabled");
+            try {
+                await API.put("/api/settings", { enable_never_skip_artists: toggleNeverSkip.checked });
+                showToast(toggleNeverSkip.checked ? "Never-skip enabled" : "Never-skip disabled");
+            } catch (err) {
+                showToast(err.message || "Failed to update setting", 3000, "error");
+                toggleNeverSkip.checked = !toggleNeverSkip.checked;
+            }
         });
     }
 
