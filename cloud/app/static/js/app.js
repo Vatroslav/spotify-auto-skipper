@@ -379,6 +379,11 @@ function initInsights() {
     let dates = [];
     let currentIdx = -1;
 
+    function updateButtons() {
+        if (prevBtn) prevBtn.disabled = currentIdx <= 0;
+        if (nextBtn) nextBtn.disabled = currentIdx >= dates.length - 1;
+    }
+
     async function loadDates() {
         const tz = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
         const data = await API.get(`/api/insights/dates?tz=${tz}`);
@@ -393,6 +398,7 @@ function initInsights() {
             const dg = document.getElementById("details-grid");
             if (dg) dg.innerHTML = "";
         }
+        updateButtons();
     }
 
     async function loadInsights(date) {
@@ -454,10 +460,10 @@ function initInsights() {
     }
 
     if (prevBtn) prevBtn.addEventListener("click", () => {
-        if (currentIdx > 0) { currentIdx--; loadInsights(dates[currentIdx]); }
+        if (currentIdx > 0) { currentIdx--; loadInsights(dates[currentIdx]); updateButtons(); }
     });
     if (nextBtn) nextBtn.addEventListener("click", () => {
-        if (currentIdx < dates.length - 1) { currentIdx++; loadInsights(dates[currentIdx]); }
+        if (currentIdx < dates.length - 1) { currentIdx++; loadInsights(dates[currentIdx]); updateButtons(); }
     });
 
     loadDates();
