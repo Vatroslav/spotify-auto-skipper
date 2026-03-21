@@ -15,10 +15,15 @@
         <button class="chip" data-level="info">Info</button>
         <button class="chip" data-level="warning">Warning</button>
         <button class="chip" data-level="error">Error</button>
+        <button class="chip" data-level="skipped">Skipped</button>
+        <button class="chip" data-level="kept">Kept</button>
     </div>
 
     <div class="card">
-        <div id="logs-container">
+        <div class="card-header">
+            <button id="copy-logs-btn" class="btn btn-sm">Copy</button>
+        </div>
+        <div id="logs-container" class="logs-scroll">
             <p class="text-muted text-center">Loading...</p>
         </div>
     </div>

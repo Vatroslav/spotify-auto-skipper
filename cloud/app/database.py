@@ -238,7 +238,7 @@ async def add_log(message: str, level: str = "info"):
 async def get_logs(date_str: str, level: str = "all") -> list[dict]:
     db = await get_db()
     try:
-        if level == "all":
+        if level in ("all", "skipped", "kept"):
             cursor = await db.execute(
                 """SELECT id, timestamp, level, message FROM logs
                    WHERE date(timestamp) = ? ORDER BY timestamp""",

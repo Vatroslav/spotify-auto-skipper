@@ -447,6 +447,24 @@ input:focus, select:focus {
     line-height: 1.4;
 }
 
+/* ── Log Card Header ──────────────────────────────── */
+
+.card-header {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+}
+
+.btn-sm {
+    padding: 4px 12px;
+    font-size: 0.75rem;
+}
+
+.logs-scroll {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
 /* ── Log Entries ──────────────────────────────────── */
 
 .log-entry {
@@ -458,6 +476,11 @@ input:focus, select:focus {
 }
 
 .log-entry:last-child { border-bottom: none; }
+
+.log-separator {
+    border-bottom: 1px solid var(--border-primary);
+    margin: 6px 0;
+}
 
 .log-time { color: var(--text-muted); margin-right: 8px; }
 .log-level-info { color: var(--text-secondary); }
