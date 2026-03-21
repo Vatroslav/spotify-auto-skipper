@@ -8,6 +8,8 @@ import json
 import aiosqlite
 from datetime import datetime, timezone
 
+from app.encryption import encrypt, decrypt
+
 DATA_DIR = os.environ.get("DATA_DIR", "/app/data")
 DB_PATH = os.path.join(DATA_DIR, "skipper.db")
 
@@ -297,20 +299,28 @@ async def get_oauth_tokens() -> dict | None:
             "SELECT access_token, refresh_token, expires_at FROM oauth_tokens WHERE id = 1"
         )
         row = await cursor.fetchone()
-        return dict(row) if row else None
+        if not row:
+            return None
+        return {
+            "access_token": decrypt(row["access_token"]) if row["access_token"] else "",
+            "refresh_token": decrypt(row["refresh_token"]) if row["refresh_token"] else "",
+            "expires_at": row["expires_at"],
+        }
     finally:
         await db.close()
 
 
 async def save_oauth_tokens(access_token: str, refresh_token: str, expires_at: str):
+    enc_access = encrypt(access_token) if access_token else ""
+    enc_refresh = encrypt(refresh_token) if refresh_token else ""
     db = await get_db()
     try:
         await db.execute(
             """INSERT INTO oauth_tokens (id, access_token, refresh_token, expires_at)
                VALUES (1, ?, ?, ?)
                ON CONFLICT(id) DO UPDATE SET access_token = ?, refresh_token = ?, expires_at = ?""",
-            (access_token, refresh_token, expires_at,
-             access_token, refresh_token, expires_at),
+            (enc_access, enc_refresh, expires_at,
+             enc_access, enc_refresh, expires_at),
         )
         await db.commit()
     finally:
