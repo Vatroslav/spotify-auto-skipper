@@ -11,10 +11,16 @@ from app.config import get_lastfm_username, get_lastfm_api_key
 from app.spotify_api import CredentialError
 
 
-async def get_last_play_date(artist: str, track: str) -> datetime | None:
+# Sentinel: returned when Last.fm could not be reached (distinct from None = no scrobbles)
+LASTFM_ERROR = "LASTFM_ERROR"
+
+
+async def get_last_play_date(artist: str, track: str) -> datetime | str | None:
     """
-    Returns the datetime (UTC) of the last scrobble for the given (artist, track)
-    from Last.fm, or None if there are no scrobbles.
+    Returns:
+      - datetime: last scrobble timestamp
+      - None: no scrobbles found for this track
+      - LASTFM_ERROR: transient/network failure (caller should not treat as "never heard")
     """
     try:
         async with httpx.AsyncClient(timeout=15) as client:
@@ -31,7 +37,7 @@ async def get_last_play_date(artist: str, track: str) -> datetime | None:
                 },
             )
     except httpx.RequestError:
-        return None
+        return LASTFM_ERROR
 
     if r.status_code != 200:
         try:
@@ -40,7 +46,7 @@ async def get_last_play_date(artist: str, track: str) -> datetime | None:
                 raise CredentialError("Invalid Last.fm API key.")
         except (ValueError, KeyError):
             pass
-        return None
+        return LASTFM_ERROR
 
     data = r.json() or {}
     trackscrobbles = data.get("trackscrobbles", {})
