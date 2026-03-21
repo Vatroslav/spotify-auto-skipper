@@ -310,6 +310,16 @@ async def get_oauth_tokens() -> dict | None:
         await db.close()
 
 
+async def clear_oauth_tokens():
+    """Delete all stored OAuth tokens."""
+    db = await get_db()
+    try:
+        await db.execute("DELETE FROM oauth_tokens")
+        await db.commit()
+    finally:
+        await db.close()
+
+
 async def save_oauth_tokens(access_token: str, refresh_token: str, expires_at: str):
     enc_access = encrypt(access_token) if access_token else ""
     enc_refresh = encrypt(refresh_token) if refresh_token else ""

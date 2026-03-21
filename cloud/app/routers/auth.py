@@ -10,7 +10,8 @@ from fastapi.responses import RedirectResponse
 import httpx
 
 from app.config import get_spotify_client_id, get_spotify_client_secret, get_base_url
-from app.database import save_oauth_tokens
+from app.database import save_oauth_tokens, clear_oauth_tokens
+from app.state import app_state
 from datetime import datetime, timedelta, timezone
 
 router = APIRouter(tags=["auth"])
@@ -89,5 +90,11 @@ async def callback(request: Request, code: str = "", state: str = "", error: str
 
 @router.post("/auth/logout")
 async def logout(request: Request):
+    """End session, clear stored OAuth tokens, and reset the shared client."""
     request.session.clear()
+    await clear_oauth_tokens()
+    # Reset the shared client's in-memory token so it stops working immediately
+    if app_state.spotify_client:
+        app_state.spotify_client._access_token = None
+        app_state.spotify_client._token_expires_at = datetime.now(timezone.utc)
     return {"ok": True}
