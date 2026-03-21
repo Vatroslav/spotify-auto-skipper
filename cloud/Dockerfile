@@ -5,7 +5,13 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app/ ./app/
+# Create non-root user and data directory
+RUN groupadd -r skipper && useradd -r -g skipper -d /app skipper \
+    && mkdir -p /app/data && chown -R skipper:skipper /app
+
+COPY --chown=skipper:skipper app/ ./app/
+
+USER skipper
 
 EXPOSE 8000
 
