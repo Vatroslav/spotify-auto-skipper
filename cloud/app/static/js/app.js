@@ -466,25 +466,27 @@ function initInsights() {
 
 function initLogs() {
     const logsContainer = document.getElementById("logs-container");
-    const dateText = document.getElementById("log-date-text");
-    const prevBtn = document.getElementById("log-date-prev");
-    const nextBtn = document.getElementById("log-date-next");
+    const datePicker = document.getElementById("log-date-picker");
     if (!logsContainer) return;
 
-    let dates = [];
-    let currentIdx = -1;
     let currentLevel = "all";
 
-    async function loadDates() {
-        const data = await API.get("/api/logs/dates");
-        dates = data.dates || [];
-        if (dates.length > 0) {
-            currentIdx = dates.length - 1;
-            loadLogs(dates[currentIdx]);
-        } else {
-            dateText.textContent = "No data yet";
-            logsContainer.innerHTML = '<p class="text-muted text-center">Logs will appear here once the skipper starts checking.</p>';
-        }
+    // Default to today (local time)
+    const today = new Date();
+    const localDate = today.getFullYear() + "-" +
+        String(today.getMonth() + 1).padStart(2, "0") + "-" +
+        String(today.getDate()).padStart(2, "0");
+    if (datePicker) datePicker.value = localDate;
+
+    function init() {
+        loadLogs();
+    }
+
+    function utcToLocal(ts) {
+        if (!ts) return "";
+        // SQLite CURRENT_TIMESTAMP is UTC but lacks a Z suffix — add it
+        const d = new Date(ts.endsWith("Z") ? ts : ts + "Z");
+        return d.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false});
     }
 
     function renderLogEntries(logs) {
@@ -494,7 +496,7 @@ function initLogs() {
             return;
         }
         logs.forEach(log => {
-            const ts = log.timestamp ? log.timestamp.substring(11, 19) : "";
+            const ts = utcToLocal(log.timestamp);
             const levelClass = `log-level-${log.level}`;
             logsContainer.innerHTML += `
                 <div class="log-entry">
@@ -526,9 +528,10 @@ function initLogs() {
         return blocks;
     }
 
-    async function loadLogs(date) {
-        dateText.textContent = date;
-        const data = await API.get(`/api/logs?date=${date}&level=${currentLevel}`);
+    async function loadLogs() {
+        const date = datePicker ? datePicker.value : "";
+        const dateParam = date ? `&date=${date}` : "";
+        const data = await API.get(`/api/logs?level=${currentLevel}${dateParam}`);
         if (!data.logs || data.logs.length === 0) {
             logsContainer.innerHTML = '<p class="text-muted text-center mt-16">No log entries.</p>';
             return;
@@ -546,7 +549,7 @@ function initLogs() {
             }
             filtered.forEach((block, i) => {
                 block.entries.forEach(log => {
-                    const ts = log.timestamp ? log.timestamp.substring(11, 19) : "";
+                    const ts = utcToLocal(log.timestamp);
                     const levelClass = `log-level-${log.level}`;
                     logsContainer.innerHTML += `
                         <div class="log-entry">
@@ -562,17 +565,26 @@ function initLogs() {
         } else {
             renderLogEntries(data.logs);
         }
+        applySearch();
         // Auto-scroll to bottom
         logsContainer.scrollTop = logsContainer.scrollHeight;
     }
 
-    // Date navigation
-    if (prevBtn) prevBtn.addEventListener("click", () => {
-        if (currentIdx > 0) { currentIdx--; loadLogs(dates[currentIdx]); }
-    });
-    if (nextBtn) nextBtn.addEventListener("click", () => {
-        if (currentIdx < dates.length - 1) { currentIdx++; loadLogs(dates[currentIdx]); }
-    });
+    // Search filter — hides non-matching entries in the DOM
+    const searchInput = document.getElementById("log-search");
+    function applySearch() {
+        const query = (searchInput ? searchInput.value : "").toLowerCase();
+        logsContainer.querySelectorAll(".log-entry").forEach(el => {
+            el.style.display = el.textContent.toLowerCase().includes(query) ? "" : "none";
+        });
+        logsContainer.querySelectorAll(".log-separator").forEach(el => {
+            el.style.display = query ? "none" : "";
+        });
+    }
+    if (searchInput) searchInput.addEventListener("input", applySearch);
+
+    // Date picker change
+    if (datePicker) datePicker.addEventListener("change", loadLogs);
 
     // Level filter chips
     document.querySelectorAll("[data-level]").forEach(chip => {
@@ -580,11 +592,11 @@ function initLogs() {
             document.querySelectorAll("[data-level]").forEach(c => c.classList.remove("active"));
             chip.classList.add("active");
             currentLevel = chip.dataset.level;
-            if (dates.length > 0) loadLogs(dates[currentIdx]);
+            loadLogs();
         });
     });
 
-    loadDates();
+    init();
 
     // Copy to clipboard
     const copyBtn = document.getElementById("copy-logs-btn");
@@ -596,10 +608,10 @@ function initLogs() {
         });
     }
 
-    // Auto-refresh every 5 seconds
+    // Auto-refresh every 5 seconds (only for today)
     setInterval(() => {
-        if (dates.length > 0 && currentIdx === dates.length - 1) {
-            loadLogs(dates[currentIdx]);
+        if (datePicker && datePicker.value === localDate) {
+            loadLogs();
         }
     }, 5000);
 }

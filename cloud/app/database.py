@@ -240,21 +240,35 @@ async def add_log(message: str, level: str = "info"):
         await db.close()
 
 
-async def get_logs(date_str: str, level: str = "all") -> list[dict]:
+async def get_logs(date_str: str = "", level: str = "all") -> list[dict]:
     db = await get_db()
     try:
-        if level in ("all", "skipped", "kept"):
-            cursor = await db.execute(
-                """SELECT id, timestamp, level, message FROM logs
-                   WHERE date(timestamp) = ? ORDER BY timestamp""",
-                (date_str,),
-            )
+        if date_str:
+            if level in ("all", "skipped", "kept"):
+                cursor = await db.execute(
+                    """SELECT id, timestamp, level, message FROM logs
+                       WHERE date(timestamp) = ? ORDER BY timestamp""",
+                    (date_str,),
+                )
+            else:
+                cursor = await db.execute(
+                    """SELECT id, timestamp, level, message FROM logs
+                       WHERE date(timestamp) = ? AND level = ? ORDER BY timestamp""",
+                    (date_str, level),
+                )
         else:
-            cursor = await db.execute(
-                """SELECT id, timestamp, level, message FROM logs
-                   WHERE date(timestamp) = ? AND level = ? ORDER BY timestamp""",
-                (date_str, level),
-            )
+            # No date filter — return today's logs (UTC)
+            if level in ("all", "skipped", "kept"):
+                cursor = await db.execute(
+                    """SELECT id, timestamp, level, message FROM logs
+                       WHERE date(timestamp) = date('now') ORDER BY timestamp""",
+                )
+            else:
+                cursor = await db.execute(
+                    """SELECT id, timestamp, level, message FROM logs
+                       WHERE date(timestamp) = date('now') AND level = ? ORDER BY timestamp""",
+                    (level,),
+                )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
     finally:
