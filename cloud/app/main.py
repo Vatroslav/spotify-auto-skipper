@@ -6,6 +6,7 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -94,12 +95,15 @@ app.include_router(logs.router)
 
 @app.get("/health")
 async def health():
-    return {
-        "status": "ok",
+    worker_alive = app_state.worker_task is not None and not app_state.worker_task.done()
+    body = {
+        "status": "ok" if worker_alive else "degraded",
         "version": APP_VERSION,
         "worker_running": app_state.worker_running,
-        "worker_alive": app_state.worker_task is not None and not app_state.worker_task.done(),
+        "worker_alive": worker_alive,
     }
+    status_code = 200 if worker_alive else 503
+    return JSONResponse(content=body, status_code=status_code)
 
 
 # ── Page routes ──────────────────────────────────────────────────

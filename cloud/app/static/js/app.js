@@ -419,11 +419,11 @@ function initInsights() {
             detailsGrid.innerHTML = `
                 <div class="detail-row">
                     <span class="detail-label">Most skipped</span>
-                    <span class="detail-value">${mostSkipped ? `${escapeHtml(mostSkipped[0][1])} — ${escapeHtml(mostSkipped[0][0])} (${mostSkipped[1]}x)` : "—"}</span>
+                    <span class="detail-value">${mostSkipped ? `${escapeHtml(mostSkipped.song)} — ${escapeHtml(mostSkipped.artist)} (${mostSkipped.count}x)` : "—"}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Most played</span>
-                    <span class="detail-value">${mostPlayed ? `${escapeHtml(mostPlayed[0][1])} — ${escapeHtml(mostPlayed[0][0])} (${mostPlayed[1]}x)` : "—"}</span>
+                    <span class="detail-value">${mostPlayed ? `${escapeHtml(mostPlayed.song)} — ${escapeHtml(mostPlayed.artist)} (${mostPlayed.count}x)` : "—"}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Longest skip streak</span>
