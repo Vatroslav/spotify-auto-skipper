@@ -12,7 +12,7 @@ from app.database import (
     is_artist_never_skipped, purge_old_logs,
 )
 from app.spotify_api import SpotifyClient, CredentialError
-from app.lastfm_api import get_last_play_date
+from app.lastfm_api import get_last_play_date, LASTFM_ERROR
 from app.state import app_state
 
 
@@ -53,14 +53,20 @@ async def polling_loop():
                f"liked_songs={'on' if settings['always_play_liked_songs'] else 'off'}, "
                f"restart_pattern={'on' if settings['enable_restart_pattern'] else 'off'}")
 
-    # Purge old data on startup
+    # Purge old data on startup, then every 24 hours
     await purge_old_logs(settings["log_retention_days"])
+    last_purge = datetime.now(timezone.utc)
 
     while True:
         try:
             # Reload settings each cycle so changes take effect
             settings = await load_settings()
             poll_interval = settings["poll_interval_seconds"]
+
+            # Periodic purge (every 24h)
+            if (datetime.now(timezone.utc) - last_purge).total_seconds() >= 86400:
+                await purge_old_logs(settings["log_retention_days"])
+                last_purge = datetime.now(timezone.utc)
 
             # Update poll timestamp every cycle (for countdown timer)
             app_state.last_checked_timestamp = datetime.now(timezone.utc)
@@ -97,6 +103,12 @@ async def polling_loop():
 
             # Get latest scrobble date from Last.fm
             last_played = await get_last_play_date(track["artist"], track["name"])
+
+            if last_played is LASTFM_ERROR:
+                await _log("Last.fm unavailable — skipping check for this song.", "warning")
+                app_state.last_check_message = "Last.fm error"
+                await app_state.interruptible_sleep(poll_interval)
+                continue
 
             if last_played:
                 days_since = (datetime.now(timezone.utc) - last_played).days
