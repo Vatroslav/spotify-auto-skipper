@@ -149,6 +149,7 @@ a:hover { color: var(--accent-hover); }
 
 .btn:hover { border-color: var(--accent); }
 .btn:active { background: var(--bg-hover); }
+.btn:disabled { opacity: 0.3; pointer-events: none; }
 
 .btn-accent {
     background: var(--accent);
