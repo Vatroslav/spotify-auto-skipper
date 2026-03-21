@@ -199,14 +199,15 @@ async def add_track_event(
         await db.close()
 
 
-async def get_track_events(date_str: str) -> list[dict]:
-    """Get track events for a specific date (YYYY-MM-DD)."""
+async def get_track_events(date_str: str, tz: str = "") -> list[dict]:
+    """Get track events for a specific date (YYYY-MM-DD) in user's timezone."""
+    utc_start, utc_end = _date_to_utc_range(date_str, tz)
     db = await get_db()
     try:
         cursor = await db.execute(
             """SELECT id, timestamp, track_id, track_name, artist_name, outcome, days_ago, context_uri
-               FROM track_events WHERE date(timestamp) = ? ORDER BY timestamp""",
-            (date_str,),
+               FROM track_events WHERE timestamp >= ? AND timestamp < ? ORDER BY timestamp""",
+            (utc_start, utc_end),
         )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
@@ -214,15 +215,28 @@ async def get_track_events(date_str: str) -> list[dict]:
         await db.close()
 
 
-async def get_track_event_dates() -> list[str]:
-    """Get list of dates that have track events."""
+async def get_track_event_dates(tz: str = "") -> list[str]:
+    """Get list of dates that have track events, grouped by user's timezone."""
+    try:
+        tz_info = ZoneInfo(tz) if tz else None
+    except Exception:
+        tz_info = None
     db = await get_db()
     try:
         cursor = await db.execute(
-            "SELECT DISTINCT date(timestamp) as d FROM track_events ORDER BY d"
+            "SELECT DISTINCT timestamp FROM track_events ORDER BY timestamp"
         )
         rows = await cursor.fetchall()
-        return [row["d"] for row in rows]
+        dates = set()
+        for row in rows:
+            ts = row["timestamp"]
+            if tz_info:
+                dt = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                local_date = dt.astimezone(tz_info).strftime("%Y-%m-%d")
+            else:
+                local_date = ts[:10]
+            dates.add(local_date)
+        return sorted(dates)
     finally:
         await db.close()
 

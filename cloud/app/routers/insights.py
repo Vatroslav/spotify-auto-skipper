@@ -13,19 +13,19 @@ router = APIRouter(prefix="/api/insights", tags=["insights"], dependencies=[Depe
 
 
 @router.get("/dates")
-async def available_dates(request: Request):
+async def available_dates(request: Request, tz: str = ""):
     """Return list of dates with track events."""
-    dates = await get_track_event_dates()
+    dates = await get_track_event_dates(tz)
     return {"dates": dates}
 
 
 @router.get("")
-async def get_insights(request: Request, date: str = ""):
+async def get_insights(request: Request, date: str = "", tz: str = ""):
     """Return metrics and insights for a specific date."""
     if not date:
         raise HTTPException(status_code=400, detail="date parameter required (YYYY-MM-DD)")
 
-    rows = await get_track_events(date)
+    rows = await get_track_events(date, tz)
     events = events_from_db_rows(rows)
     metrics = compute_metrics(events)
 

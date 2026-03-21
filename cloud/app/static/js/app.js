@@ -380,7 +380,8 @@ function initInsights() {
     let currentIdx = -1;
 
     async function loadDates() {
-        const data = await API.get("/api/insights/dates");
+        const tz = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
+        const data = await API.get(`/api/insights/dates?tz=${tz}`);
         dates = data.dates || [];
         if (dates.length > 0) {
             currentIdx = dates.length - 1; // Latest date
@@ -396,7 +397,8 @@ function initInsights() {
 
     async function loadInsights(date) {
         dateText.textContent = date;
-        const data = await API.get(`/api/insights?date=${date}`);
+        const tz = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
+        const data = await API.get(`/api/insights?date=${date}&tz=${tz}`);
         const m = data.metrics;
 
         metricsGrid.innerHTML = `
