@@ -86,6 +86,9 @@ async def callback(request: Request, code: str = "", state: str = "", error: str
     request.session["authenticated"] = True
     request.session.pop("oauth_state", None)
 
+    # Restart the worker if it died from a previous CredentialError
+    app_state.restart_worker_if_dead()
+
     return RedirectResponse("/")
 
 
