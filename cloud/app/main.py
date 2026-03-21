@@ -27,16 +27,18 @@ async def lifespan(app: FastAPI):
     app_state.spotify_client = SpotifyClient(get_spotify_client_id(), get_spotify_client_secret())
 
     from app.worker import polling_loop
-    task = asyncio.create_task(polling_loop())
+    app_state.worker_task = asyncio.create_task(polling_loop())
     app_state.worker_running = True
 
     yield
 
     # Shutdown
-    task.cancel()
+    if app_state.worker_task:
+        app_state.worker_task.cancel()
     app_state.worker_running = False
     try:
-        await task
+        if app_state.worker_task:
+            await app_state.worker_task
     except asyncio.CancelledError:
         pass
     if app_state.spotify_client:

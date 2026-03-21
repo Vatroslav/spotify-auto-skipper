@@ -18,6 +18,14 @@ class AppState:
         self.recent_skip_days: list[int] = []
         self.last_check_message: str | None = None
         self.spotify_client = None  # Shared SpotifyClient, set during lifespan
+        self.worker_task: asyncio.Task | None = None  # Reference to polling_loop task
+
+    def restart_worker_if_dead(self):
+        """Restart the polling loop if it has stopped (e.g. after CredentialError)."""
+        if self.worker_task is None or self.worker_task.done():
+            from app.worker import polling_loop
+            self.worker_task = asyncio.create_task(polling_loop())
+            self.worker_running = True
 
     async def interruptible_sleep(self, seconds: float):
         """Sleep that can be interrupted by check_now_event."""
