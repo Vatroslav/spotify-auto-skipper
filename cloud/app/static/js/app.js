@@ -379,6 +379,8 @@ function initInsights() {
     const nextBtn = document.getElementById("date-next");
     if (!metricsGrid) return;
 
+    const tz = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
+
     let dates = [];
     let currentIdx = -1;
 
@@ -387,70 +389,49 @@ function initInsights() {
         if (nextBtn) nextBtn.disabled = currentIdx >= dates.length - 1;
     }
 
-    async function loadDates() {
-        const tz = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
-        const data = await API.get(`/api/insights/dates?tz=${tz}`);
-        dates = data.dates || [];
-        if (dates.length > 0) {
-            currentIdx = dates.length - 1; // Latest date
-            loadInsights(dates[currentIdx]);
-        } else {
-            dateText.textContent = "No data yet";
-            metricsGrid.innerHTML = '<p class="text-muted text-center">Start playing music and the skipper will track activity here.</p>';
-            insightsList.innerHTML = "";
-            const dg = document.getElementById("details-grid");
-            if (dg) dg.innerHTML = "";
-        }
-        updateButtons();
+    // ── Shared renderers ──────────────────────────────────────────
+
+    function renderMetrics(container, m) {
+        container.innerHTML = `
+            <div class="metric-card"><div class="metric-value">${m.songs_played.toLocaleString()}</div><div class="metric-label">Songs</div></div>
+            <div class="metric-card"><div class="metric-value">${m.songs_skipped.toLocaleString()}</div><div class="metric-label">Skipped</div></div>
+            <div class="metric-card"><div class="metric-value">${m.songs_kept.toLocaleString()}</div><div class="metric-label">Kept</div></div>
+            <div class="metric-card"><div class="metric-value">${m.skip_rate.toFixed(0)}%</div><div class="metric-label">Skip Rate</div></div>
+            <div class="metric-card"><div class="metric-value">${m.unique_songs.toLocaleString()}</div><div class="metric-label">Unique Songs</div></div>
+            <div class="metric-card"><div class="metric-value">${m.unique_artists.toLocaleString()}</div><div class="metric-label">Unique Artists</div></div>
+        `;
     }
 
-    async function loadInsights(date) {
-        dateText.textContent = date;
-        const tz = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
-        const data = await API.get(`/api/insights?date=${date}&tz=${tz}`);
-        const m = data.metrics;
-
-        metricsGrid.innerHTML = `
-            <div class="metric-card"><div class="metric-value">${m.songs_played}</div><div class="metric-label">Songs</div></div>
-            <div class="metric-card"><div class="metric-value">${m.songs_skipped}</div><div class="metric-label">Skipped</div></div>
-            <div class="metric-card"><div class="metric-value">${m.songs_kept}</div><div class="metric-label">Kept</div></div>
-            <div class="metric-card"><div class="metric-value">${m.skip_rate.toFixed(0)}%</div><div class="metric-label">Skip Rate</div></div>
-            <div class="metric-card"><div class="metric-value">${m.unique_songs}</div><div class="metric-label">Unique Songs</div></div>
-            <div class="metric-card"><div class="metric-value">${m.unique_artists}</div><div class="metric-label">Unique Artists</div></div>
+    function renderDetails(container, m) {
+        const mostSkipped = m.most_skipped;
+        const mostPlayed = m.most_played;
+        const streak = m.longest_skip_streak;
+        const avgDays = m.avg_skip_days;
+        container.innerHTML = `
+            <div class="detail-row">
+                <span class="detail-label">Most skipped</span>
+                <span class="detail-value">${mostSkipped ? `${escapeHtml(mostSkipped.song)} — ${escapeHtml(mostSkipped.artist)} (${mostSkipped.count}x)` : "—"}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Most played</span>
+                <span class="detail-value">${mostPlayed ? `${escapeHtml(mostPlayed.song)} — ${escapeHtml(mostPlayed.artist)} (${mostPlayed.count}x)` : "—"}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Longest skip streak</span>
+                <span class="detail-value">${streak > 0 ? `${streak} songs` : "—"}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Avg skip age</span>
+                <span class="detail-value">${avgDays !== null ? `${avgDays.toFixed(0)} days` : "—"}</span>
+            </div>
         `;
+    }
 
-        // Details section
-        const detailsGrid = document.getElementById("details-grid");
-        if (detailsGrid) {
-            const mostSkipped = m.most_skipped;
-            const mostPlayed = m.most_played;
-            const streak = m.longest_skip_streak;
-            const avgDays = m.avg_skip_days;
-
-            detailsGrid.innerHTML = `
-                <div class="detail-row">
-                    <span class="detail-label">Most skipped</span>
-                    <span class="detail-value">${mostSkipped ? `${escapeHtml(mostSkipped.song)} — ${escapeHtml(mostSkipped.artist)} (${mostSkipped.count}x)` : "—"}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Most played</span>
-                    <span class="detail-value">${mostPlayed ? `${escapeHtml(mostPlayed.song)} — ${escapeHtml(mostPlayed.artist)} (${mostPlayed.count}x)` : "—"}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Longest skip streak</span>
-                    <span class="detail-value">${streak > 0 ? `${streak} songs` : "—"}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Avg skip age</span>
-                    <span class="detail-value">${avgDays !== null ? `${avgDays.toFixed(0)} days` : "—"}</span>
-                </div>
-            `;
-        }
-
-        insightsList.innerHTML = "";
-        (data.insights || []).forEach(i => {
+    function renderInsightsList(container, insights) {
+        container.innerHTML = "";
+        (insights || []).forEach(i => {
             const iconChar = i.icon === "warning" ? "\u26a0\ufe0f" : "\u2139\ufe0f";
-            insightsList.innerHTML += `
+            container.innerHTML += `
                 <div class="insight-item">
                     <div class="insight-icon ${i.icon}">${iconChar}</div>
                     <div class="insight-content">
@@ -462,13 +443,103 @@ function initInsights() {
         });
     }
 
+    // ── Overall section ───────────────────────────────────────────
+
+    async function loadOverall() {
+        const overallMetrics = document.getElementById("overall-metrics-grid");
+        const overallDetails = document.getElementById("overall-details-grid");
+        const overallRecords = document.getElementById("overall-records-grid");
+        const overallInsights = document.getElementById("overall-insights-list");
+        if (!overallMetrics) return;
+
+        const data = await API.get(`/api/insights/overall?tz=${tz}`);
+        const m = data.metrics;
+
+        if (!m) {
+            overallMetrics.innerHTML = '<p class="text-muted text-center">No data yet.</p>';
+            if (overallDetails) overallDetails.innerHTML = "";
+            if (overallRecords) overallRecords.innerHTML = "";
+            if (overallInsights) overallInsights.innerHTML = "";
+            return;
+        }
+
+        renderMetrics(overallMetrics, m);
+        if (overallDetails) renderDetails(overallDetails, m);
+
+        // Records section
+        if (overallRecords) {
+            const oldest = m.oldest_scrobble;
+            const busiest = m.busiest_day;
+            const mostSkipsDay = m.most_skips_day;
+            const highRate = m.highest_skip_rate_day;
+            const longestStreak = m.longest_streak_day;
+
+            overallRecords.innerHTML = `
+                <div class="detail-row">
+                    <span class="detail-label">Oldest last scrobble</span>
+                    <span class="detail-value">${oldest ? `${escapeHtml(oldest.song)} — ${escapeHtml(oldest.artist)} (${oldest.days_ago} days)` : "—"}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Busiest day</span>
+                    <span class="detail-value">${busiest && busiest.count > 0 ? `${busiest.date} (${busiest.count} songs)` : "—"}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Most skips in a day</span>
+                    <span class="detail-value">${mostSkipsDay && mostSkipsDay.count > 0 ? `${mostSkipsDay.date} (${mostSkipsDay.count} skips)` : "—"}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Highest skip rate</span>
+                    <span class="detail-value">${highRate && highRate.rate > 0 ? `${highRate.date} (${highRate.rate.toFixed(0)}%)` : "—"}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Longest streak</span>
+                    <span class="detail-value">${longestStreak && longestStreak.streak > 0 ? `${longestStreak.date} (${longestStreak.streak} in a row)` : "—"}</span>
+                </div>
+            `;
+        }
+
+        if (overallInsights) renderInsightsList(overallInsights, data.insights);
+    }
+
+    // ── Daily section ─────────────────────────────────────────────
+
+    async function loadDates() {
+        const data = await API.get(`/api/insights/dates?tz=${tz}`);
+        dates = data.dates || [];
+        if (dates.length > 0) {
+            currentIdx = dates.length - 1;
+            loadDailyInsights(dates[currentIdx]);
+        } else {
+            dateText.textContent = "No data yet";
+            metricsGrid.innerHTML = '<p class="text-muted text-center">Start playing music and the skipper will track activity here.</p>';
+            insightsList.innerHTML = "";
+            const dg = document.getElementById("details-grid");
+            if (dg) dg.innerHTML = "";
+        }
+        updateButtons();
+    }
+
+    async function loadDailyInsights(date) {
+        dateText.textContent = date;
+        const data = await API.get(`/api/insights?date=${date}&tz=${tz}`);
+        const m = data.metrics;
+
+        renderMetrics(metricsGrid, m);
+
+        const detailsGrid = document.getElementById("details-grid");
+        if (detailsGrid) renderDetails(detailsGrid, m);
+
+        renderInsightsList(insightsList, data.insights);
+    }
+
     if (prevBtn) prevBtn.addEventListener("click", () => {
-        if (currentIdx > 0) { currentIdx--; loadInsights(dates[currentIdx]); updateButtons(); }
+        if (currentIdx > 0) { currentIdx--; loadDailyInsights(dates[currentIdx]); updateButtons(); }
     });
     if (nextBtn) nextBtn.addEventListener("click", () => {
-        if (currentIdx < dates.length - 1) { currentIdx++; loadInsights(dates[currentIdx]); updateButtons(); }
+        if (currentIdx < dates.length - 1) { currentIdx++; loadDailyInsights(dates[currentIdx]); updateButtons(); }
     });
 
+    loadOverall();
     loadDates();
 }
 

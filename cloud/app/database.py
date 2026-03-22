@@ -215,6 +215,51 @@ async def get_track_events(date_str: str, tz: str = "") -> list[dict]:
         await db.close()
 
 
+async def get_all_track_events() -> list[dict]:
+    """Get ALL track events across all dates (for overall insights)."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            """SELECT id, timestamp, track_id, track_name, artist_name, outcome, days_ago, context_uri
+               FROM track_events ORDER BY timestamp"""
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        await db.close()
+
+
+async def get_all_track_events_by_date(tz: str = "") -> list[tuple[str, list[dict]]]:
+    """Get ALL track events grouped by date in user's timezone.
+
+    Returns list of (date_str, [row_dicts]) tuples sorted by date.
+    """
+    try:
+        tz_info = ZoneInfo(tz) if tz else None
+    except Exception:
+        tz_info = None
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            """SELECT id, timestamp, track_id, track_name, artist_name, outcome, days_ago, context_uri
+               FROM track_events ORDER BY timestamp"""
+        )
+        rows = await cursor.fetchall()
+        by_date: dict[str, list[dict]] = {}
+        for row in rows:
+            r = dict(row)
+            ts = r["timestamp"]
+            if tz_info:
+                dt = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                local_date = dt.astimezone(tz_info).strftime("%Y-%m-%d")
+            else:
+                local_date = ts[:10]
+            by_date.setdefault(local_date, []).append(r)
+        return sorted(by_date.items())
+    finally:
+        await db.close()
+
+
 async def get_track_event_dates(tz: str = "") -> list[str]:
     """Get list of dates that have track events, grouped by user's timezone."""
     try:

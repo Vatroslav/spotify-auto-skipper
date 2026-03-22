@@ -155,3 +155,152 @@ def generate_insights(metrics: dict, skip_window_days: int = 60) -> list[dict]:
         })
 
     return insights
+
+
+def compute_metrics_all(events_by_date: list[tuple[str, list["TrackEvent"]]]) -> dict | None:
+    """Compute aggregated metrics across all dates, plus daily records.
+
+    Parameters
+    ----------
+    events_by_date : list of (date_str, [TrackEvent]) tuples, sorted by date.
+
+    Returns dict with same base keys as compute_metrics(), plus record fields.
+    Returns None if no events exist.
+    """
+    if not events_by_date:
+        return None
+
+    all_events: list[TrackEvent] = []
+
+    # Per-day tracking for records
+    best_busiest = ("", 0)
+    best_most_skips = ("", 0)
+    best_skip_rate = ("", 0.0)
+    best_streak = ("", 0)
+    best_oldest = None  # {"artist", "song", "days_ago", "date"}
+
+    for date_str, day_events in events_by_date:
+        all_events.extend(day_events)
+        day_total = len(day_events)
+        day_skipped = [e for e in day_events if e.outcome == "skipped"]
+        day_skip_count = len(day_skipped)
+
+        if day_total > best_busiest[1]:
+            best_busiest = (date_str, day_total)
+
+        if day_skip_count > best_most_skips[1]:
+            best_most_skips = (date_str, day_skip_count)
+
+        if day_total >= 5:
+            day_rate = day_skip_count / day_total * 100
+            if day_rate > best_skip_rate[1]:
+                best_skip_rate = (date_str, day_rate)
+
+        streak = 0
+        day_best_streak = 0
+        for e in day_events:
+            if e.outcome == "skipped":
+                streak += 1
+                day_best_streak = max(day_best_streak, streak)
+            else:
+                streak = 0
+        if day_best_streak > best_streak[1]:
+            best_streak = (date_str, day_best_streak)
+
+        for e in day_skipped:
+            if e.days_ago is not None:
+                if best_oldest is None or e.days_ago > best_oldest["days_ago"]:
+                    best_oldest = {
+                        "artist": e.artist, "song": e.song,
+                        "days_ago": e.days_ago, "date": date_str,
+                    }
+
+    if not all_events:
+        return None
+
+    metrics = compute_metrics(all_events)
+    metrics.update({
+        "total_days": len(events_by_date),
+        "oldest_scrobble": best_oldest,
+        "busiest_day": {"date": best_busiest[0], "count": best_busiest[1]},
+        "most_skips_day": {"date": best_most_skips[0], "count": best_most_skips[1]},
+        "highest_skip_rate_day": {"date": best_skip_rate[0], "rate": best_skip_rate[1]},
+        "longest_streak_day": {"date": best_streak[0], "streak": best_streak[1]},
+    })
+    return metrics
+
+
+def generate_insights_all(metrics: dict, skip_window_days: int = 60) -> list[dict]:
+    """Generate all-time observations from aggregated metrics."""
+    insights = []
+    total = metrics["songs_played"]
+    days = metrics["total_days"]
+    rate = metrics["skip_rate"]
+
+    insights.append({
+        "icon": "info",
+        "title": "Total activity",
+        "detail": (
+            f"{total:,} songs processed across {days} day{'s' if days != 1 else ''} "
+            f"({total / days:.0f}/day avg)."
+        ),
+    })
+
+    if rate > 50:
+        insights.append({
+            "icon": "warning",
+            "title": "High overall skip rate",
+            "detail": (
+                f"{rate:.0f}% of all songs were skipped. Consider lowering "
+                f"the skip window ({skip_window_days} days) for a better balance."
+            ),
+        })
+    elif rate < 10 and total > 20:
+        insights.append({
+            "icon": "info",
+            "title": "Low overall skip rate",
+            "detail": (
+                f"Only {rate:.0f}% of songs were skipped across all time. "
+                f"Your settings seem well balanced."
+            ),
+        })
+
+    streak = metrics["longest_skip_streak"]
+    if streak >= 6:
+        sd = metrics["longest_streak_day"]
+        insights.append({
+            "icon": "warning",
+            "title": "All-time skip streak",
+            "detail": (
+                f"{sd['streak']} songs skipped in a row ({sd['date']}). "
+                f"Consider enabling restart-pattern detection."
+            ),
+        })
+
+    ms = metrics["most_skipped"]
+    if ms and ms["count"] >= 5:
+        insights.append({
+            "icon": "warning",
+            "title": "Most skipped song",
+            "detail": f'"{ms["song"]}" by {ms["artist"]} was skipped {ms["count"]} times total.',
+        })
+
+    avg = metrics["avg_skip_days"]
+    if avg is not None and avg < 7:
+        insights.append({
+            "icon": "warning",
+            "title": "Skipping very recent songs",
+            "detail": (
+                f"Skipped songs were listened to an average of {avg:.1f} days ago overall. "
+                f"A smaller skip window might help."
+            ),
+        })
+
+    if len(insights) == 1:
+        insights.append({
+            "icon": "info",
+            "title": "Looking good",
+            "detail": "No issues detected across your listening history.",
+        })
+
+    return insights
