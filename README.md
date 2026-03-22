@@ -2,11 +2,11 @@
 
 I have a [playlist with over 5,000 songs](https://open.spotify.com/playlist/2DTe0ztu8OB5c1B80pjdfc?si=7b1c5cb732394d14), but Spotify's shuffle keeps playing the same ones over and over. This app fixes that — it checks your Last.fm scrobble history and automatically skips any song you've already heard recently, so you actually get to hear the rest of your library.
 
-Available as a **self-hosted cloud app** (v3.0.0) or a **Windows desktop app** (v2.5.0).
+Available as a **self-hosted cloud app** (v3.2.1) or a legacy **Windows desktop app** (v2.5.0).
 
 ---
 
-## Cloud Version (v3.0.0)
+## Cloud Version (v3.2.1)
 
 A self-hosted web app you can run on any VPS with Docker. Access it from any device via browser — no desktop client needed.
 
@@ -68,7 +68,9 @@ All other settings (skip window, poll interval, etc.) are configured through the
 
 ---
 
-## Desktop Version (v2.5.0)
+## Desktop Version (v2.5.0) — Legacy
+
+> **Note:** The desktop version is no longer actively developed. The source code has been archived but the [v2.5.0 release](https://github.com/Vatroslav/spotify-auto-skipper/releases/tag/v2.5.0) remains available for download.
 
 A Windows system tray app with a dark Spotify-themed GUI built with PySide6.
 
@@ -95,39 +97,7 @@ A Windows system tray app with a dark Spotify-themed GUI built with PySide6.
 
 ### Getting started
 
-**Option 1: Pre-built EXE** — Download from the [v2.5.0 release](https://github.com/Vatroslav/spotify-auto-skipper/releases/tag/v2.5.0) and run it.
-
-**Option 2: Run from source**
-```bash
-pip install -r requirements.txt
-python -m spotify_auto_skipper
-```
-
-The Setup Wizard opens on first run and walks you through connecting Last.fm and Spotify.
-
-### Configuration
-
-Config is stored as JSON in `%APPDATA%\SpotifyAutoSkipper\`. Edit through the Settings GUI (right-click tray icon) or manually.
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `skip_window_days` | 60 | How many days back to check scrobbles |
-| `poll_interval_seconds` | 120 | How often to check the current track |
-| `always_play_liked_songs` | true | Never skip songs in your Liked Songs |
-| `enable_restart_pattern` | true | Detect and handle playlist restart loops |
-| `never_skip_artists` | [] | Artists that are never skipped |
-| `start_with_windows` | false | Launch app on Windows startup |
-
-### System tray controls
-
-| Menu item | Description |
-|-----------|-------------|
-| **Pause Skipping** | Toggle skip pausing |
-| **Don't skip this song** | Pause for current song only |
-| **Check Now** | Immediately check current song |
-| **Settings...** | Open Settings GUI |
-| **Open Logs** | Open log folder |
-| **Exit** | Stop the app |
+Download the pre-built EXE from the [v2.5.0 release](https://github.com/Vatroslav/spotify-auto-skipper/releases/tag/v2.5.0) and run it. The Setup Wizard opens on first run and walks you through connecting Last.fm and Spotify.
 
 ---
 
