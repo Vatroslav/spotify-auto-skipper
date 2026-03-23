@@ -439,15 +439,11 @@ async def get_log_dates() -> list[str]:
 
 
 async def purge_old_logs(retention_days: int):
-    """Delete log entries and track events older than retention_days."""
+    """Delete log entries older than retention_days. Track events are kept permanently."""
     db = await get_db()
     try:
         await db.execute(
             "DELETE FROM logs WHERE timestamp < datetime('now', ?)",
-            (f"-{retention_days} days",),
-        )
-        await db.execute(
-            "DELETE FROM track_events WHERE timestamp < datetime('now', ?)",
             (f"-{retention_days} days",),
         )
         await db.commit()
