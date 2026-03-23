@@ -17,12 +17,10 @@ logger = logging.getLogger(__name__)
 LASTFM_ERROR = "LASTFM_ERROR"
 
 
-async def get_last_play_date(artist: str, track: str) -> datetime | str | None:
+async def _lookup_scrobbles(artist: str, track: str) -> datetime | str | None:
     """
-    Returns:
-      - datetime: last scrobble timestamp
-      - None: no scrobbles found for this track
-      - LASTFM_ERROR: transient/network failure (caller should not treat as "never heard")
+    Raw scrobble lookup — no fallback logic.
+    Returns datetime, None (no scrobbles), or LASTFM_ERROR.
     """
     try:
         async with httpx.AsyncClient(timeout=15) as client:
@@ -79,5 +77,32 @@ async def get_last_play_date(artist: str, track: str) -> datetime | str | None:
                 return datetime.fromtimestamp(int(uts), tz=timezone.utc)
             except (ValueError, OSError):
                 return None
+
+    return None
+
+
+async def get_last_play_date(artist: str, track: str) -> datetime | str | None:
+    """
+    Returns:
+      - datetime: last scrobble timestamp
+      - None: no scrobbles found for this track
+      - LASTFM_ERROR: transient/network failure (caller should not treat as "never heard")
+
+    If exact match finds nothing, checks the track_aliases table for
+    a known Last.fm name mapping and retries with that.
+    """
+    from app.database import get_track_alias
+
+    result = await _lookup_scrobbles(artist, track)
+
+    # If we got a date or an error, return as-is
+    if result is not None:
+        return result
+
+    # No scrobbles — check for a known alias
+    alias = await get_track_alias(artist, track)
+    if alias:
+        logger.info("[Last.fm] Using alias: '%s' → '%s'", track, alias)
+        return await _lookup_scrobbles(artist, alias)
 
     return None

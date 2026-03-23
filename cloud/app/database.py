@@ -52,6 +52,14 @@ CREATE TABLE IF NOT EXISTS oauth_tokens (
     expires_at    TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS track_aliases (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    artist       TEXT NOT NULL,
+    spotify_name TEXT NOT NULL,
+    lastfm_name  TEXT NOT NULL,
+    UNIQUE(artist, spotify_name)
+);
+
 CREATE INDEX IF NOT EXISTS idx_track_events_timestamp ON track_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
 """
@@ -79,6 +87,22 @@ async def init_db():
         if "image_url" not in columns:
             await db.execute("ALTER TABLE never_skip_artists ADD COLUMN image_url TEXT DEFAULT ''")
         await db.commit()
+    finally:
+        await db.close()
+
+
+# ── Track Aliases ────────────────────────────────────────────────
+
+async def get_track_alias(artist: str, spotify_name: str) -> str | None:
+    """Return the Last.fm name for a track, or None if no alias exists."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT lastfm_name FROM track_aliases WHERE artist = ? AND spotify_name = ?",
+            (artist, spotify_name),
+        )
+        row = await cursor.fetchone()
+        return row["lastfm_name"] if row else None
     finally:
         await db.close()
 
@@ -327,7 +351,10 @@ def _today_utc_range(tz_name: str) -> tuple[str, str]:
     return _date_to_utc_range(today_str, tz_name)
 
 
-async def get_logs(date_str: str = "", level: str = "all", tz: str = "") -> list[dict]:
+async def get_logs(
+    date_str: str = "", level: str = "all", tz: str = "",
+    limit: int = 0, before_id: int = 0,
+) -> list[dict]:
     db = await get_db()
     try:
         if date_str:
@@ -342,12 +369,27 @@ async def get_logs(date_str: str = "", level: str = "all", tz: str = "") -> list
             base_where += " AND level = ?"
             params.append(level)
 
-        cursor = await db.execute(
-            f"SELECT id, timestamp, level, message FROM logs {base_where} ORDER BY timestamp",
-            params,
-        )
-        rows = await cursor.fetchall()
-        return [dict(row) for row in rows]
+        if before_id:
+            base_where += " AND id < ?"
+            params.append(before_id)
+
+        limit_clause = f"LIMIT {int(limit)}" if limit > 0 else ""
+
+        # When using limit, fetch newest first then reverse for chronological order
+        if limit > 0:
+            cursor = await db.execute(
+                f"SELECT id, timestamp, level, message FROM logs {base_where} ORDER BY timestamp DESC {limit_clause}",
+                params,
+            )
+            rows = await cursor.fetchall()
+            return [dict(row) for row in reversed(rows)]
+        else:
+            cursor = await db.execute(
+                f"SELECT id, timestamp, level, message FROM logs {base_where} ORDER BY timestamp",
+                params,
+            )
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
     finally:
         await db.close()
 

@@ -18,7 +18,11 @@ async def available_dates(request: Request):
 
 
 @router.get("")
-async def get_log_entries(request: Request, date: str = "", level: str = "all", tz: str = ""):
+async def get_log_entries(
+    request: Request, date: str = "", level: str = "all", tz: str = "",
+    limit: int = 0, before_id: int = 0,
+):
     """Return log entries for a specific date, or today if omitted."""
-    logs = await get_logs(date, level, tz)
-    return {"date": date, "logs": logs}
+    logs = await get_logs(date, level, tz, limit=limit, before_id=before_id)
+    has_more = bool(limit and len(logs) == limit)
+    return {"date": date, "logs": logs, "has_more": has_more}
