@@ -60,6 +60,38 @@ CREATE TABLE IF NOT EXISTS track_aliases (
     UNIQUE(artist, spotify_name)
 );
 
+CREATE TABLE IF NOT EXISTS overall_metrics (
+    id              INTEGER PRIMARY KEY CHECK (id = 1),
+    computed_at     TIMESTAMP NOT NULL,
+    songs_played    INTEGER NOT NULL DEFAULT 0,
+    songs_skipped   INTEGER NOT NULL DEFAULT 0,
+    songs_kept      INTEGER NOT NULL DEFAULT 0,
+    skip_rate       REAL NOT NULL DEFAULT 0,
+    unique_songs    INTEGER NOT NULL DEFAULT 0,
+    unique_artists  INTEGER NOT NULL DEFAULT 0,
+    most_skipped_song   TEXT,
+    most_skipped_artist TEXT,
+    most_skipped_count  INTEGER,
+    most_played_song    TEXT,
+    most_played_artist  TEXT,
+    most_played_count   INTEGER,
+    longest_skip_streak INTEGER NOT NULL DEFAULT 0,
+    avg_skip_days       REAL,
+    total_days          INTEGER NOT NULL DEFAULT 0,
+    oldest_scrobble_song    TEXT,
+    oldest_scrobble_artist  TEXT,
+    oldest_scrobble_days    INTEGER,
+    oldest_scrobble_date    TEXT,
+    busiest_day_date    TEXT,
+    busiest_day_count   INTEGER,
+    most_skips_day_date TEXT,
+    most_skips_day_count INTEGER,
+    highest_skip_rate_date  TEXT,
+    highest_skip_rate_rate  REAL,
+    longest_streak_day_date TEXT,
+    longest_streak_day_streak INTEGER
+);
+
 CREATE INDEX IF NOT EXISTS idx_track_events_timestamp ON track_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
 """
@@ -419,6 +451,203 @@ async def purge_old_logs(retention_days: int):
             (f"-{retention_days} days",),
         )
         await db.commit()
+    finally:
+        await db.close()
+
+
+# ── Overall metrics cache ────────────────────────────────────────
+
+async def recompute_overall_metrics():
+    """Recompute all-time metrics via SQL and store in overall_metrics table."""
+    db = await get_db()
+    try:
+        # Basic counts
+        row = (await (await db.execute(
+            "SELECT COUNT(*) as total, SUM(outcome='skipped') as skipped, SUM(outcome!='skipped') as kept FROM track_events"
+        )).fetchone())
+        total = row["total"] or 0
+        skipped = row["skipped"] or 0
+        kept = row["kept"] or 0
+        skip_rate = (skipped / total * 100) if total > 0 else 0.0
+
+        # Unique counts
+        row = (await (await db.execute(
+            "SELECT COUNT(DISTINCT artist_name || '|||' || track_name) as c FROM track_events"
+        )).fetchone())
+        unique_songs = row["c"] or 0
+
+        row = (await (await db.execute(
+            "SELECT COUNT(DISTINCT artist_name) as c FROM track_events"
+        )).fetchone())
+        unique_artists = row["c"] or 0
+
+        # Most skipped
+        row = (await (await db.execute(
+            "SELECT artist_name, track_name, COUNT(*) as c FROM track_events WHERE outcome='skipped' GROUP BY artist_name, track_name ORDER BY c DESC LIMIT 1"
+        )).fetchone())
+        ms_song, ms_artist, ms_count = (row["track_name"], row["artist_name"], row["c"]) if row else (None, None, None)
+
+        # Most played
+        row = (await (await db.execute(
+            "SELECT artist_name, track_name, COUNT(*) as c FROM track_events WHERE outcome!='skipped' GROUP BY artist_name, track_name ORDER BY c DESC LIMIT 1"
+        )).fetchone())
+        mp_song, mp_artist, mp_count = (row["track_name"], row["artist_name"], row["c"]) if row else (None, None, None)
+
+        # Avg skip age
+        row = (await (await db.execute(
+            "SELECT AVG(days_ago) as a FROM track_events WHERE outcome='skipped' AND days_ago IS NOT NULL"
+        )).fetchone())
+        avg_skip_days = row["a"]
+
+        # Oldest scrobble
+        row = (await (await db.execute(
+            "SELECT artist_name, track_name, days_ago, DATE(timestamp) as d FROM track_events WHERE outcome='skipped' AND days_ago IS NOT NULL ORDER BY days_ago DESC LIMIT 1"
+        )).fetchone())
+        os_song, os_artist, os_days, os_date = (row["track_name"], row["artist_name"], row["days_ago"], row["d"]) if row else (None, None, None, None)
+
+        # Total days
+        row = (await (await db.execute(
+            "SELECT COUNT(DISTINCT DATE(timestamp)) as c FROM track_events"
+        )).fetchone())
+        total_days = row["c"] or 0
+
+        # Busiest day
+        row = (await (await db.execute(
+            "SELECT DATE(timestamp) as d, COUNT(*) as c FROM track_events GROUP BY d ORDER BY c DESC LIMIT 1"
+        )).fetchone())
+        busiest_date, busiest_count = (row["d"], row["c"]) if row else (None, None)
+
+        # Most skips in a day
+        row = (await (await db.execute(
+            "SELECT DATE(timestamp) as d, COUNT(*) as c FROM track_events WHERE outcome='skipped' GROUP BY d ORDER BY c DESC LIMIT 1"
+        )).fetchone())
+        most_skips_date, most_skips_count = (row["d"], row["c"]) if row else (None, None)
+
+        # Highest skip rate day (min 5 songs)
+        row = (await (await db.execute(
+            """SELECT DATE(timestamp) as d,
+                      CAST(SUM(outcome='skipped') AS REAL) / COUNT(*) * 100 as rate
+               FROM track_events GROUP BY d HAVING COUNT(*) >= 5 ORDER BY rate DESC LIMIT 1"""
+        )).fetchone())
+        high_rate_date, high_rate_rate = (row["d"], row["rate"]) if row else (None, None)
+
+        # Longest skip streak (Python — fetch outcomes in order)
+        cursor = await db.execute("SELECT outcome FROM track_events ORDER BY timestamp")
+        outcomes = await cursor.fetchall()
+        longest_streak = 0
+        current = 0
+        for r in outcomes:
+            if r["outcome"] == "skipped":
+                current += 1
+                if current > longest_streak:
+                    longest_streak = current
+            else:
+                current = 0
+
+        # Longest streak per day
+        cursor = await db.execute(
+            "SELECT DATE(timestamp) as d, outcome FROM track_events ORDER BY timestamp"
+        )
+        day_rows = await cursor.fetchall()
+        best_streak_date, best_streak_val = None, 0
+        cur_day, cur_streak, day_best = None, 0, 0
+        for r in day_rows:
+            d = r["d"]
+            if d != cur_day:
+                if day_best > best_streak_val:
+                    best_streak_val = day_best
+                    best_streak_date = cur_day
+                cur_day, cur_streak, day_best = d, 0, 0
+            if r["outcome"] == "skipped":
+                cur_streak += 1
+                if cur_streak > day_best:
+                    day_best = cur_streak
+            else:
+                cur_streak = 0
+        if day_best > best_streak_val:
+            best_streak_val = day_best
+            best_streak_date = cur_day
+
+        # Write to cache
+        await db.execute(
+            """INSERT INTO overall_metrics (
+                id, computed_at,
+                songs_played, songs_skipped, songs_kept, skip_rate,
+                unique_songs, unique_artists,
+                most_skipped_song, most_skipped_artist, most_skipped_count,
+                most_played_song, most_played_artist, most_played_count,
+                longest_skip_streak, avg_skip_days, total_days,
+                oldest_scrobble_song, oldest_scrobble_artist, oldest_scrobble_days, oldest_scrobble_date,
+                busiest_day_date, busiest_day_count,
+                most_skips_day_date, most_skips_day_count,
+                highest_skip_rate_date, highest_skip_rate_rate,
+                longest_streak_day_date, longest_streak_day_streak
+            ) VALUES (1, datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                computed_at=excluded.computed_at,
+                songs_played=excluded.songs_played, songs_skipped=excluded.songs_skipped,
+                songs_kept=excluded.songs_kept, skip_rate=excluded.skip_rate,
+                unique_songs=excluded.unique_songs, unique_artists=excluded.unique_artists,
+                most_skipped_song=excluded.most_skipped_song, most_skipped_artist=excluded.most_skipped_artist, most_skipped_count=excluded.most_skipped_count,
+                most_played_song=excluded.most_played_song, most_played_artist=excluded.most_played_artist, most_played_count=excluded.most_played_count,
+                longest_skip_streak=excluded.longest_skip_streak, avg_skip_days=excluded.avg_skip_days, total_days=excluded.total_days,
+                oldest_scrobble_song=excluded.oldest_scrobble_song, oldest_scrobble_artist=excluded.oldest_scrobble_artist,
+                oldest_scrobble_days=excluded.oldest_scrobble_days, oldest_scrobble_date=excluded.oldest_scrobble_date,
+                busiest_day_date=excluded.busiest_day_date, busiest_day_count=excluded.busiest_day_count,
+                most_skips_day_date=excluded.most_skips_day_date, most_skips_day_count=excluded.most_skips_day_count,
+                highest_skip_rate_date=excluded.highest_skip_rate_date, highest_skip_rate_rate=excluded.highest_skip_rate_rate,
+                longest_streak_day_date=excluded.longest_streak_day_date, longest_streak_day_streak=excluded.longest_streak_day_streak""",
+            (total, skipped, kept, skip_rate,
+             unique_songs, unique_artists,
+             ms_song, ms_artist, ms_count,
+             mp_song, mp_artist, mp_count,
+             longest_streak, avg_skip_days, total_days,
+             os_song, os_artist, os_days, os_date,
+             busiest_date, busiest_count,
+             most_skips_date, most_skips_count,
+             high_rate_date, high_rate_rate,
+             best_streak_date, best_streak_val),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def get_cached_overall_metrics() -> dict | None:
+    """Read precomputed overall metrics. Returns None if not yet computed."""
+    db = await get_db()
+    try:
+        row = (await (await db.execute("SELECT * FROM overall_metrics WHERE id = 1")).fetchone())
+        if not row:
+            return None
+        r = dict(row)
+
+        def _top_track(song_key, artist_key, count_key):
+            if r[song_key] is None:
+                return None
+            return {"song": r[song_key], "artist": r[artist_key], "count": r[count_key]}
+
+        return {
+            "songs_played": r["songs_played"],
+            "songs_skipped": r["songs_skipped"],
+            "songs_kept": r["songs_kept"],
+            "skip_rate": r["skip_rate"],
+            "unique_songs": r["unique_songs"],
+            "unique_artists": r["unique_artists"],
+            "most_skipped": _top_track("most_skipped_song", "most_skipped_artist", "most_skipped_count"),
+            "most_played": _top_track("most_played_song", "most_played_artist", "most_played_count"),
+            "longest_skip_streak": r["longest_skip_streak"],
+            "avg_skip_days": r["avg_skip_days"],
+            "total_days": r["total_days"],
+            "oldest_scrobble": {
+                "song": r["oldest_scrobble_song"], "artist": r["oldest_scrobble_artist"],
+                "days_ago": r["oldest_scrobble_days"], "date": r["oldest_scrobble_date"],
+            } if r["oldest_scrobble_song"] else None,
+            "busiest_day": {"date": r["busiest_day_date"], "count": r["busiest_day_count"]},
+            "most_skips_day": {"date": r["most_skips_day_date"], "count": r["most_skips_day_count"]},
+            "highest_skip_rate_day": {"date": r["highest_skip_rate_date"], "rate": r["highest_skip_rate_rate"]},
+            "longest_streak_day": {"date": r["longest_streak_day_date"], "streak": r["longest_streak_day_streak"]},
+        }
     finally:
         await db.close()
 

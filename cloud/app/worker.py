@@ -10,6 +10,7 @@ from app.config import load_settings
 from app.database import (
     add_log, add_track_event, get_oauth_tokens,
     is_artist_never_skipped, purge_old_logs,
+    recompute_overall_metrics,
 )
 from app.spotify_api import CredentialError
 from app.lastfm_api import get_last_play_date, LASTFM_ERROR
@@ -58,6 +59,7 @@ async def polling_loop():
 
     # Purge old data on startup, then every 24 hours
     await purge_old_logs(settings["log_retention_days"])
+    await recompute_overall_metrics()
     last_purge = datetime.now(timezone.utc)
 
     while True:
@@ -66,9 +68,10 @@ async def polling_loop():
             settings = await load_settings()
             poll_interval = settings["poll_interval_seconds"]
 
-            # Periodic purge (every 24h)
+            # Periodic purge + metrics recompute (every 24h)
             if (datetime.now(timezone.utc) - last_purge).total_seconds() >= 86400:
                 await purge_old_logs(settings["log_retention_days"])
+                await recompute_overall_metrics()
                 last_purge = datetime.now(timezone.utc)
 
             # Update poll timestamp every cycle (for countdown timer)
