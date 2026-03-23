@@ -501,7 +501,7 @@ async def recompute_overall_metrics():
 
         # Oldest scrobble
         row = (await (await db.execute(
-            "SELECT artist_name, track_name, days_ago, DATE(timestamp) as d FROM track_events WHERE outcome='skipped' AND days_ago IS NOT NULL ORDER BY days_ago DESC LIMIT 1"
+            "SELECT artist_name, track_name, days_ago, DATE(timestamp) as d FROM track_events WHERE days_ago IS NOT NULL ORDER BY days_ago DESC LIMIT 1"
         )).fetchone())
         os_song, os_artist, os_days, os_date = (row["track_name"], row["artist_name"], row["days_ago"], row["d"]) if row else (None, None, None, None)
 
