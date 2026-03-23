@@ -207,7 +207,7 @@ def compute_metrics_all(events_by_date: list[tuple[str, list["TrackEvent"]]]) ->
         if day_best_streak > best_streak[1]:
             best_streak = (date_str, day_best_streak)
 
-        for e in day_skipped:
+        for e in day_events:
             if e.days_ago is not None:
                 if best_oldest is None or e.days_ago > best_oldest["days_ago"]:
                     best_oldest = {
