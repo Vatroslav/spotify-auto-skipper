@@ -552,6 +552,9 @@ function initLogs() {
     if (!logsContainer) return;
 
     let currentLevel = "all";
+    const LOG_PAGE_SIZE = 200;
+    let hasMore = false;
+    let oldestLoadedId = null;
 
     function init() {
         loadLogs();
@@ -559,27 +562,29 @@ function initLogs() {
 
     function utcToLocal(ts) {
         if (!ts) return "";
-        // SQLite CURRENT_TIMESTAMP is UTC but lacks a Z suffix — add it
         const d = new Date(ts.endsWith("Z") ? ts : ts + "Z");
         return d.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false});
     }
 
-    function renderLogEntries(logs) {
-        logsContainer.innerHTML = "";
-        if (!logs || logs.length === 0) {
-            logsContainer.innerHTML = '<p class="text-muted text-center mt-16">No log entries.</p>';
-            return;
+    function buildLogEntryHTML(log) {
+        const ts = utcToLocal(log.timestamp);
+        const levelClass = `log-level-${log.level}`;
+        return `<div class="log-entry"><span class="log-time">${ts}</span><span class="${levelClass}">${escapeHtml(log.message)}</span></div>`;
+    }
+
+    function renderLoadMoreBtn() {
+        // Remove existing button if any
+        const existing = logsContainer.querySelector(".load-more-btn");
+        if (existing) existing.remove();
+
+        if (hasMore) {
+            const btn = document.createElement("button");
+            btn.className = "btn btn-sm load-more-btn";
+            btn.textContent = "Load older logs";
+            btn.style.cssText = "display:block;margin:8px auto";
+            btn.addEventListener("click", loadOlder);
+            logsContainer.prepend(btn);
         }
-        logs.forEach(log => {
-            const ts = utcToLocal(log.timestamp);
-            const levelClass = `log-level-${log.level}`;
-            logsContainer.innerHTML += `
-                <div class="log-entry">
-                    <span class="log-time">${ts}</span>
-                    <span class="${levelClass}">${escapeHtml(log.message)}</span>
-                </div>
-            `;
-        });
     }
 
     function groupIntoBlocks(logs) {
@@ -603,48 +608,108 @@ function initLogs() {
         return blocks;
     }
 
-    async function loadLogs() {
+    function buildQueryParams(extraLimit, beforeId) {
         const date = datePicker ? datePicker.value : "";
-        const dateParam = date ? `&date=${date}` : "";
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const tzParam = `&tz=${encodeURIComponent(tz)}`;
-        const data = await API.get(`/api/logs?level=${currentLevel}${dateParam}${tzParam}`);
+        let params = `level=${currentLevel}&tz=${encodeURIComponent(tz)}`;
+        if (date) params += `&date=${date}`;
+        if (extraLimit) params += `&limit=${extraLimit}`;
+        if (beforeId) params += `&before_id=${beforeId}`;
+        return params;
+    }
+
+    function renderFilteredBlocks(blocks) {
+        logsContainer.innerHTML = "";
+        if (blocks.length === 0) {
+            logsContainer.innerHTML = '<p class="text-muted text-center mt-16">No matching entries.</p>';
+            return;
+        }
+        const html = blocks.map((block, i) => {
+            let out = block.entries.map(buildLogEntryHTML).join("");
+            if (i < blocks.length - 1) out += '<div class="log-separator"></div>';
+            return out;
+        }).join("");
+        logsContainer.innerHTML = html;
+    }
+
+    async function loadLogs() {
+        const params = buildQueryParams(LOG_PAGE_SIZE, 0);
+        const data = await API.get(`/api/logs?${params}`);
+
         if (!data.logs || data.logs.length === 0) {
             logsContainer.innerHTML = '<p class="text-muted text-center mt-16">No log entries.</p>';
+            hasMore = false;
+            oldestLoadedId = null;
             return;
         }
 
-        if (currentLevel === "skipped" || currentLevel === "kept") {
+        hasMore = data.has_more || false;
+        oldestLoadedId = data.logs.length > 0 ? data.logs[0].id : null;
+
+        const isFiltered = currentLevel === "skipped" || currentLevel === "kept";
+        if (isFiltered) {
             const blocks = groupIntoBlocks(data.logs);
-            const filtered = blocks.filter(b => b.outcome === currentLevel);
-            const flatLogs = filtered.flatMap(b => b.entries);
-            // Add separators between blocks
-            logsContainer.innerHTML = "";
-            if (filtered.length === 0) {
-                logsContainer.innerHTML = '<p class="text-muted text-center mt-16">No matching entries.</p>';
-                return;
+            // Drop first block if it's likely cut off at the page boundary
+            if (hasMore && blocks.length > 0 && !blocks[0].entries[0].message.startsWith("Currently playing:")) {
+                blocks.shift();
             }
-            filtered.forEach((block, i) => {
-                block.entries.forEach(log => {
-                    const ts = utcToLocal(log.timestamp);
-                    const levelClass = `log-level-${log.level}`;
-                    logsContainer.innerHTML += `
-                        <div class="log-entry">
-                            <span class="log-time">${ts}</span>
-                            <span class="${levelClass}">${escapeHtml(log.message)}</span>
-                        </div>
-                    `;
-                });
-                if (i < filtered.length - 1) {
-                    logsContainer.innerHTML += '<div class="log-separator"></div>';
-                }
-            });
+            const filtered = blocks.filter(b => b.outcome === currentLevel);
+            renderFilteredBlocks(filtered);
+            renderLoadMoreBtn();
         } else {
-            renderLogEntries(data.logs);
+            logsContainer.innerHTML = data.logs.map(buildLogEntryHTML).join("");
+            renderLoadMoreBtn();
         }
+
         applySearch();
-        // Auto-scroll to bottom
         logsContainer.scrollTop = logsContainer.scrollHeight;
+    }
+
+    async function loadOlder() {
+        if (!oldestLoadedId) return;
+        const params = buildQueryParams(LOG_PAGE_SIZE, oldestLoadedId);
+        const data = await API.get(`/api/logs?${params}`);
+
+        if (!data.logs || data.logs.length === 0) {
+            hasMore = false;
+            renderLoadMoreBtn();
+            return;
+        }
+
+        hasMore = data.has_more || false;
+        oldestLoadedId = data.logs[0].id;
+
+        // Remember scroll position so view doesn't jump
+        const prevHeight = logsContainer.scrollHeight;
+
+        // Remove existing load-more button before prepending
+        const existing = logsContainer.querySelector(".load-more-btn");
+        if (existing) existing.remove();
+
+        const isFiltered = currentLevel === "skipped" || currentLevel === "kept";
+        if (isFiltered) {
+            const blocks = groupIntoBlocks(data.logs);
+            // Drop last block (may be incomplete — continues into already-loaded data)
+            if (blocks.length > 1) blocks.pop();
+            const filtered = blocks.filter(b => b.outcome === currentLevel);
+            const html = filtered.map((block, i) => {
+                let out = block.entries.map(buildLogEntryHTML).join("");
+                out += '<div class="log-separator"></div>';
+                return out;
+            }).join("");
+            const fragment = document.createRange().createContextualFragment(html);
+            logsContainer.prepend(fragment);
+        } else {
+            const fragment = document.createRange().createContextualFragment(
+                data.logs.map(buildLogEntryHTML).join("")
+            );
+            logsContainer.prepend(fragment);
+        }
+        renderLoadMoreBtn();
+        applySearch();
+
+        // Restore scroll position
+        logsContainer.scrollTop = logsContainer.scrollHeight - prevHeight;
     }
 
     // Search filter — hides non-matching entries in the DOM
