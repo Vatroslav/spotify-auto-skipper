@@ -403,6 +403,7 @@ input:focus, select:focus {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
+    flex-wrap: wrap;
     padding: 10px 0;
     border-bottom: 1px solid var(--border-secondary);
     gap: 12px;
@@ -420,10 +421,8 @@ input:focus, select:focus {
     font-size: 0.85rem;
     color: var(--text-primary);
     text-align: right;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    word-break: break-word;
+    margin-left: auto;
 }
 
 /* ── Insights ────────────────────────────────────── */
@@ -519,11 +518,31 @@ input:focus, select:focus {
 
 /* ── Date Navigation ─────────────────────────────── */
 
-.date-nav {
+.daily-header {
     display: flex;
     align-items: center;
     gap: 16px;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
+}
+
+.daily-header .section-title {
+    margin-bottom: 0;
+    white-space: nowrap;
+}
+
+.date-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.daily-header .date-nav .btn {
+    padding: 4px 10px;
+    font-size: 0.75rem;
+}
+
+.daily-header .date-text {
+    font-size: 0.8rem;
 }
 
 .date-input {
@@ -661,6 +680,19 @@ input:focus, select:focus {
     color: #fff;
 }
 
+/* ── Insights columns ────────────────────────────── */
+
+.insights-columns {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.insights-column {
+    flex: 1;
+    min-width: 0;
+}
+
 /* ── Responsive ──────────────────────────────────── */
 
 @media (min-width: 768px) {
@@ -706,5 +738,16 @@ input:focus, select:focus {
 
     .toast {
         bottom: 32px;
+    }
+}
+
+@media (min-width: 1100px) {
+    .insights-columns {
+        flex-direction: row;
+        gap: 24px;
+    }
+
+    .container:has(.insights-columns) {
+        max-width: 1200px;
     }
 }
