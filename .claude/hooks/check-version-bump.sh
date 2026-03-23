@@ -6,7 +6,7 @@ CMD=$(python -c "import sys,json; print(json.load(sys.stdin)['tool_input']['comm
 
 # ── Check 1: Block VPS deploys without version bump ──────────────
 # Catch ANY ssh/tar command targeting the VPS that rebuilds docker
-if echo "$CMD" | grep -qE '46\.225\.170\.120.*docker compose|tar.*ssh.*46\.225\.170\.120'; then
+if echo "$CMD" | grep -qE '(46\.225\.170\.120|autoskipper\.duckdns\.org).*docker compose|tar.*ssh.*(46\.225\.170\.120|autoskipper\.duckdns\.org)'; then
     # Check if cloud/ files have been modified (staged or unstaged) since last commit
     CLOUD_CHANGES=$(git diff --name-only HEAD -- cloud/ 2>/dev/null; git diff --cached --name-only -- cloud/ 2>/dev/null)
     # Also check untracked cloud files
@@ -23,6 +23,28 @@ $(git ls-files --others --exclude-standard -- cloud/ 2>/dev/null)"
             printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Deploy blocked! cloud/ files changed but cloud/app/__init__.py version not bumped. Increment the version first."}}'
             exit 0
         fi
+    fi
+
+    # ── Check 1b: If version has a test suffix, ensure it was incremented ──
+    LAST_DEPLOY_FILE=".claude/hooks/.last-deployed-version"
+    CURRENT_VERSION=$(sed -n 's/.*APP_VERSION.*"\(v\?\)\([^"]*\)".*/\2/p' cloud/app/__init__.py 2>/dev/null)
+
+    if echo "$CURRENT_VERSION" | grep -qE '\-[0-9]+$'; then
+        # Has test suffix — check against last deploy
+        if [ -f "$LAST_DEPLOY_FILE" ]; then
+            LAST_VERSION=$(cat "$LAST_DEPLOY_FILE")
+            if [ "$CURRENT_VERSION" = "$LAST_VERSION" ]; then
+                # Calculate next suffix
+                CUR_SUFFIX=$(echo "$CURRENT_VERSION" | sed -E 's/.*-([0-9]+)$/\1/')
+                NEXT_SUFFIX=$((CUR_SUFFIX + 1))
+                BASE=$(echo "$CURRENT_VERSION" | sed -E 's/-[0-9]+$//')
+                NEXT_VERSION="${BASE}-${NEXT_SUFFIX}"
+                printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Deploy blocked! Test version %s was already deployed. Increment the suffix (e.g. %s → %s) before deploying again."}}' \
+                    "$CURRENT_VERSION" "$CURRENT_VERSION" "$NEXT_VERSION"
+                exit 0
+            fi
+        fi
+        # Save current version as last deployed (will be written by post-deploy hook)
     fi
 fi
 
