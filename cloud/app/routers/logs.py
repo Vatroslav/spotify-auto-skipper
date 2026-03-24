@@ -4,7 +4,7 @@ Logs API routes.
 
 from fastapi import APIRouter, Depends, Request
 
-from app.database import get_logs, get_log_dates
+from app.database import get_logs, get_log_dates, search_logs
 from app.routers.deps import require_auth
 
 router = APIRouter(prefix="/api/logs", tags=["logs"], dependencies=[Depends(require_auth)])
@@ -15,6 +15,15 @@ async def available_dates(request: Request):
     """Return list of dates with log entries."""
     dates = await get_log_dates()
     return {"dates": dates}
+
+
+@router.get("/search")
+async def search_log_entries(request: Request, q: str = "", date: str = "", tz: str = ""):
+    """Search logs for blocks matching a song or artist query."""
+    if not q.strip():
+        return {"logs": []}
+    logs = await search_logs(q.strip(), date, tz)
+    return {"logs": logs}
 
 
 @router.get("")
