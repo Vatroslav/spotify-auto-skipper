@@ -8,8 +8,8 @@ from datetime import datetime, timedelta, timezone
 
 from app.config import load_settings
 from app.database import (
-    add_log, add_track_event, get_oauth_tokens,
-    is_artist_never_skipped, purge_old_logs,
+    add_log, add_track_event, get_last_track_event_id,
+    get_oauth_tokens, is_artist_never_skipped, purge_old_logs,
     recompute_overall_metrics,
 )
 from app.spotify_api import CredentialError
@@ -60,6 +60,7 @@ async def polling_loop():
     # Purge old data on startup, then every 24 hours
     await purge_old_logs(settings["log_retention_days"])
     await recompute_overall_metrics()
+    app_state.last_checked_track_id = await get_last_track_event_id()
     last_purge = datetime.now(timezone.utc)
 
     while True:
