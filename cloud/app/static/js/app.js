@@ -749,7 +749,7 @@ function initLogs() {
 
     // Auto-refresh every 5 seconds (only when no date/search is active = live today view)
     setInterval(() => {
-        if (!searchMode && (!datePicker || !datePicker.value)) {
+        if (!searchMode && currentLevel === "all" && (!datePicker || !datePicker.value)) {
             loadLogs();
         }
     }, 5000);
