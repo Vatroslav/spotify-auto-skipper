@@ -4,8 +4,9 @@
 <div class="container">
     <h1 class="page-title">Logs</h1>
 
-    <div class="date-nav">
+    <div class="log-toolbar">
         <input type="date" id="log-date-picker" class="date-input" />
+        <input type="text" id="log-search" class="log-search-input" placeholder="Search by song or artist..." />
     </div>
 
     <div class="filter-chips">
@@ -15,10 +16,6 @@
         <button class="chip" data-level="error">Error</button>
         <button class="chip" data-level="skipped">Skipped</button>
         <button class="chip" data-level="kept">Kept</button>
-    </div>
-
-    <div class="log-search-wrapper">
-        <input type="text" id="log-search" class="log-search-input" placeholder="Search by song or artist..." />
     </div>
 
     <div class="card">

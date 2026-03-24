@@ -562,8 +562,10 @@ input:focus, select:focus {
     width: 160px;
 }
 
-.log-search-wrapper {
-    margin-bottom: 12px;
+.log-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
 }
 
 .log-search-input {
@@ -571,12 +573,12 @@ input:focus, select:focus {
     color: var(--text-primary);
     border: 1px solid var(--border-primary);
     border-radius: 6px;
-    padding: 8px 12px;
+    padding: 6px 12px;
     font-size: 0.85rem;
     font-family: inherit;
     color-scheme: dark;
-    width: 100%;
-    box-sizing: border-box;
+    flex: 1;
+    min-width: 0;
 }
 
 .log-search-input::placeholder {
