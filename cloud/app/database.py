@@ -255,6 +255,18 @@ async def add_track_event(
         await db.close()
 
 
+async def get_last_track_event_id() -> str | None:
+    """Return the track_id of the most recent track event, or None."""
+    db = await get_db()
+    try:
+        row = await (await db.execute(
+            "SELECT track_id FROM track_events ORDER BY id DESC LIMIT 1"
+        )).fetchone()
+        return row[0] if row else None
+    finally:
+        await db.close()
+
+
 async def get_track_events(date_str: str, tz: str = "") -> list[dict]:
     """Get track events for a specific date (YYYY-MM-DD) in user's timezone."""
     utc_start, utc_end = _date_to_utc_range(date_str, tz)
