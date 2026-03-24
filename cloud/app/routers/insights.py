@@ -33,7 +33,7 @@ async def get_overall_insights(request: Request, tz: str = ""):
         # First run or empty cache — compute now
         await recompute_overall_metrics()
         metrics = await get_cached_overall_metrics()
-    if metrics is None:
+    if metrics is None or metrics.get("songs_played", 0) == 0:
         return {"metrics": None, "insights": []}
 
     settings = await load_settings()
