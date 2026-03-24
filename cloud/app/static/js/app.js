@@ -735,9 +735,10 @@ function initLogs() {
         });
     }
 
-    // Auto-refresh every 5 seconds (only when no date is selected = today)
+    // Auto-refresh every 5 seconds (only when no date/search is active = live today view)
     setInterval(() => {
-        if (!datePicker || !datePicker.value) {
+        const hasSearch = searchInput && searchInput.value.trim().length > 0;
+        if (!hasSearch && (!datePicker || !datePicker.value)) {
             loadLogs();
         }
     }, 5000);
