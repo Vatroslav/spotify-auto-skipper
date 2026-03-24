@@ -555,6 +555,8 @@ function initLogs() {
     const LOG_PAGE_SIZE = 200;
     let hasMore = false;
     let oldestLoadedId = null;
+    let allLogs = [];
+    const searchInput = document.getElementById("log-search");
 
     function init() {
         loadLogs();
@@ -632,36 +634,52 @@ function initLogs() {
         logsContainer.innerHTML = html;
     }
 
+    function renderAll() {
+        const query = (searchInput ? searchInput.value : "").trim().toLowerCase();
+        const isBlockFilter = currentLevel === "skipped" || currentLevel === "kept";
+        const needsBlocks = isBlockFilter || query.length > 0;
+
+        if (allLogs.length === 0) {
+            logsContainer.innerHTML = '<p class="text-muted text-center mt-16">No log entries.</p>';
+            renderLoadMoreBtn();
+            return;
+        }
+
+        if (needsBlocks) {
+            let blocks = groupIntoBlocks(allLogs);
+            if (isBlockFilter) {
+                blocks = blocks.filter(b => b.outcome === currentLevel);
+            }
+            if (query) {
+                blocks = blocks.filter(block => {
+                    const header = block.entries[0];
+                    if (!header || !header.message.startsWith("Currently playing:")) return false;
+                    return header.message.toLowerCase().includes(query);
+                });
+            }
+            renderFilteredBlocks(blocks);
+        } else {
+            logsContainer.innerHTML = allLogs.map(buildLogEntryHTML).join("");
+        }
+        renderLoadMoreBtn();
+    }
+
     async function loadLogs() {
         const params = buildQueryParams(LOG_PAGE_SIZE, 0);
         const data = await API.get(`/api/logs?${params}`);
 
         if (!data.logs || data.logs.length === 0) {
-            logsContainer.innerHTML = '<p class="text-muted text-center mt-16">No log entries.</p>';
+            allLogs = [];
             hasMore = false;
             oldestLoadedId = null;
+            renderAll();
             return;
         }
 
         hasMore = data.has_more || false;
-        oldestLoadedId = data.logs.length > 0 ? data.logs[0].id : null;
-
-        const isFiltered = currentLevel === "skipped" || currentLevel === "kept";
-        if (isFiltered) {
-            const blocks = groupIntoBlocks(data.logs);
-            // Drop first block if it's likely cut off at the page boundary
-            if (hasMore && blocks.length > 0 && !blocks[0].entries[0].message.startsWith("Currently playing:")) {
-                blocks.shift();
-            }
-            const filtered = blocks.filter(b => b.outcome === currentLevel);
-            renderFilteredBlocks(filtered);
-            renderLoadMoreBtn();
-        } else {
-            logsContainer.innerHTML = data.logs.map(buildLogEntryHTML).join("");
-            renderLoadMoreBtn();
-        }
-
-        applySearch();
+        oldestLoadedId = data.logs[0].id;
+        allLogs = data.logs;
+        renderAll();
         logsContainer.scrollTop = logsContainer.scrollHeight;
     }
 
@@ -679,51 +697,16 @@ function initLogs() {
         hasMore = data.has_more || false;
         oldestLoadedId = data.logs[0].id;
 
-        // Remember scroll position so view doesn't jump
         const prevHeight = logsContainer.scrollHeight;
-
-        // Remove existing load-more button before prepending
-        const existing = logsContainer.querySelector(".load-more-btn");
-        if (existing) existing.remove();
-
-        const isFiltered = currentLevel === "skipped" || currentLevel === "kept";
-        if (isFiltered) {
-            const blocks = groupIntoBlocks(data.logs);
-            // Drop last block (may be incomplete — continues into already-loaded data)
-            if (blocks.length > 1) blocks.pop();
-            const filtered = blocks.filter(b => b.outcome === currentLevel);
-            const html = filtered.map((block, i) => {
-                let out = block.entries.map(buildLogEntryHTML).join("");
-                out += '<div class="log-separator"></div>';
-                return out;
-            }).join("");
-            const fragment = document.createRange().createContextualFragment(html);
-            logsContainer.prepend(fragment);
-        } else {
-            const fragment = document.createRange().createContextualFragment(
-                data.logs.map(buildLogEntryHTML).join("")
-            );
-            logsContainer.prepend(fragment);
-        }
-        renderLoadMoreBtn();
-        applySearch();
-
-        // Restore scroll position
+        allLogs = [...data.logs, ...allLogs];
+        renderAll();
         logsContainer.scrollTop = logsContainer.scrollHeight - prevHeight;
     }
 
-    // Search filter — hides non-matching entries in the DOM
-    const searchInput = document.getElementById("log-search");
-    function applySearch() {
-        const query = (searchInput ? searchInput.value : "").toLowerCase();
-        logsContainer.querySelectorAll(".log-entry").forEach(el => {
-            el.style.display = el.textContent.toLowerCase().includes(query) ? "" : "none";
-        });
-        logsContainer.querySelectorAll(".log-separator").forEach(el => {
-            el.style.display = query ? "none" : "";
-        });
-    }
-    if (searchInput) searchInput.addEventListener("input", applySearch);
+    if (searchInput) searchInput.addEventListener("input", () => {
+        renderAll();
+        logsContainer.scrollTop = logsContainer.scrollHeight;
+    });
 
     // Date picker — reload on date change
     if (datePicker) {
