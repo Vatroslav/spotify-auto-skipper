@@ -457,9 +457,9 @@ function initInsights() {
 
         if (!m) {
             overallMetrics.innerHTML = '<p class="text-muted text-center">No data yet.</p>';
-            if (overallDetails) overallDetails.innerHTML = "";
-            if (overallRecords) overallRecords.innerHTML = "";
-            if (overallInsights) overallInsights.innerHTML = "";
+            if (overallDetails) overallDetails.innerHTML = '<p class="text-muted text-center">—</p>';
+            if (overallRecords) overallRecords.innerHTML = '<p class="text-muted text-center">—</p>';
+            if (overallInsights) overallInsights.innerHTML = '<p class="text-muted text-center">—</p>';
             return;
         }
 
@@ -511,10 +511,10 @@ function initInsights() {
             loadDailyInsights(dates[currentIdx]);
         } else {
             dateText.textContent = "No data yet";
-            metricsGrid.innerHTML = '<p class="text-muted text-center">Start playing music and the skipper will track activity here.</p>';
-            insightsList.innerHTML = "";
+            metricsGrid.innerHTML = '<p class="text-muted text-center">No data yet.</p>';
+            insightsList.innerHTML = '<p class="text-muted text-center">—</p>';
             const dg = document.getElementById("details-grid");
-            if (dg) dg.innerHTML = "";
+            if (dg) dg.innerHTML = '<p class="text-muted text-center">—</p>';
         }
         updateButtons();
     }
