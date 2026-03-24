@@ -438,6 +438,51 @@ async def get_logs(
         await db.close()
 
 
+async def search_logs(query: str, date_str: str = "", tz: str = "") -> list[dict]:
+    """Search logs for blocks where 'Currently playing:' matches query."""
+    db = await get_db()
+    try:
+        if date_str:
+            utc_start, utc_end = _date_to_utc_range(date_str, tz)
+        else:
+            utc_start, utc_end = None, None
+
+        # Find all "Currently playing:" lines matching the query
+        where = "WHERE message LIKE 'Currently playing:%' AND message LIKE ?"
+        params: list = [f"%{query}%"]
+        if utc_start and utc_end:
+            where += " AND timestamp >= ? AND timestamp < ?"
+            params.extend([utc_start, utc_end])
+
+        cursor = await db.execute(
+            f"SELECT id, timestamp, level, message FROM logs {where} ORDER BY timestamp",
+            params,
+        )
+        headers = [dict(row) for row in await cursor.fetchall()]
+
+        if not headers:
+            return []
+
+        # For each header, grab the next 4 lines (block context)
+        results = []
+        for header in headers:
+            cursor = await db.execute(
+                "SELECT id, timestamp, level, message FROM logs WHERE id > ? ORDER BY id LIMIT 4",
+                (header["id"],),
+            )
+            following = [dict(row) for row in await cursor.fetchall()]
+            block = [header]
+            for row in following:
+                if row["message"].startswith("Currently playing:"):
+                    break
+                block.append(row)
+            results.extend(block)
+
+        return results
+    finally:
+        await db.close()
+
+
 async def get_log_dates() -> list[str]:
     db = await get_db()
     try:

@@ -556,7 +556,9 @@ function initLogs() {
     let hasMore = false;
     let oldestLoadedId = null;
     let allLogs = [];
+    let searchMode = false;
     const searchInput = document.getElementById("log-search");
+    const searchBtn = document.getElementById("log-search-btn");
 
     function init() {
         loadLogs();
@@ -635,9 +637,7 @@ function initLogs() {
     }
 
     function renderAll() {
-        const query = (searchInput ? searchInput.value : "").trim().toLowerCase();
         const isBlockFilter = currentLevel === "skipped" || currentLevel === "kept";
-        const needsBlocks = isBlockFilter || query.length > 0;
 
         if (allLogs.length === 0) {
             logsContainer.innerHTML = '<p class="text-muted text-center mt-16">No log entries.</p>';
@@ -645,18 +645,9 @@ function initLogs() {
             return;
         }
 
-        if (needsBlocks) {
+        if (isBlockFilter) {
             let blocks = groupIntoBlocks(allLogs);
-            if (isBlockFilter) {
-                blocks = blocks.filter(b => b.outcome === currentLevel);
-            }
-            if (query) {
-                blocks = blocks.filter(block => {
-                    const header = block.entries[0];
-                    if (!header || !header.message.startsWith("Currently playing:")) return false;
-                    return header.message.toLowerCase().includes(query);
-                });
-            }
+            blocks = blocks.filter(b => b.outcome === currentLevel);
             renderFilteredBlocks(blocks);
         } else {
             logsContainer.innerHTML = allLogs.map(buildLogEntryHTML).join("");
@@ -703,9 +694,30 @@ function initLogs() {
         logsContainer.scrollTop = logsContainer.scrollHeight - prevHeight;
     }
 
-    if (searchInput) searchInput.addEventListener("input", () => {
-        renderAll();
+    async function doSearch() {
+        const query = (searchInput ? searchInput.value : "").trim();
+        if (!query) {
+            searchMode = false;
+            loadLogs();
+            return;
+        }
+        searchMode = true;
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const date = datePicker ? datePicker.value : "";
+        let params = `q=${encodeURIComponent(query)}&tz=${encodeURIComponent(tz)}`;
+        if (date) params += `&date=${date}`;
+        logsContainer.innerHTML = '<p class="text-muted text-center">Searching...</p>';
+        const data = await API.get(`/api/logs/search?${params}`);
+        hasMore = false;
+        allLogs = data.logs || [];
+        const blocks = groupIntoBlocks(allLogs);
+        renderFilteredBlocks(blocks);
         logsContainer.scrollTop = logsContainer.scrollHeight;
+    }
+
+    if (searchBtn) searchBtn.addEventListener("click", doSearch);
+    if (searchInput) searchInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") doSearch();
     });
 
     // Date picker — reload on date change
@@ -737,8 +749,7 @@ function initLogs() {
 
     // Auto-refresh every 5 seconds (only when no date/search is active = live today view)
     setInterval(() => {
-        const hasSearch = searchInput && searchInput.value.trim().length > 0;
-        if (!hasSearch && (!datePicker || !datePicker.value)) {
+        if (!searchMode && (!datePicker || !datePicker.value)) {
             loadLogs();
         }
     }, 5000);
