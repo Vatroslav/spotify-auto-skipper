@@ -568,6 +568,11 @@ input:focus, select:focus {
     margin-bottom: 8px;
 }
 
+.log-toolbar .btn {
+    font-size: 0.85rem;
+    padding: 6px 14px;
+}
+
 .log-search-input {
     background: var(--bg-input);
     color: var(--text-primary);
