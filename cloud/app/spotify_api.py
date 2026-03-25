@@ -338,8 +338,17 @@ class SpotifyClient:
         if r is None or r.status_code not in (200, 201):
             return None
         data = r.json()
+        playlist_id = data.get("id")
+
+        # Spotify ignores public=false on creation — force it with a follow-up PUT
+        if not public and playlist_id:
+            await self._put(
+                f"https://api.spotify.com/v1/playlists/{playlist_id}",
+                json={"public": False},
+            )
+
         return {
-            "id": data.get("id"),
+            "id": playlist_id,
             "url": (data.get("external_urls") or {}).get("spotify", ""),
         }
 
