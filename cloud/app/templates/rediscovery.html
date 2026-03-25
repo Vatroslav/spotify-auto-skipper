@@ -5,17 +5,17 @@
     <h1 class="page-title">Rediscovery</h1>
     <p class="text-secondary mb-16">Find songs in a playlist you haven't listened to in a while and create a new playlist with them.</p>
 
-    <div class="card">
+    <div id="config-section" class="card">
         <div class="card-title">Source Playlist</div>
         <div class="form-group">
-            <select id="playlist-select" >
+            <select id="playlist-select">
                 <option value="">Loading playlists...</option>
             </select>
         </div>
 
         <div class="form-group">
             <label for="playlist-name">Output playlist name</label>
-            <input type="text" id="playlist-name"  placeholder="Rediscovery - ...">
+            <input type="text" id="playlist-name" placeholder="Rediscovery - ...">
         </div>
 
         <button id="start-btn" class="btn btn-accent btn-full mt-8" disabled>Start</button>
@@ -28,12 +28,14 @@
             <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
         </div>
         <div id="progress-detail" class="help-text mt-8"></div>
+        <button id="cancel-btn" class="btn btn-full mt-8">Cancel</button>
     </div>
 
     <div id="result-section" class="card mt-16 hidden">
         <div class="card-title">Done</div>
         <div id="result-message" class="text-secondary"></div>
-        <a id="result-link" href="#" target="_blank" class="btn btn-accent btn-full mt-8">Open playlist on Spotify</a>
+        <a id="result-link" href="#" target="_blank" class="btn btn-accent btn-full mt-8 hidden">Open playlist on Spotify</a>
+        <button id="reset-btn" class="btn btn-full mt-8">Start new</button>
     </div>
 </div>
 
