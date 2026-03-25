@@ -25,6 +25,7 @@ async def get_playback(request: Request):
         "last_check_message": app_state.last_check_message,
         "poll_interval": settings["idle_poll_interval_seconds"] if app_state.idle_mode else settings["poll_interval_seconds"],
         "idle_mode": app_state.idle_mode,
+        "skip_exempt_track_id": app_state.skip_exempt_track_id,
     }
 
 
@@ -33,6 +34,22 @@ async def check_now(request: Request):
     """Trigger an immediate poll cycle."""
     app_state.check_now_event.set()
     return {"ok": True}
+
+
+@router.post("/skip-one-pause")
+async def skip_one_pause(request: Request):
+    """Exempt the currently playing song from being skipped (one-time).
+
+    Fetches the current track directly from Spotify to ensure freshness.
+    """
+    client = app_state.spotify_client
+    if not client:
+        return JSONResponse({"ok": False, "error": "Spotify client not ready"}, status_code=503)
+    track = await client.get_current_track()
+    if not track or not track.get("id"):
+        return JSONResponse({"ok": False, "error": "Nothing is playing"}, status_code=400)
+    app_state.skip_exempt_track_id = track["id"]
+    return {"ok": True, "track_name": track["name"], "artist": track["artist"]}
 
 
 @router.post("/toggle-pause")
