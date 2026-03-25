@@ -781,6 +781,176 @@ function initLogs() {
 }
 
 
+// ── Rediscovery (rediscovery.html) ──────────────────────────────
+
+function initRediscovery() {
+    const formCard = document.getElementById("rediscovery-form-card");
+    const progressCard = document.getElementById("rediscovery-progress-card");
+    const resultCard = document.getElementById("rediscovery-result-card");
+    if (!formCard) return;
+
+    const playlistInput = document.getElementById("rd-playlist");
+    const resolveBtn = document.getElementById("rd-resolve-btn");
+    const playlistStatus = document.getElementById("rd-playlist-status");
+    const thresholdInput = document.getElementById("rd-threshold");
+    const hoursInput = document.getElementById("rd-hours");
+    const startBtn = document.getElementById("rd-start-btn");
+    const startError = document.getElementById("rd-start-error");
+    const progressBar = document.getElementById("rd-progress-bar");
+    const progressText = document.getElementById("rd-progress-text");
+    const currentTrack = document.getElementById("rd-current-track");
+    const statsText = document.getElementById("rd-stats");
+    const cancelBtn = document.getElementById("rd-cancel-btn");
+    const resultText = document.getElementById("rd-result-text");
+    const resultLink = document.getElementById("rd-result-link");
+    const newScanBtn = document.getElementById("rd-new-scan-btn");
+
+    let pollInterval = null;
+
+    // Resolve playlist
+    resolveBtn.addEventListener("click", async () => {
+        const q = playlistInput.value.trim();
+        if (!q) return;
+        resolveBtn.disabled = true;
+        resolveBtn.textContent = "...";
+        try {
+            const data = await API.get(`/api/settings/resolve-playlist?q=${encodeURIComponent(q)}`);
+            playlistStatus.textContent = `\u2713 ${data.name}` + (data.owner ? ` \u2014 by ${data.owner}` : "");
+            playlistStatus.className = "help-text text-success";
+        } catch (err) {
+            playlistStatus.textContent = `\u2717 ${err.message || "Not found"}`;
+            playlistStatus.className = "help-text text-error";
+        }
+        resolveBtn.disabled = false;
+        resolveBtn.textContent = "Resolve";
+    });
+
+    // Start scan
+    startBtn.addEventListener("click", async () => {
+        const url = playlistInput.value.trim();
+        if (!url) { startError.textContent = "Enter a playlist URL or ID."; startError.classList.remove("hidden"); return; }
+        startError.classList.add("hidden");
+        startBtn.disabled = true;
+        startBtn.textContent = "Starting...";
+        try {
+            await API.post("/api/rediscovery/start", {
+                playlist_url: url,
+                threshold_days: parseInt(thresholdInput.value, 10) || 60,
+                hours_available: parseFloat(hoursInput.value) || 8,
+            });
+            showRunningUI();
+            startPolling();
+        } catch (err) {
+            startError.textContent = err.message || "Failed to start.";
+            startError.classList.remove("hidden");
+            startBtn.disabled = false;
+            startBtn.textContent = "Start Scan";
+        }
+    });
+
+    // Cancel
+    cancelBtn.addEventListener("click", async () => {
+        cancelBtn.disabled = true;
+        try { await API.post("/api/rediscovery/cancel"); } catch {}
+    });
+
+    // New scan
+    newScanBtn.addEventListener("click", () => {
+        formCard.classList.remove("hidden");
+        resultCard.classList.add("hidden");
+        startBtn.disabled = false;
+        startBtn.textContent = "Start Scan";
+    });
+
+    function showRunningUI() {
+        formCard.classList.add("hidden");
+        progressCard.classList.remove("hidden");
+        resultCard.classList.add("hidden");
+        cancelBtn.disabled = false;
+    }
+
+    function showResultUI(job) {
+        stopPolling();
+        formCard.classList.add("hidden");
+        progressCard.classList.add("hidden");
+        resultCard.classList.remove("hidden");
+
+        if (job.status === "done") {
+            resultText.textContent = `Done! Found ${job.found} tracks out of ${job.total_tracks}.` +
+                (job.errors > 0 ? ` (${job.errors} Last.fm errors skipped)` : "");
+            if (job.result_playlist_url) {
+                resultLink.href = job.result_playlist_url;
+                resultLink.classList.remove("hidden");
+            } else {
+                resultLink.classList.add("hidden");
+                resultText.textContent += " No qualifying tracks found — no playlist created.";
+            }
+        } else if (job.status === "cancelled") {
+            resultText.textContent = `Cancelled after checking ${job.checked} of ${job.total_tracks} tracks. Found ${job.found} qualifying.`;
+            resultLink.classList.add("hidden");
+        } else if (job.status === "error") {
+            resultText.textContent = `Error: ${job.error_message || "Unknown error."}`;
+            if (job.result_playlist_url) {
+                resultLink.href = job.result_playlist_url;
+                resultLink.classList.remove("hidden");
+            } else {
+                resultLink.classList.add("hidden");
+            }
+        }
+    }
+
+    function updateProgress(job) {
+        const pct = job.total_tracks > 0 ? (job.checked / job.total_tracks * 100) : 0;
+        progressBar.style.width = pct.toFixed(1) + "%";
+        progressText.textContent = `Checked ${job.checked} of ${job.total_tracks} tracks (${job.found} qualifying)`;
+        currentTrack.textContent = job.current_track || "";
+        const parts = [];
+        if (job.errors > 0) parts.push(`${job.errors} errors`);
+        if (job.started_at) {
+            const elapsed = Math.round((Date.now() - new Date(job.started_at).getTime()) / 60000);
+            parts.push(`${elapsed} min elapsed`);
+        }
+        statsText.textContent = parts.join(" \u2014 ");
+    }
+
+    function startPolling() {
+        stopPolling();
+        pollInterval = setInterval(pollStatus, 3000);
+        pollStatus();
+    }
+
+    function stopPolling() {
+        if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+    }
+
+    async function pollStatus() {
+        try {
+            const job = await API.get("/api/rediscovery/status");
+            if (job.status === "running") {
+                updateProgress(job);
+            } else if (job.status === "done" || job.status === "cancelled" || job.status === "error") {
+                updateProgress(job);
+                showResultUI(job);
+            }
+        } catch {}
+    }
+
+    // On page load, check if a job is already running
+    (async () => {
+        try {
+            const job = await API.get("/api/rediscovery/status");
+            if (job.status === "running") {
+                showRunningUI();
+                updateProgress(job);
+                startPolling();
+            } else if (job.status === "done" || job.status === "cancelled" || job.status === "error") {
+                showResultUI(job);
+            }
+        } catch {}
+    })();
+}
+
+
 // ── Utilities ───────────────────────────────────────────────────
 
 function escapeHtml(text) {
@@ -798,4 +968,5 @@ document.addEventListener("DOMContentLoaded", () => {
     initArtists();
     initInsights();
     initLogs();
+    initRediscovery();
 });
