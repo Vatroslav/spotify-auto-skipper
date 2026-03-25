@@ -264,6 +264,91 @@ class SpotifyClient:
             "owner": (data.get("owner") or {}).get("display_name", ""),
         }
 
+    # ── Playlist operations (Rediscovery) ────────────────────────
+
+    async def get_user_playlists(self, limit: int = 50, offset: int = 0) -> list[dict]:
+        """Return user's playlists (id, name, track count, image)."""
+        r = await self._get(
+            "https://api.spotify.com/v1/me/playlists",
+            params={"limit": limit, "offset": offset},
+        )
+        if r is None or r.status_code != 200:
+            return []
+        data = r.json()
+        results = []
+        for p in data.get("items") or []:
+            images = p.get("images") or []
+            results.append({
+                "id": p["id"],
+                "name": p.get("name", ""),
+                "track_count": (p.get("tracks") or {}).get("total", 0),
+                "image_url": images[0]["url"] if images else "",
+            })
+        return results
+
+    async def get_playlist_tracks(self, playlist_id: str, limit: int = 100, offset: int = 0) -> dict:
+        """Return a page of playlist tracks. Returns {items: [...], total: int}."""
+        r = await self._get(
+            f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks",
+            params={
+                "limit": limit,
+                "offset": offset,
+                "fields": "total,items(track(id,name,uri,artists(name)))",
+            },
+        )
+        if r is None or r.status_code != 200:
+            return {"items": [], "total": 0}
+        data = r.json()
+        items = []
+        for entry in data.get("items") or []:
+            track = entry.get("track")
+            if not track or not track.get("id"):
+                continue
+            artists = track.get("artists") or []
+            items.append({
+                "id": track["id"],
+                "name": track.get("name", ""),
+                "uri": track.get("uri", ""),
+                "artist": artists[0]["name"] if artists else "Unknown",
+            })
+        return {"items": items, "total": data.get("total", 0)}
+
+    async def create_playlist(self, name: str, description: str = "", public: bool = False) -> dict | None:
+        """Create a new playlist. Returns {id, url} or None."""
+        # Need user ID first
+        r = await self._get("https://api.spotify.com/v1/me")
+        if r is None or r.status_code != 200:
+            return None
+        user_id = r.json().get("id")
+        if not user_id:
+            return None
+
+        r = await self._request(
+            "POST",
+            f"https://api.spotify.com/v1/users/{user_id}/playlists",
+            json={"name": name, "description": description, "public": public},
+        )
+        if r is None or r.status_code not in (200, 201):
+            return None
+        data = r.json()
+        return {
+            "id": data.get("id"),
+            "url": (data.get("external_urls") or {}).get("spotify", ""),
+        }
+
+    async def add_tracks_to_playlist(self, playlist_id: str, uris: list[str]) -> bool:
+        """Add tracks to playlist in batches of 100. Returns True on success."""
+        for i in range(0, len(uris), 100):
+            batch = uris[i:i + 100]
+            r = await self._request(
+                "POST",
+                f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks",
+                json={"uris": batch},
+            )
+            if r is None or r.status_code not in (200, 201):
+                return False
+        return True
+
     async def search_artists(self, query: str, limit: int = 5) -> list[dict]:
         if not query or not query.strip():
             return []
