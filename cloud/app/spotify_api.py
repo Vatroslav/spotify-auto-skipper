@@ -266,24 +266,30 @@ class SpotifyClient:
 
     # ── Playlist operations (Rediscovery) ────────────────────────
 
-    async def get_user_playlists(self, limit: int = 50, offset: int = 0) -> list[dict]:
-        """Return user's playlists (id, name, track count, image)."""
-        r = await self._get(
-            "https://api.spotify.com/v1/me/playlists",
-            params={"limit": limit, "offset": offset},
-        )
-        if r is None or r.status_code != 200:
-            return []
-        data = r.json()
+    async def get_user_playlists(self) -> list[dict]:
+        """Return all user's playlists (paginates automatically)."""
         results = []
-        for p in data.get("items") or []:
-            images = p.get("images") or []
-            results.append({
-                "id": p["id"],
-                "name": p.get("name", ""),
-                "track_count": (p.get("tracks") or {}).get("total", 0),
-                "image_url": images[0]["url"] if images else "",
-            })
+        offset = 0
+        while True:
+            r = await self._get(
+                "https://api.spotify.com/v1/me/playlists",
+                params={"limit": 50, "offset": offset},
+            )
+            if r is None or r.status_code != 200:
+                break
+            data = r.json()
+            items = data.get("items") or []
+            for p in items:
+                images = p.get("images") or []
+                results.append({
+                    "id": p["id"],
+                    "name": p.get("name", ""),
+                    "track_count": (p.get("tracks") or {}).get("total", 0),
+                    "image_url": images[0]["url"] if images else "",
+                })
+            if not data.get("next"):
+                break
+            offset += 50
         return results
 
     async def get_playlist_tracks(self, playlist_id: str, limit: int = 100, offset: int = 0) -> dict:
