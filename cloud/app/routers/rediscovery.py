@@ -18,7 +18,7 @@ async def list_playlists():
     if not client:
         raise HTTPException(status_code=503, detail="Spotify client not ready")
     try:
-        playlists = await client.get_user_playlists(limit=50)
+        playlists = await client.get_user_playlists()
     except CredentialError:
         raise HTTPException(status_code=401, detail="Spotify credentials expired.")
     return {"playlists": playlists}
