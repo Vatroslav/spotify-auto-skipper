@@ -2,9 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Workflow
+
+- **Questions are not instructions.** When the user asks how something works or asks a question, answer the question. Do NOT start editing code unless explicitly told to make a change.
+- **DELETE safety.** Always wrap DELETE operations in a transaction: BEGIN, DELETE, check affected row count matches expected, COMMIT only if correct, ROLLBACK otherwise.
+
 ## Permissions
 
-- You may run all git and bash commands without asking for confirmation (commit, push, tag, release, etc.)
 - Main branch has force-push protection enabled on GitHub — do not attempt `git push --force` to main
 
 ## Build & Deploy
@@ -22,6 +26,10 @@ ssh REDACTED_SSH "cd REDACTED_PATH/cloud && git pull && docker compose up -d --b
 ```
 
 No tests or linting are configured.
+
+**Server details:**
+- Docker container name: `skipper-skipper-1`
+- SQLite database path (inside container): `/app/data/skipper.db`
 
 ## Versioning
 
