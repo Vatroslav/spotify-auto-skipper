@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 
 router = APIRouter(tags=["auth"])
 
-SCOPES = "user-read-currently-playing user-read-playback-state user-modify-playback-state user-library-read playlist-modify-public playlist-modify-private"
+SCOPES = "user-read-currently-playing user-read-playback-state user-modify-playback-state user-library-read"
 
 
 @router.get("/auth/login")

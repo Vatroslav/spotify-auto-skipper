@@ -21,8 +21,6 @@ class AppState:
         self.skip_exempt_track_id: str | None = None
         self.spotify_client = None  # Shared SpotifyClient, set during lifespan
         self.worker_task: asyncio.Task | None = None  # Reference to polling_loop task
-        self.rediscovery_job: dict | None = None
-        self.rediscovery_task: asyncio.Task | None = None
 
     def restart_worker_if_dead(self):
         """Restart the polling loop if it has stopped (e.g. after CredentialError)."""
