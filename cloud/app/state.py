@@ -18,6 +18,7 @@ class AppState:
         self.recent_skip_days: list[int] = []
         self.last_check_message: str | None = None
         self.idle_mode: bool = False
+        self.skip_exempt_track_id: str | None = None
         self.spotify_client = None  # Shared SpotifyClient, set during lifespan
         self.worker_task: asyncio.Task | None = None  # Reference to polling_loop task
 

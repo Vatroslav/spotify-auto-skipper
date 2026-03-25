@@ -148,8 +148,16 @@ async def polling_loop():
                 cutoff = datetime.now(timezone.utc) - timedelta(days=settings["skip_window_days"])
 
                 if last_played > cutoff:
+                    # Check one-time skip pause
+                    if app_state.skip_exempt_track_id == track["id"]:
+                        await _log("Skip paused for this song (one-time) — not skipping")
+                        app_state.skip_exempt_track_id = None
+                        await add_track_event(
+                            track["id"], track["name"], track["artist"],
+                            "skip_paused", days_since, track.get("context_uri"),
+                        )
                     # Check never-skip list
-                    if settings["enable_never_skip_artists"] and await is_artist_never_skipped(track.get("artist_ids", [])):
+                    elif settings["enable_never_skip_artists"] and await is_artist_never_skipped(track.get("artist_ids", [])):
                         await _log("Artist is in never-skip list \u2014 not skipping")
                         await add_track_event(
                             track["id"], track["name"], track["artist"],
