@@ -789,8 +789,8 @@ function initRediscovery() {
     const resultCard = document.getElementById("rediscovery-result-card");
     if (!formCard) return;
 
-    const playlistInput = document.getElementById("rd-playlist");
-    const resolveBtn = document.getElementById("rd-resolve-btn");
+    const playlistSelect = document.getElementById("rd-playlist-select");
+    const playlistManual = document.getElementById("rd-playlist-manual");
     const playlistStatus = document.getElementById("rd-playlist-status");
     const outputNameInput = document.getElementById("rd-output-name");
     const thresholdInput = document.getElementById("rd-threshold");
@@ -807,32 +807,51 @@ function initRediscovery() {
     const newScanBtn = document.getElementById("rd-new-scan-btn");
 
     let pollInterval = null;
+    let playlistsCache = [];
 
-    // Resolve playlist
-    resolveBtn.addEventListener("click", async () => {
-        const q = playlistInput.value.trim();
-        if (!q) return;
-        resolveBtn.disabled = true;
-        resolveBtn.textContent = "...";
+    // Load playlists into dropdown
+    (async () => {
         try {
-            const data = await API.get(`/api/settings/resolve-playlist?q=${encodeURIComponent(q)}`);
-            playlistStatus.textContent = `\u2713 ${data.name}` + (data.owner ? ` \u2014 by ${data.owner}` : "");
-            playlistStatus.className = "help-text text-success";
-            if (!outputNameInput.value.trim()) {
-                outputNameInput.value = `Rediscovery - ${data.name}`;
+            playlistsCache = await API.get("/api/rediscovery/playlists");
+            playlistSelect.innerHTML = '<option value="">-- Select a playlist --</option>';
+            for (const p of playlistsCache) {
+                const opt = document.createElement("option");
+                opt.value = p.id;
+                opt.textContent = `${p.name} (${p.track_count} tracks)`;
+                playlistSelect.appendChild(opt);
             }
-        } catch (err) {
-            playlistStatus.textContent = `\u2717 ${err.message || "Not found"}`;
-            playlistStatus.className = "help-text text-error";
+        } catch {
+            playlistSelect.innerHTML = '<option value="">Failed to load playlists</option>';
         }
-        resolveBtn.disabled = false;
-        resolveBtn.textContent = "Resolve";
+    })();
+
+    // Auto-fill output name when selecting from dropdown
+    playlistSelect.addEventListener("change", () => {
+        const p = playlistsCache.find(x => x.id === playlistSelect.value);
+        if (p && !outputNameInput.value.trim()) {
+            outputNameInput.value = `Rediscovery - ${p.name}`;
+        }
+        // Clear manual input when using dropdown
+        if (playlistSelect.value) playlistManual.value = "";
+        playlistStatus.textContent = "";
     });
+
+    // Clear dropdown when typing manual link
+    playlistManual.addEventListener("input", () => {
+        if (playlistManual.value.trim()) playlistSelect.value = "";
+    });
+
+    // Helper: get selected playlist ID
+    function getPlaylistId() {
+        const manual = playlistManual.value.trim();
+        if (manual) return manual;
+        return playlistSelect.value;
+    }
 
     // Start scan
     startBtn.addEventListener("click", async () => {
-        const url = playlistInput.value.trim();
-        if (!url) { startError.textContent = "Enter a playlist URL or ID."; startError.classList.remove("hidden"); return; }
+        const url = getPlaylistId();
+        if (!url) { startError.textContent = "Select a playlist or paste a link."; startError.classList.remove("hidden"); return; }
         startError.classList.add("hidden");
         startBtn.disabled = true;
         startBtn.textContent = "Starting...";

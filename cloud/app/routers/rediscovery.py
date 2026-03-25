@@ -15,6 +15,14 @@ from app.state import app_state
 router = APIRouter(prefix="/api/rediscovery", tags=["rediscovery"], dependencies=[Depends(require_auth)])
 
 
+@router.get("/playlists")
+async def list_playlists():
+    """Return the user's Spotify playlists for the dropdown."""
+    client = app_state.spotify_client
+    playlists = await client.get_user_playlists(limit=50)
+    return playlists
+
+
 class StartRequest(BaseModel):
     playlist_url: str
     threshold_days: int = 60
