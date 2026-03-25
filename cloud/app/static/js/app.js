@@ -28,6 +28,7 @@ function initDashboard() {
     const statusBadge = document.getElementById("status-badge");
     const pauseBtn = document.getElementById("pause-btn");
     const checkNowBtn = document.getElementById("check-now-btn");
+    const skipOnePauseBtn = document.getElementById("skip-one-pause-btn");
 
     if (!trackName) return; // Not on dashboard
 
@@ -86,6 +87,22 @@ function initDashboard() {
             if (pauseBtn) {
                 pauseBtn.textContent = data.skipping_paused ? "Resume Skipping" : "Pause Skipping";
             }
+
+            // "Don't Skip This Song" button
+            if (skipOnePauseBtn) {
+                if (data.track && !data.skipping_paused && data.worker_running) {
+                    skipOnePauseBtn.classList.remove("hidden");
+                    if (data.skip_exempt_track_id === data.track.id) {
+                        skipOnePauseBtn.textContent = "Skip Paused for This Song";
+                        skipOnePauseBtn.disabled = true;
+                    } else {
+                        skipOnePauseBtn.textContent = "Don't Skip This Song";
+                        skipOnePauseBtn.disabled = false;
+                    }
+                } else {
+                    skipOnePauseBtn.classList.add("hidden");
+                }
+            }
         } catch (e) {
             console.error("Failed to fetch playback:", e);
         }
@@ -110,6 +127,19 @@ function initDashboard() {
                 checkNowBtn.textContent = "Check Now";
                 updatePlayback();
             }, 3000);
+        });
+    }
+
+    // Don't skip this song
+    if (skipOnePauseBtn) {
+        skipOnePauseBtn.addEventListener("click", async () => {
+            try {
+                const result = await API.post("/api/playback/skip-one-pause");
+                showToast(`Won't skip: ${result.track_name}`);
+                updatePlayback();
+            } catch (e) {
+                showToast(e.message || "Failed", 2000, "error");
+            }
         });
     }
 
