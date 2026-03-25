@@ -123,7 +123,7 @@ class SpotifyClient:
             try:
                 token = await self.get_token()
                 headers = {"Authorization": f"Bearer {token}"}
-                if method == "PUT":
+                if method in ("PUT", "POST") and "json" in kwargs:
                     headers["Content-Type"] = "application/json"
 
                 r = await self._http.request(method, url, headers=headers, **kwargs)
