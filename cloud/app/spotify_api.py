@@ -276,6 +276,27 @@ class SpotifyClient:
         self._user_id = r.json().get("id")
         return self._user_id
 
+    async def get_user_playlists(self, limit: int = 50) -> list[dict]:
+        """Fetch the current user's playlists. Returns list of {id, name, owner, track_count}."""
+        playlists = []
+        url = "https://api.spotify.com/v1/me/playlists"
+        params = {"limit": min(limit, 50)}
+        while url and len(playlists) < limit:
+            r = await self._get(url, params=params)
+            if r is None or r.status_code != 200:
+                break
+            data = r.json()
+            for item in data.get("items") or []:
+                playlists.append({
+                    "id": item["id"],
+                    "name": item.get("name", ""),
+                    "owner": (item.get("owner") or {}).get("display_name", ""),
+                    "track_count": (item.get("tracks") or {}).get("total", 0),
+                })
+            url = data.get("next")
+            params = {}  # next URL already has params
+        return playlists[:limit]
+
     async def get_playlist_tracks(self, playlist_id: str) -> list[dict]:
         """Fetch all tracks from a playlist (paginated). Skips local/deleted tracks."""
         tracks = []
