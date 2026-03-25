@@ -268,6 +268,8 @@ class SpotifyClient:
 
     async def get_user_playlists(self) -> list[dict]:
         """Return all user's playlists (paginates automatically)."""
+        import logging
+        logger = logging.getLogger(__name__)
         results = []
         offset = 0
         while True:
@@ -276,10 +278,15 @@ class SpotifyClient:
                 params={"limit": 50, "offset": offset},
             )
             if r is None or r.status_code != 200:
+                logger.warning("[Spotify] get_user_playlists failed: %s", r.status_code if r else "None")
                 break
             data = r.json()
+            total = data.get("total", 0)
             items = data.get("items") or []
+            logger.info("[Spotify] Playlists page offset=%d: %d items, total=%d", offset, len(items), total)
             for p in items:
+                if not p or not p.get("id"):
+                    continue
                 images = p.get("images") or []
                 results.append({
                     "id": p["id"],
@@ -290,6 +297,7 @@ class SpotifyClient:
             if not data.get("next"):
                 break
             offset += 50
+        logger.info("[Spotify] Total playlists returned: %d", len(results))
         return results
 
     async def get_playlist_tracks(self, playlist_id: str, limit: int = 100, offset: int = 0) -> dict:
