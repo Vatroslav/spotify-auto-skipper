@@ -90,17 +90,12 @@ function initDashboard() {
 
             // "Don't Skip This Song" button
             if (skipOnePauseBtn) {
-                if (data.track && !data.skipping_paused && data.worker_running) {
-                    skipOnePauseBtn.classList.remove("hidden");
-                    if (data.skip_exempt_track_id === data.track.id) {
-                        skipOnePauseBtn.textContent = "Skip Paused for This Song";
-                        skipOnePauseBtn.disabled = true;
-                    } else {
-                        skipOnePauseBtn.textContent = "Don't Skip This Song";
-                        skipOnePauseBtn.disabled = false;
-                    }
+                if (data.track && data.skip_exempt_track_id === data.track.id) {
+                    skipOnePauseBtn.textContent = "Skip Paused for This Song";
+                    skipOnePauseBtn.disabled = true;
                 } else {
-                    skipOnePauseBtn.classList.add("hidden");
+                    skipOnePauseBtn.textContent = "Don't Skip This Song";
+                    skipOnePauseBtn.disabled = false;
                 }
             }
         } catch (e) {

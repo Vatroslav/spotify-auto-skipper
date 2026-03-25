@@ -171,6 +171,17 @@ async def polling_loop():
                             "liked", days_since, track.get("context_uri"),
                         )
                     else:
+                        # Re-check pause flag right before skipping (user may have
+                        # pressed Pause while we were querying Last.fm)
+                        if app_state.skipping_paused:
+                            await _log("Skipping was paused while checking \u2014 not skipping")
+                            await add_track_event(
+                                track["id"], track["name"], track["artist"],
+                                "skip_paused", days_since, track.get("context_uri"),
+                            )
+                            await app_state.interruptible_sleep(poll_interval)
+                            continue
+
                         await _log(f"Already listened to {days_since} days ago \u2014 skipping")
                         was_paused = await client.is_spotify_paused()
                         await client.skip_current_track()
