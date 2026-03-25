@@ -28,7 +28,7 @@ def _default_job() -> dict:
     }
 
 
-async def run_rediscovery(source_playlist_id: str, threshold_days: int, hours_available: float):
+async def run_rediscovery(source_playlist_id: str, threshold_days: int, hours_available: float, output_name: str | None = None):
     """Main job coroutine. Updates app_state.rediscovery_job throughout."""
     job = app_state.rediscovery_job
     client = app_state.spotify_client
@@ -98,8 +98,11 @@ async def run_rediscovery(source_playlist_id: str, threshold_days: int, hours_av
         if qualifying:
             source_info = await client.get_playlist_info(source_playlist_id)
             source_name = source_info["name"] if source_info else source_playlist_id
-            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            playlist_name = f"Rediscovery - {source_name} - {date_str}"
+            if output_name:
+                playlist_name = output_name
+            else:
+                date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                playlist_name = f"Rediscovery - {source_name} - {date_str}"
             description = (
                 f"Tracks not listened to in {threshold_days}+ days. "
                 f"Generated from '{source_name}'."
