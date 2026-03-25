@@ -36,6 +36,7 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str):
 
         all_tracks = []
         offset = 0
+        total = 0
         while True:
             page = await client.get_playlist_tracks(playlist_id, limit=100, offset=offset)
             items = page.get("items", [])
@@ -45,9 +46,9 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str):
             app_state.rediscovery_progress["total"] = total
             app_state.rediscovery_progress["message"] = f"Loading tracks... {len(all_tracks)}/{total}"
 
-            if len(items) < 100 or len(all_tracks) >= total:
-                break
             offset += 100
+            if offset >= total:
+                break
 
         logger.info("[Rediscovery] Fetched %d tracks", len(all_tracks))
 
