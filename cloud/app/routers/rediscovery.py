@@ -19,6 +19,7 @@ class StartRequest(BaseModel):
     playlist_url: str
     threshold_days: int = 60
     hours_available: float = 8.0
+    output_name: str | None = None
 
 
 def _parse_playlist_id(raw: str) -> str:
@@ -48,7 +49,7 @@ async def start(body: StartRequest):
 
     app_state.rediscovery_job = _default_job()
     app_state.rediscovery_task = asyncio.create_task(
-        run_rediscovery(playlist_id, body.threshold_days, body.hours_available)
+        run_rediscovery(playlist_id, body.threshold_days, body.hours_available, body.output_name)
     )
     return {"ok": True}
 

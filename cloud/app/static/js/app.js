@@ -792,6 +792,7 @@ function initRediscovery() {
     const playlistInput = document.getElementById("rd-playlist");
     const resolveBtn = document.getElementById("rd-resolve-btn");
     const playlistStatus = document.getElementById("rd-playlist-status");
+    const outputNameInput = document.getElementById("rd-output-name");
     const thresholdInput = document.getElementById("rd-threshold");
     const hoursInput = document.getElementById("rd-hours");
     const startBtn = document.getElementById("rd-start-btn");
@@ -817,6 +818,9 @@ function initRediscovery() {
             const data = await API.get(`/api/settings/resolve-playlist?q=${encodeURIComponent(q)}`);
             playlistStatus.textContent = `\u2713 ${data.name}` + (data.owner ? ` \u2014 by ${data.owner}` : "");
             playlistStatus.className = "help-text text-success";
+            if (!outputNameInput.value.trim()) {
+                outputNameInput.value = `Rediscovery - ${data.name}`;
+            }
         } catch (err) {
             playlistStatus.textContent = `\u2717 ${err.message || "Not found"}`;
             playlistStatus.className = "help-text text-error";
@@ -837,6 +841,7 @@ function initRediscovery() {
                 playlist_url: url,
                 threshold_days: parseInt(thresholdInput.value, 10) || 60,
                 hours_available: parseFloat(hoursInput.value) || 8,
+                output_name: outputNameInput.value.trim() || null,
             });
             showRunningUI();
             startPolling();
