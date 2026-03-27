@@ -813,7 +813,7 @@ input:focus, select:focus {
     }
 
     .container:has(.settings-grid) {
-        max-width: calc(100vw - 72px - 48px);
+        max-width: none;
     }
 }
 
