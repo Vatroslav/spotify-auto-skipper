@@ -755,6 +755,10 @@ input:focus, select:focus {
     margin-bottom: 0;
 }
 
+.settings-save {
+    max-width: 340px;
+}
+
 /* ── Responsive ──────────────────────────────────── */
 
 @media (min-width: 768px) {
