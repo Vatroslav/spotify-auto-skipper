@@ -153,3 +153,8 @@ async def rediscovery_page(request: Request):
     if not _is_authenticated(request):
         return templates.TemplateResponse("login.html", {"request": request, "version": APP_VERSION})
     return templates.TemplateResponse("rediscovery.html", {"request": request, "version": APP_VERSION})
+
+
+@app.get("/unauthorized")
+async def unauthorized_page(request: Request):
+    return templates.TemplateResponse("unauthorized.html", {"request": request, "version": APP_VERSION})

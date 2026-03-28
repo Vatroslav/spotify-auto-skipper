@@ -85,6 +85,10 @@ def get_secret_key() -> str:
 def get_base_url() -> str:
     return os.environ.get("BASE_URL", "http://localhost:8000")
 
+def get_allowed_spotify_user() -> str:
+    """Spotify user ID whitelist. Empty string means no restriction."""
+    return os.environ.get("ALLOWED_SPOTIFY_USER", "")
+
 
 # ── Settings (from SQLite) ───────────────────────────────────────
 
