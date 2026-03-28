@@ -95,9 +95,13 @@ async def callback(request: Request, code: str = "", state: str = "", error: str
                 if spotify_user_id != allowed_user:
                     return RedirectResponse("/unauthorized")
             else:
-                return RedirectResponse("/?error=user_check_failed")
+                import logging
+                logging.getLogger("auth").warning(
+                    "Spotify /v1/me returned %s: %s", me_resp.status_code, me_resp.text[:200]
+                )
+                return RedirectResponse("/unauthorized")
         except httpx.RequestError:
-            return RedirectResponse("/?error=spotify_unreachable")
+            return RedirectResponse("/unauthorized")
 
     await save_oauth_tokens(access_token, refresh_token, expires_at.isoformat())
 
