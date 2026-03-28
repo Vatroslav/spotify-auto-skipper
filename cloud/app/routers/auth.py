@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 import httpx
 
-from app.config import get_spotify_client_id, get_spotify_client_secret, get_base_url
+from app.config import get_spotify_client_id, get_spotify_client_secret, get_base_url, get_allowed_spotify_user
 from app.database import save_oauth_tokens, clear_oauth_tokens
 from app.routers.deps import require_auth
 from app.state import app_state
@@ -80,6 +80,24 @@ async def callback(request: Request, code: str = "", state: str = "", error: str
     except (ValueError, TypeError):
         expires_in = 3600
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=max(0, expires_in - 100))
+
+    # Check if the logged-in user is allowed
+    allowed_user = get_allowed_spotify_user()
+    if allowed_user:
+        try:
+            async with httpx.AsyncClient(timeout=10) as me_client:
+                me_resp = await me_client.get(
+                    "https://api.spotify.com/v1/me",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                )
+            if me_resp.status_code == 200:
+                spotify_user_id = me_resp.json().get("id", "")
+                if spotify_user_id != allowed_user:
+                    return RedirectResponse("/unauthorized")
+            else:
+                return RedirectResponse("/?error=user_check_failed")
+        except httpx.RequestError:
+            return RedirectResponse("/?error=spotify_unreachable")
 
     await save_oauth_tokens(access_token, refresh_token, expires_at.isoformat())
 
