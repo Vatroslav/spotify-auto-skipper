@@ -23,13 +23,15 @@ def events_from_db_rows(rows: list[dict]) -> list[TrackEvent]:
         ts = row.get("timestamp", "")
         # Extract HH:MM:SS from timestamp string
         time_str = ts[11:19] if len(ts) >= 19 else ts
-        events.append(TrackEvent(
-            time=time_str,
-            artist=row["artist_name"],
-            song=row["track_name"],
-            outcome=row["outcome"],
-            days_ago=row.get("days_ago"),
-        ))
+        events.append(
+            TrackEvent(
+                time=time_str,
+                artist=row["artist_name"],
+                song=row["track_name"],
+                outcome=row["outcome"],
+                days_ago=row.get("days_ago"),
+            )
+        )
     return events
 
 
@@ -90,69 +92,82 @@ def generate_insights(metrics: dict, skip_window_days: int = 60) -> list[dict]:
     rate = metrics["skip_rate"]
 
     if total == 0:
-        insights.append({
-            "icon": "info",
-            "title": "No activity",
-            "detail": "No songs were detected on this date.",
-        })
+        insights.append(
+            {
+                "icon": "info",
+                "title": "No activity",
+                "detail": "No songs were detected on this date.",
+            }
+        )
         return insights
 
     if rate > 50:
-        insights.append({
-            "icon": "warning",
-            "title": "High skip rate",
-            "detail": (
-                f"{rate:.0f}% of songs were skipped. Your skip window "
-                f"({skip_window_days} days) might be too large \u2014 "
-                f"try lowering it so fewer songs get flagged."
-            ),
-        })
+        insights.append(
+            {
+                "icon": "warning",
+                "title": "High skip rate",
+                "detail": (
+                    f"{rate:.0f}% of songs were skipped. Your skip window "
+                    f"({skip_window_days} days) might be too large \u2014 "
+                    f"try lowering it so fewer songs get flagged."
+                ),
+            }
+        )
     elif rate < 10 and total > 5:
-        insights.append({
-            "icon": "info",
-            "title": "Low skip rate",
-            "detail": (
-                f"Only {rate:.0f}% of songs were skipped. Your playlist "
-                f"size and skip window seem well balanced."
-            ),
-        })
+        insights.append(
+            {
+                "icon": "info",
+                "title": "Low skip rate",
+                "detail": (
+                    f"Only {rate:.0f}% of songs were skipped. Your playlist size and skip window seem well balanced."
+                ),
+            }
+        )
 
     streak = metrics["longest_skip_streak"]
     if streak >= 4:
-        insights.append({
-            "icon": "warning",
-            "title": "Long skip streak",
-            "detail": (
-                f"{streak} songs were skipped in a row. If this happens "
-                f"often, enable restart-pattern detection or lower the threshold."
-            ),
-        })
+        insights.append(
+            {
+                "icon": "warning",
+                "title": "Long skip streak",
+                "detail": (
+                    f"{streak} songs were skipped in a row. If this happens "
+                    f"often, enable restart-pattern detection or lower the threshold."
+                ),
+            }
+        )
 
     ms = metrics["most_skipped"]
     if ms and ms["count"] >= 3:
-        insights.append({
-            "icon": "warning",
-            "title": "Frequently skipped song",
-            "detail": f'"{ms["song"]}" by {ms["artist"]} was skipped {ms["count"]} times.',
-        })
+        insights.append(
+            {
+                "icon": "warning",
+                "title": "Frequently skipped song",
+                "detail": f'"{ms["song"]}" by {ms["artist"]} was skipped {ms["count"]} times.',
+            }
+        )
 
     avg = metrics["avg_skip_days"]
     if avg is not None and avg < 7:
-        insights.append({
-            "icon": "warning",
-            "title": "Skipping very recent songs",
-            "detail": (
-                f"Skipped songs were listened to an average of {avg:.0f} days ago. "
-                f"You may want to reduce the skip window for a fresher mix."
-            ),
-        })
+        insights.append(
+            {
+                "icon": "warning",
+                "title": "Skipping very recent songs",
+                "detail": (
+                    f"Skipped songs were listened to an average of {avg:.0f} days ago. "
+                    f"You may want to reduce the skip window for a fresher mix."
+                ),
+            }
+        )
 
     if not insights:
-        insights.append({
-            "icon": "info",
-            "title": "Looking good",
-            "detail": "No issues detected. Everything seems well balanced.",
-        })
+        insights.append(
+            {
+                "icon": "info",
+                "title": "Looking good",
+                "detail": "No issues detected. Everything seems well balanced.",
+            }
+        )
 
     return insights
 
@@ -211,22 +226,26 @@ def compute_metrics_all(events_by_date: list[tuple[str, list["TrackEvent"]]]) ->
             if e.days_ago is not None:
                 if best_oldest is None or e.days_ago > best_oldest["days_ago"]:
                     best_oldest = {
-                        "artist": e.artist, "song": e.song,
-                        "days_ago": e.days_ago, "date": date_str,
+                        "artist": e.artist,
+                        "song": e.song,
+                        "days_ago": e.days_ago,
+                        "date": date_str,
                     }
 
     if not all_events:
         return None
 
     metrics = compute_metrics(all_events)
-    metrics.update({
-        "total_days": len(events_by_date),
-        "oldest_scrobble": best_oldest,
-        "busiest_day": {"date": best_busiest[0], "count": best_busiest[1]},
-        "most_skips_day": {"date": best_most_skips[0], "count": best_most_skips[1]},
-        "highest_skip_rate_day": {"date": best_skip_rate[0], "rate": best_skip_rate[1]},
-        "longest_streak_day": {"date": best_streak[0], "streak": best_streak[1]},
-    })
+    metrics.update(
+        {
+            "total_days": len(events_by_date),
+            "oldest_scrobble": best_oldest,
+            "busiest_day": {"date": best_busiest[0], "count": best_busiest[1]},
+            "most_skips_day": {"date": best_most_skips[0], "count": best_most_skips[1]},
+            "highest_skip_rate_day": {"date": best_skip_rate[0], "rate": best_skip_rate[1]},
+            "longest_streak_day": {"date": best_streak[0], "streak": best_streak[1]},
+        }
+    )
     return metrics
 
 
@@ -237,70 +256,82 @@ def generate_insights_all(metrics: dict, skip_window_days: int = 60) -> list[dic
     days = metrics["total_days"]
     rate = metrics["skip_rate"]
 
-    insights.append({
-        "icon": "info",
-        "title": "Total activity",
-        "detail": (
-            f"{total:,} songs processed across {days} day{'s' if days != 1 else ''} "
-            f"({total / days:.0f}/day avg)."
-        ),
-    })
+    insights.append(
+        {
+            "icon": "info",
+            "title": "Total activity",
+            "detail": (
+                f"{total:,} songs processed across {days} day{'s' if days != 1 else ''} ({total / days:.0f}/day avg)."
+            ),
+        }
+    )
 
     if rate > 50:
-        insights.append({
-            "icon": "warning",
-            "title": "High overall skip rate",
-            "detail": (
-                f"{rate:.0f}% of all songs were skipped. Consider lowering "
-                f"the skip window ({skip_window_days} days) for a better balance."
-            ),
-        })
+        insights.append(
+            {
+                "icon": "warning",
+                "title": "High overall skip rate",
+                "detail": (
+                    f"{rate:.0f}% of all songs were skipped. Consider lowering "
+                    f"the skip window ({skip_window_days} days) for a better balance."
+                ),
+            }
+        )
     elif rate < 10 and total > 20:
-        insights.append({
-            "icon": "info",
-            "title": "Low overall skip rate",
-            "detail": (
-                f"Only {rate:.0f}% of songs were skipped across all time. "
-                f"Your settings seem well balanced."
-            ),
-        })
+        insights.append(
+            {
+                "icon": "info",
+                "title": "Low overall skip rate",
+                "detail": (
+                    f"Only {rate:.0f}% of songs were skipped across all time. Your settings seem well balanced."
+                ),
+            }
+        )
 
     streak = metrics["longest_skip_streak"]
     if streak >= 6:
         sd = metrics["longest_streak_day"]
-        insights.append({
-            "icon": "warning",
-            "title": "All-time skip streak",
-            "detail": (
-                f"{sd['streak']} songs skipped in a row ({sd['date']}). "
-                f"Consider enabling restart-pattern detection."
-            ),
-        })
+        insights.append(
+            {
+                "icon": "warning",
+                "title": "All-time skip streak",
+                "detail": (
+                    f"{sd['streak']} songs skipped in a row ({sd['date']}). "
+                    f"Consider enabling restart-pattern detection."
+                ),
+            }
+        )
 
     ms = metrics["most_skipped"]
     if ms and ms["count"] >= 5:
-        insights.append({
-            "icon": "warning",
-            "title": "Most skipped song",
-            "detail": f'"{ms["song"]}" by {ms["artist"]} was skipped {ms["count"]} times total.',
-        })
+        insights.append(
+            {
+                "icon": "warning",
+                "title": "Most skipped song",
+                "detail": f'"{ms["song"]}" by {ms["artist"]} was skipped {ms["count"]} times total.',
+            }
+        )
 
     avg = metrics["avg_skip_days"]
     if avg is not None and avg < 7:
-        insights.append({
-            "icon": "warning",
-            "title": "Skipping very recent songs",
-            "detail": (
-                f"Skipped songs were listened to an average of {avg:.1f} days ago overall. "
-                f"A smaller skip window might help."
-            ),
-        })
+        insights.append(
+            {
+                "icon": "warning",
+                "title": "Skipping very recent songs",
+                "detail": (
+                    f"Skipped songs were listened to an average of {avg:.1f} days ago overall. "
+                    f"A smaller skip window might help."
+                ),
+            }
+        )
 
     if len(insights) == 1:
-        insights.append({
-            "icon": "info",
-            "title": "Looking good",
-            "detail": "No issues detected across your listening history.",
-        })
+        insights.append(
+            {
+                "icon": "info",
+                "title": "Looking good",
+                "detail": "No issues detected across your listening history.",
+            }
+        )
 
     return insights

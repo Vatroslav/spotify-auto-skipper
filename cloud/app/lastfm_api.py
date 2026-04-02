@@ -3,12 +3,12 @@ Last.fm API wrapper — async version.
 Nearly verbatim port from desktop app.
 """
 
-from datetime import datetime, timezone
 import logging
+from datetime import datetime, timezone
 
 import httpx
 
-from app.config import get_lastfm_username, get_lastfm_api_key
+from app.config import get_lastfm_api_key, get_lastfm_username
 from app.spotify_api import CredentialError
 
 logger = logging.getLogger(__name__)

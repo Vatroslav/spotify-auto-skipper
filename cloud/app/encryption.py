@@ -4,9 +4,10 @@ Derives a stable Fernet key from SECRET_KEY via HKDF.
 """
 
 import base64
+
 from cryptography.fernet import Fernet, InvalidToken
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 _fernet: Fernet | None = None
 
@@ -15,6 +16,7 @@ def _get_fernet() -> Fernet:
     global _fernet
     if _fernet is None:
         from app.config import get_secret_key
+
         kdf = HKDF(
             algorithm=hashes.SHA256(),
             length=32,

@@ -8,12 +8,16 @@ from datetime import datetime, timedelta, timezone
 
 from app.config import load_settings
 from app.database import (
-    add_log, add_track_event, get_last_track_event_id,
-    get_oauth_tokens, is_artist_never_skipped, purge_old_logs,
+    add_log,
+    add_track_event,
+    get_last_track_event_id,
+    get_oauth_tokens,
+    is_artist_never_skipped,
+    purge_old_logs,
     recompute_overall_metrics,
 )
+from app.lastfm_api import LASTFM_ERROR, get_last_play_date
 from app.spotify_api import CredentialError
-from app.lastfm_api import get_last_play_date, LASTFM_ERROR
 from app.state import app_state
 
 
@@ -50,12 +54,14 @@ async def polling_loop():
         return
 
     settings = await load_settings()
-    await _log(f"Configuration: skip_window={settings['skip_window_days']}d, "
-               f"poll_interval={settings['poll_interval_seconds']}s, "
-               f"idle_threshold={settings['idle_threshold']}, "
-               f"idle_poll_interval={settings['idle_poll_interval_seconds']}s, "
-               f"liked_songs={'on' if settings['always_play_liked_songs'] else 'off'}, "
-               f"restart_pattern={'on' if settings['enable_restart_pattern'] else 'off'}")
+    await _log(
+        f"Configuration: skip_window={settings['skip_window_days']}d, "
+        f"poll_interval={settings['poll_interval_seconds']}s, "
+        f"idle_threshold={settings['idle_threshold']}, "
+        f"idle_poll_interval={settings['idle_poll_interval_seconds']}s, "
+        f"liked_songs={'on' if settings['always_play_liked_songs'] else 'off'}, "
+        f"restart_pattern={'on' if settings['enable_restart_pattern'] else 'off'}"
+    )
 
     # Purge old data on startup, then every 24 hours
     await purge_old_logs(settings["log_retention_days"])
@@ -96,7 +102,10 @@ async def polling_loop():
                 consecutive_idle += 1
                 if not app_state.idle_mode and consecutive_idle >= idle_threshold:
                     app_state.idle_mode = True
-                    await _log(f"Nothing playing for {consecutive_idle} checks — switching to slow polling ({idle_poll_interval}s).")
+                    await _log(
+                        f"Nothing playing for {consecutive_idle} checks "
+                        f"— switching to slow polling ({idle_poll_interval}s)."
+                    )
                 else:
                     await _log("Nothing is playing right now.")
                 app_state.current_track = None
@@ -153,22 +162,36 @@ async def polling_loop():
                         await _log("Skip paused for this song (one-time) — not skipping")
                         app_state.skip_exempt_track_id = None
                         await add_track_event(
-                            track["id"], track["name"], track["artist"],
-                            "skip_paused", days_since, track.get("context_uri"),
+                            track["id"],
+                            track["name"],
+                            track["artist"],
+                            "skip_paused",
+                            days_since,
+                            track.get("context_uri"),
                         )
                     # Check never-skip list
-                    elif settings["enable_never_skip_artists"] and await is_artist_never_skipped(track.get("artist_ids", [])):
+                    elif settings["enable_never_skip_artists"] and await is_artist_never_skipped(
+                        track.get("artist_ids", [])
+                    ):
                         await _log("Artist is in never-skip list \u2014 not skipping")
                         await add_track_event(
-                            track["id"], track["name"], track["artist"],
-                            "never_skip", days_since, track.get("context_uri"),
+                            track["id"],
+                            track["name"],
+                            track["artist"],
+                            "never_skip",
+                            days_since,
+                            track.get("context_uri"),
                         )
                     # Check liked songs
                     elif settings["always_play_liked_songs"] and await client.is_track_liked(track["id"]):
                         await _log("Track is in Liked Songs \u2014 not skipping")
                         await add_track_event(
-                            track["id"], track["name"], track["artist"],
-                            "liked", days_since, track.get("context_uri"),
+                            track["id"],
+                            track["name"],
+                            track["artist"],
+                            "liked",
+                            days_since,
+                            track.get("context_uri"),
                         )
                     else:
                         # Re-check pause flag right before skipping (user may have
@@ -176,8 +199,12 @@ async def polling_loop():
                         if app_state.skipping_paused:
                             await _log("Skipping was paused while checking \u2014 not skipping")
                             await add_track_event(
-                                track["id"], track["name"], track["artist"],
-                                "skip_paused", days_since, track.get("context_uri"),
+                                track["id"],
+                                track["name"],
+                                track["artist"],
+                                "skip_paused",
+                                days_since,
+                                track.get("context_uri"),
                             )
                             await app_state.interruptible_sleep(poll_interval)
                             continue
@@ -190,8 +217,12 @@ async def polling_loop():
                             await client.pause_spotify_playback()
 
                         await add_track_event(
-                            track["id"], track["name"], track["artist"],
-                            "skipped", days_since, track.get("context_uri"),
+                            track["id"],
+                            track["name"],
+                            track["artist"],
+                            "skipped",
+                            days_since,
+                            track.get("context_uri"),
                         )
 
                         # Track skip patterns for restart detection
@@ -203,9 +234,13 @@ async def polling_loop():
 
                             if (
                                 len(recent_skip_days) == threshold
-                                and max(recent_skip_days) - min(recent_skip_days) <= settings["restart_pattern_day_diff"]
+                                and max(recent_skip_days) - min(recent_skip_days)
+                                <= settings["restart_pattern_day_diff"]
                             ):
-                                await _log(f"Detected repeating pattern ({threshold} skips) \u2014 restarting playlist...", "warning")
+                                await _log(
+                                    f"Detected repeating pattern ({threshold} skips) \u2014 restarting playlist...",
+                                    "warning",
+                                )
                                 await client.restart_playlist(settings["dummy_playlist_id"])
                                 recent_skip_days.clear()
 
@@ -215,15 +250,23 @@ async def polling_loop():
                 else:
                     await _log("Last scrobble is older than the window \u2014 not skipping.")
                     await add_track_event(
-                        track["id"], track["name"], track["artist"],
-                        "played", days_since, track.get("context_uri"),
+                        track["id"],
+                        track["name"],
+                        track["artist"],
+                        "played",
+                        days_since,
+                        track.get("context_uri"),
                     )
             else:
                 await _log("No scrobble for this song \u2014 not skipping.")
                 app_state.last_check_message = "Never heard before"
                 await add_track_event(
-                    track["id"], track["name"], track["artist"],
-                    "no_scrobble", None, track.get("context_uri"),
+                    track["id"],
+                    track["name"],
+                    track["artist"],
+                    "no_scrobble",
+                    None,
+                    track.get("context_uri"),
                 )
 
         except CredentialError as e:

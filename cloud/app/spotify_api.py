@@ -5,9 +5,7 @@ Uses httpx.AsyncClient, class-based token management.
 
 import asyncio
 import base64
-import re
 from datetime import datetime, timedelta, timezone
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 import httpx
 
@@ -16,6 +14,7 @@ from app.database import get_oauth_tokens, save_oauth_tokens
 
 class CredentialError(Exception):
     """Raised when Spotify credentials are invalid or expired."""
+
     pass
 
 
@@ -57,9 +56,7 @@ class SpotifyClient:
 
         refresh_token = tokens["refresh_token"]
 
-        auth_header = base64.b64encode(
-            f"{self.client_id}:{self.client_secret}".encode()
-        ).decode()
+        auth_header = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
 
         try:
             r = await self._http.post(
@@ -199,9 +196,13 @@ class SpotifyClient:
 
         if track_id and artist_name and track_name:
             return {
-                "id": track_id, "name": track_name, "artist": artist_name,
-                "artist_ids": artist_ids, "context_uri": context_uri,
-                "progress_ms": progress_ms, "duration_ms": duration_ms,
+                "id": track_id,
+                "name": track_name,
+                "artist": artist_name,
+                "artist_ids": artist_ids,
+                "context_uri": context_uri,
+                "progress_ms": progress_ms,
+                "duration_ms": duration_ms,
                 "album_art": album_art,
             }
         return None
@@ -233,8 +234,9 @@ class SpotifyClient:
         if not context_uri:
             return False
 
-        await self._put("https://api.spotify.com/v1/me/player/play",
-                        json={"context_uri": f"spotify:playlist:{dummy_playlist_id}"})
+        await self._put(
+            "https://api.spotify.com/v1/me/player/play", json={"context_uri": f"spotify:playlist:{dummy_playlist_id}"}
+        )
         await asyncio.sleep(1)
 
         await self._put("https://api.spotify.com/v1/me/player/shuffle", params={"state": "true"})
@@ -254,7 +256,10 @@ class SpotifyClient:
 
     async def get_playlist_info(self, playlist_id: str) -> dict | None:
         """Resolve a playlist ID to its info. Returns None if not found."""
-        r = await self._get(f"https://api.spotify.com/v1/playlists/{playlist_id}", params={"fields": "name,description,owner(display_name)"})
+        r = await self._get(
+            f"https://api.spotify.com/v1/playlists/{playlist_id}",
+            params={"fields": "name,description,owner(display_name)"},
+        )
         if r is None or r.status_code != 200:
             return None
         data = r.json()
@@ -282,12 +287,14 @@ class SpotifyClient:
                 if not p or not p.get("id"):
                     continue
                 images = p.get("images") or []
-                results.append({
-                    "id": p["id"],
-                    "name": p.get("name", ""),
-                    "track_count": (p.get("tracks") or {}).get("total", 0),
-                    "image_url": images[0]["url"] if images else "",
-                })
+                results.append(
+                    {
+                        "id": p["id"],
+                        "name": p.get("name", ""),
+                        "track_count": (p.get("tracks") or {}).get("total", 0),
+                        "image_url": images[0]["url"] if images else "",
+                    }
+                )
             if not data.get("next"):
                 break
             offset += 50
@@ -312,12 +319,14 @@ class SpotifyClient:
             if not track or not track.get("id"):
                 continue
             artists = track.get("artists") or []
-            items.append({
-                "id": track["id"],
-                "name": track.get("name", ""),
-                "uri": track.get("uri", ""),
-                "artist": artists[0]["name"] if artists else "Unknown",
-            })
+            items.append(
+                {
+                    "id": track["id"],
+                    "name": track.get("name", ""),
+                    "uri": track.get("uri", ""),
+                    "artist": artists[0]["name"] if artists else "Unknown",
+                }
+            )
         return {"items": items, "total": data.get("total", 0)}
 
     async def create_playlist(self, name: str, description: str = "", public: bool = False) -> dict | None:
@@ -346,7 +355,7 @@ class SpotifyClient:
     async def add_tracks_to_playlist(self, playlist_id: str, uris: list[str]) -> bool:
         """Add tracks to playlist in batches of 100. Returns True on success."""
         for i in range(0, len(uris), 100):
-            batch = uris[i:i + 100]
+            batch = uris[i : i + 100]
             r = await self._request(
                 "POST",
                 f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks",
@@ -371,11 +380,13 @@ class SpotifyClient:
         for a in artists:
             images = a.get("images") or []
             image_url = images[-1]["url"] if images else ""
-            results.append({
-                "id": a["id"],
-                "name": a["name"],
-                "followers": a.get("followers", {}).get("total", 0),
-                "genres": a.get("genres", []),
-                "image_url": image_url,
-            })
+            results.append(
+                {
+                    "id": a["id"],
+                    "name": a["name"],
+                    "followers": a.get("followers", {}).get("total", 0),
+                    "genres": a.get("genres", []),
+                    "image_url": image_url,
+                }
+            )
         return results

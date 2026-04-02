@@ -8,18 +8,23 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
-from app.database import get_never_skip_artists, add_never_skip_artist, remove_never_skip_artist
+from app.database import add_never_skip_artist, get_never_skip_artists, remove_never_skip_artist
+from app.routers.deps import require_auth
 from app.spotify_api import CredentialError
 from app.state import app_state
-from app.routers.deps import require_auth
 
 router = APIRouter(prefix="/api/artists", tags=["artists"], dependencies=[Depends(require_auth)])
 
 # Spotify IDs are 22-character base-62 strings
 _SPOTIFY_ID_RE = re.compile(r"^[a-zA-Z0-9]{1,40}$")
 
-_ALLOWED_IMAGE_HOSTS = {"i.scdn.co", "mosaic.scdn.co", "image-cdn-ak.spotifycdn.com",
-                         "image-cdn-fa.spotifycdn.com", "wrapped-images.spotifycdn.com"}
+_ALLOWED_IMAGE_HOSTS = {
+    "i.scdn.co",
+    "mosaic.scdn.co",
+    "image-cdn-ak.spotifycdn.com",
+    "image-cdn-fa.spotifycdn.com",
+    "wrapped-images.spotifycdn.com",
+}
 
 
 def _validate_image_url(url: str) -> str:

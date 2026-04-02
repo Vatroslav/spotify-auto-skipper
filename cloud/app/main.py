@@ -29,6 +29,7 @@ async def lifespan(app: FastAPI):
     app_state.spotify_client = SpotifyClient(get_spotify_client_id(), get_spotify_client_secret())
 
     from app.worker import polling_loop
+
     app_state.worker_task = asyncio.create_task(polling_loop())
     app_state.worker_running = True
 
@@ -58,6 +59,7 @@ app.add_middleware(
     same_site="lax",
 )
 
+
 # Content Security Policy middleware
 class CSPMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
@@ -72,16 +74,18 @@ class CSPMiddleware(BaseHTTPMiddleware):
         )
         return response
 
+
 app.add_middleware(CSPMiddleware)
 
 # Static files and templates
 import os
+
 _app_dir = os.path.dirname(os.path.abspath(__file__))
 app.mount("/static", StaticFiles(directory=os.path.join(_app_dir, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(_app_dir, "templates"))
 
 # Include routers
-from app.routers import auth, playback, settings, artists, insights, logs, rediscovery
+from app.routers import artists, auth, insights, logs, playback, rediscovery, settings
 
 app.include_router(auth.router)
 app.include_router(playback.router)
@@ -93,6 +97,7 @@ app.include_router(rediscovery.router)
 
 
 # ── Health check ─────────────────────────────────────────────────
+
 
 @app.get("/health")
 async def health():
@@ -108,6 +113,7 @@ async def health():
 
 
 # ── Page routes ──────────────────────────────────────────────────
+
 
 def _is_authenticated(request: Request) -> bool:
     return request.session.get("authenticated", False)

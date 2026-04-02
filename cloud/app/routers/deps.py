@@ -2,7 +2,7 @@
 Shared FastAPI dependencies for API routers.
 """
 
-from fastapi import Request, HTTPException
+from fastapi import HTTPException, Request
 
 
 async def require_auth(request: Request):

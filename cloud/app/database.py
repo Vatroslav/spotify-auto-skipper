@@ -4,12 +4,12 @@ All data persists at DATA_DIR/skipper.db (default: /app/data/skipper.db).
 """
 
 import os
-import json
-import aiosqlite
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from app.encryption import encrypt, decrypt
+import aiosqlite
+
+from app.encryption import decrypt, encrypt
 
 DATA_DIR = os.environ.get("DATA_DIR", "/app/data")
 DB_PATH = os.path.join(DATA_DIR, "skipper.db")
@@ -125,6 +125,7 @@ async def init_db():
 
 # ── Track Aliases ────────────────────────────────────────────────
 
+
 async def get_track_alias(artist: str, spotify_name: str) -> str | None:
     """Return the Last.fm name for a track, or None if no alias exists."""
     db = await get_db()
@@ -140,6 +141,7 @@ async def get_track_alias(artist: str, spotify_name: str) -> str | None:
 
 
 # ── Settings CRUD ────────────────────────────────────────────────
+
 
 async def get_setting(key: str, default=None):
     db = await get_db()
@@ -190,6 +192,7 @@ async def set_many_settings(settings: dict):
 
 # ── Never-skip artists CRUD ─────────────────────────────────────
 
+
 async def get_never_skip_artists() -> list[dict]:
     db = await get_db()
     try:
@@ -239,9 +242,14 @@ async def is_artist_never_skipped(artist_ids: list[str]) -> bool:
 
 # ── Track events ─────────────────────────────────────────────────
 
+
 async def add_track_event(
-    track_id: str, track_name: str, artist_name: str,
-    outcome: str, days_ago: int | None = None, context_uri: str | None = None,
+    track_id: str,
+    track_name: str,
+    artist_name: str,
+    outcome: str,
+    days_ago: int | None = None,
+    context_uri: str | None = None,
 ):
     db = await get_db()
     try:
@@ -259,9 +267,7 @@ async def get_last_track_event_id() -> str | None:
     """Return the track_id of the most recent track event, or None."""
     db = await get_db()
     try:
-        row = await (await db.execute(
-            "SELECT track_id FROM track_events ORDER BY id DESC LIMIT 1"
-        )).fetchone()
+        row = await (await db.execute("SELECT track_id FROM track_events ORDER BY id DESC LIMIT 1")).fetchone()
         return row[0] if row else None
     finally:
         await db.close()
@@ -336,9 +342,7 @@ async def get_track_event_dates(tz: str = "") -> list[str]:
         tz_info = None
     db = await get_db()
     try:
-        cursor = await db.execute(
-            "SELECT DISTINCT timestamp FROM track_events ORDER BY timestamp"
-        )
+        cursor = await db.execute("SELECT DISTINCT timestamp FROM track_events ORDER BY timestamp")
         rows = await cursor.fetchall()
         dates = set()
         for row in rows:
@@ -355,6 +359,7 @@ async def get_track_event_dates(tz: str = "") -> list[str]:
 
 
 # ── Logs ─────────────────────────────────────────────────────────
+
 
 async def add_log(message: str, level: str = "info"):
     db = await get_db()
@@ -396,8 +401,11 @@ def _today_utc_range(tz_name: str) -> tuple[str, str]:
 
 
 async def get_logs(
-    date_str: str = "", level: str = "all", tz: str = "",
-    limit: int = 0, before_id: int = 0,
+    date_str: str = "",
+    level: str = "all",
+    tz: str = "",
+    limit: int = 0,
+    before_id: int = 0,
 ) -> list[dict]:
     db = await get_db()
     try:
@@ -486,9 +494,7 @@ async def search_logs(query: str, date_str: str = "", tz: str = "") -> list[dict
 async def get_log_dates() -> list[str]:
     db = await get_db()
     try:
-        cursor = await db.execute(
-            "SELECT DISTINCT date(timestamp) as d FROM logs ORDER BY d"
-        )
+        cursor = await db.execute("SELECT DISTINCT date(timestamp) as d FROM logs ORDER BY d")
         rows = await cursor.fetchall()
         return [row["d"] for row in rows]
     finally:
@@ -510,78 +516,93 @@ async def purge_old_logs(retention_days: int):
 
 # ── Overall metrics cache ────────────────────────────────────────
 
+
 async def recompute_overall_metrics():
     """Recompute all-time metrics via SQL and store in overall_metrics table."""
     db = await get_db()
     try:
         # Basic counts
-        row = (await (await db.execute(
-            "SELECT COUNT(*) as total, SUM(outcome='skipped') as skipped, SUM(outcome!='skipped') as kept FROM track_events"
-        )).fetchone())
+        row = await (
+            await db.execute(
+                "SELECT COUNT(*) as total, SUM(outcome='skipped') as skipped, SUM(outcome!='skipped') as kept FROM track_events"
+            )
+        ).fetchone()
         total = row["total"] or 0
         skipped = row["skipped"] or 0
         kept = row["kept"] or 0
         skip_rate = (skipped / total * 100) if total > 0 else 0.0
 
         # Unique counts
-        row = (await (await db.execute(
-            "SELECT COUNT(DISTINCT artist_name || '|||' || track_name) as c FROM track_events"
-        )).fetchone())
+        row = await (
+            await db.execute("SELECT COUNT(DISTINCT artist_name || '|||' || track_name) as c FROM track_events")
+        ).fetchone()
         unique_songs = row["c"] or 0
 
-        row = (await (await db.execute(
-            "SELECT COUNT(DISTINCT artist_name) as c FROM track_events"
-        )).fetchone())
+        row = await (await db.execute("SELECT COUNT(DISTINCT artist_name) as c FROM track_events")).fetchone()
         unique_artists = row["c"] or 0
 
         # Most skipped
-        row = (await (await db.execute(
-            "SELECT artist_name, track_name, COUNT(*) as c FROM track_events WHERE outcome='skipped' GROUP BY artist_name, track_name ORDER BY c DESC LIMIT 1"
-        )).fetchone())
+        row = await (
+            await db.execute(
+                "SELECT artist_name, track_name, COUNT(*) as c FROM track_events WHERE outcome='skipped' GROUP BY artist_name, track_name ORDER BY c DESC LIMIT 1"
+            )
+        ).fetchone()
         ms_song, ms_artist, ms_count = (row["track_name"], row["artist_name"], row["c"]) if row else (None, None, None)
 
         # Most played
-        row = (await (await db.execute(
-            "SELECT artist_name, track_name, COUNT(*) as c FROM track_events WHERE outcome!='skipped' GROUP BY artist_name, track_name ORDER BY c DESC LIMIT 1"
-        )).fetchone())
+        row = await (
+            await db.execute(
+                "SELECT artist_name, track_name, COUNT(*) as c FROM track_events WHERE outcome!='skipped' GROUP BY artist_name, track_name ORDER BY c DESC LIMIT 1"
+            )
+        ).fetchone()
         mp_song, mp_artist, mp_count = (row["track_name"], row["artist_name"], row["c"]) if row else (None, None, None)
 
         # Avg skip age
-        row = (await (await db.execute(
-            "SELECT AVG(days_ago) as a FROM track_events WHERE outcome='skipped' AND days_ago IS NOT NULL"
-        )).fetchone())
+        row = await (
+            await db.execute(
+                "SELECT AVG(days_ago) as a FROM track_events WHERE outcome='skipped' AND days_ago IS NOT NULL"
+            )
+        ).fetchone()
         avg_skip_days = row["a"]
 
         # Oldest scrobble
-        row = (await (await db.execute(
-            "SELECT artist_name, track_name, days_ago, DATE(timestamp) as d FROM track_events WHERE days_ago IS NOT NULL ORDER BY days_ago DESC LIMIT 1"
-        )).fetchone())
-        os_song, os_artist, os_days, os_date = (row["track_name"], row["artist_name"], row["days_ago"], row["d"]) if row else (None, None, None, None)
+        row = await (
+            await db.execute(
+                "SELECT artist_name, track_name, days_ago, DATE(timestamp) as d FROM track_events WHERE days_ago IS NOT NULL ORDER BY days_ago DESC LIMIT 1"
+            )
+        ).fetchone()
+        os_song, os_artist, os_days, os_date = (
+            (row["track_name"], row["artist_name"], row["days_ago"], row["d"]) if row else (None, None, None, None)
+        )
 
         # Total days
-        row = (await (await db.execute(
-            "SELECT COUNT(DISTINCT DATE(timestamp)) as c FROM track_events"
-        )).fetchone())
+        row = await (await db.execute("SELECT COUNT(DISTINCT DATE(timestamp)) as c FROM track_events")).fetchone()
         total_days = row["c"] or 0
 
         # Busiest day
-        row = (await (await db.execute(
-            "SELECT DATE(timestamp) as d, COUNT(*) as c FROM track_events GROUP BY d ORDER BY c DESC LIMIT 1"
-        )).fetchone())
+        row = await (
+            await db.execute(
+                "SELECT DATE(timestamp) as d, COUNT(*) as c FROM track_events GROUP BY d ORDER BY c DESC LIMIT 1"
+            )
+        ).fetchone()
         busiest_date, busiest_count = (row["d"], row["c"]) if row else (None, None)
 
         # Most skips in a day
-        row = (await (await db.execute(
-            "SELECT DATE(timestamp) as d, COUNT(*) as c FROM track_events WHERE outcome='skipped' GROUP BY d ORDER BY c DESC LIMIT 1"
-        )).fetchone())
+        row = await (
+            await db.execute(
+                "SELECT DATE(timestamp) as d, COUNT(*) as c FROM track_events WHERE outcome='skipped' GROUP BY d ORDER BY c DESC LIMIT 1"
+            )
+        ).fetchone()
         most_skips_date, most_skips_count = (row["d"], row["c"]) if row else (None, None)
 
         # Highest skip rate day (min 5 songs)
-        row = (await (await db.execute(
-            """SELECT DATE(timestamp) as d,
+        row = await (
+            await db.execute(
+                """SELECT DATE(timestamp) as d,
                       CAST(SUM(outcome='skipped') AS REAL) / COUNT(*) * 100 as rate
                FROM track_events GROUP BY d HAVING COUNT(*) >= 5 ORDER BY rate DESC LIMIT 1"""
-        )).fetchone())
+            )
+        ).fetchone()
         high_rate_date, high_rate_rate = (row["d"], row["rate"]) if row else (None, None)
 
         # Longest skip streak (Python — fetch outcomes in order)
@@ -598,9 +619,7 @@ async def recompute_overall_metrics():
                 current = 0
 
         # Longest streak per day
-        cursor = await db.execute(
-            "SELECT DATE(timestamp) as d, outcome FROM track_events ORDER BY timestamp"
-        )
+        cursor = await db.execute("SELECT DATE(timestamp) as d, outcome FROM track_events ORDER BY timestamp")
         day_rows = await cursor.fetchall()
         best_streak_date, best_streak_val = None, 0
         cur_day, cur_streak, day_best = None, 0, 0
@@ -663,16 +682,35 @@ async def recompute_overall_metrics():
                 highest_skip_rate_rate=MAX(COALESCE(overall_metrics.highest_skip_rate_rate, 0), excluded.highest_skip_rate_rate),
                 longest_streak_day_date=CASE WHEN excluded.longest_streak_day_streak > COALESCE(overall_metrics.longest_streak_day_streak, 0) THEN excluded.longest_streak_day_date ELSE overall_metrics.longest_streak_day_date END,
                 longest_streak_day_streak=MAX(COALESCE(overall_metrics.longest_streak_day_streak, 0), excluded.longest_streak_day_streak)""",
-            (total, skipped, kept, skip_rate,
-             unique_songs, unique_artists,
-             ms_song, ms_artist, ms_count,
-             mp_song, mp_artist, mp_count,
-             longest_streak, avg_skip_days, total_days,
-             os_song, os_artist, os_days, os_date,
-             busiest_date, busiest_count,
-             most_skips_date, most_skips_count,
-             high_rate_date, high_rate_rate,
-             best_streak_date, best_streak_val),
+            (
+                total,
+                skipped,
+                kept,
+                skip_rate,
+                unique_songs,
+                unique_artists,
+                ms_song,
+                ms_artist,
+                ms_count,
+                mp_song,
+                mp_artist,
+                mp_count,
+                longest_streak,
+                avg_skip_days,
+                total_days,
+                os_song,
+                os_artist,
+                os_days,
+                os_date,
+                busiest_date,
+                busiest_count,
+                most_skips_date,
+                most_skips_count,
+                high_rate_date,
+                high_rate_rate,
+                best_streak_date,
+                best_streak_val,
+            ),
         )
         await db.commit()
     finally:
@@ -683,7 +721,7 @@ async def get_cached_overall_metrics() -> dict | None:
     """Read precomputed overall metrics. Returns None if not yet computed."""
     db = await get_db()
     try:
-        row = (await (await db.execute("SELECT * FROM overall_metrics WHERE id = 1")).fetchone())
+        row = await (await db.execute("SELECT * FROM overall_metrics WHERE id = 1")).fetchone()
         if not row:
             return None
         r = dict(row)
@@ -706,9 +744,13 @@ async def get_cached_overall_metrics() -> dict | None:
             "avg_skip_days": r["avg_skip_days"],
             "total_days": r["total_days"],
             "oldest_scrobble": {
-                "song": r["oldest_scrobble_song"], "artist": r["oldest_scrobble_artist"],
-                "days_ago": r["oldest_scrobble_days"], "date": r["oldest_scrobble_date"],
-            } if r["oldest_scrobble_song"] else None,
+                "song": r["oldest_scrobble_song"],
+                "artist": r["oldest_scrobble_artist"],
+                "days_ago": r["oldest_scrobble_days"],
+                "date": r["oldest_scrobble_date"],
+            }
+            if r["oldest_scrobble_song"]
+            else None,
             "busiest_day": {"date": r["busiest_day_date"], "count": r["busiest_day_count"]},
             "most_skips_day": {"date": r["most_skips_day_date"], "count": r["most_skips_day_count"]},
             "highest_skip_rate_day": {"date": r["highest_skip_rate_date"], "rate": r["highest_skip_rate_rate"]},
@@ -720,12 +762,11 @@ async def get_cached_overall_metrics() -> dict | None:
 
 # ── OAuth tokens ─────────────────────────────────────────────────
 
+
 async def get_oauth_tokens() -> dict | None:
     db = await get_db()
     try:
-        cursor = await db.execute(
-            "SELECT access_token, refresh_token, expires_at FROM oauth_tokens WHERE id = 1"
-        )
+        cursor = await db.execute("SELECT access_token, refresh_token, expires_at FROM oauth_tokens WHERE id = 1")
         row = await cursor.fetchone()
         if not row:
             return None
@@ -757,8 +798,7 @@ async def save_oauth_tokens(access_token: str, refresh_token: str, expires_at: s
             """INSERT INTO oauth_tokens (id, access_token, refresh_token, expires_at)
                VALUES (1, ?, ?, ?)
                ON CONFLICT(id) DO UPDATE SET access_token = ?, refresh_token = ?, expires_at = ?""",
-            (enc_access, enc_refresh, expires_at,
-             enc_access, enc_refresh, expires_at),
+            (enc_access, enc_refresh, expires_at, enc_access, enc_refresh, expires_at),
         )
         await db.commit()
     finally:

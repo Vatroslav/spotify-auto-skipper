@@ -4,13 +4,14 @@ Settings API routes.
 
 import re
 from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from app.config import load_settings, save_settings, CONFIG_DEFAULTS
+from app.config import CONFIG_DEFAULTS, load_settings, save_settings
+from app.routers.deps import require_auth
 from app.spotify_api import CredentialError
 from app.state import app_state
-from app.routers.deps import require_auth
 
 router = APIRouter(prefix="/api/settings", tags=["settings"], dependencies=[Depends(require_auth)])
 

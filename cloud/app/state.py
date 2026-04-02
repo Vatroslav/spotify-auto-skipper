@@ -4,7 +4,7 @@ Replaces desktop app's utils.py shared mutable state.
 """
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime
 
 
 class AppState:
@@ -25,14 +25,15 @@ class AppState:
         # Rediscovery
         self.rediscovery_task: asyncio.Task | None = None
         self.rediscovery_status: str = "idle"  # idle/running/completed/failed
-        self.rediscovery_progress: dict = {}   # {phase, current, total, message}
-        self.rediscovery_results: list = []    # track dicts that passed filter
+        self.rediscovery_progress: dict = {}  # {phase, current, total, message}
+        self.rediscovery_results: list = []  # track dicts that passed filter
         self.rediscovery_playlist_url: str | None = None
 
     def restart_worker_if_dead(self):
         """Restart the polling loop if it has stopped (e.g. after CredentialError)."""
         if self.worker_task is None or self.worker_task.done():
             from app.worker import polling_loop
+
             self.worker_task = asyncio.create_task(polling_loop())
             self.worker_running = True
 

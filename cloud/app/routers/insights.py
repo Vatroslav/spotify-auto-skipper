@@ -4,13 +4,17 @@ Insights API routes.
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.database import (
-    get_track_events, get_track_event_dates,
-    get_cached_overall_metrics, recompute_overall_metrics,
-)
 from app.config import load_settings
+from app.database import (
+    get_cached_overall_metrics,
+    get_track_event_dates,
+    get_track_events,
+    recompute_overall_metrics,
+)
 from app.insights import (
-    events_from_db_rows, compute_metrics, generate_insights,
+    compute_metrics,
+    events_from_db_rows,
+    generate_insights,
     generate_insights_all,
 )
 from app.routers.deps import require_auth

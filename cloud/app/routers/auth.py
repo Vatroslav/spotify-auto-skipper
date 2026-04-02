@@ -3,21 +3,24 @@ Spotify OAuth Authorization Code Flow.
 """
 
 import secrets
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
+import httpx
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
-import httpx
 
-from app.config import get_spotify_client_id, get_spotify_client_secret, get_base_url, get_allowed_spotify_user
-from app.database import save_oauth_tokens, clear_oauth_tokens
+from app.config import get_allowed_spotify_user, get_base_url, get_spotify_client_id, get_spotify_client_secret
+from app.database import clear_oauth_tokens, save_oauth_tokens
 from app.routers.deps import require_auth
 from app.state import app_state
-from datetime import datetime, timedelta, timezone
 
 router = APIRouter(tags=["auth"])
 
-SCOPES = "user-read-currently-playing user-read-playback-state user-modify-playback-state user-library-read playlist-read-private playlist-modify-private"
+SCOPES = (
+    "user-read-currently-playing user-read-playback-state user-modify-playback-state "
+    "user-library-read playlist-read-private playlist-modify-private"
+)
 
 
 @router.get("/auth/login")
@@ -96,6 +99,7 @@ async def callback(request: Request, code: str = "", state: str = "", error: str
                     return RedirectResponse("/unauthorized")
             else:
                 import logging
+
                 logging.getLogger("auth").warning(
                     "Spotify /v1/me returned %s: %s", me_resp.status_code, me_resp.text[:200]
                 )

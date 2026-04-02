@@ -5,9 +5,9 @@ Playback API routes — current track, check now, pause/resume.
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
-from app.state import app_state
 from app.config import load_settings
 from app.routers.deps import require_auth
+from app.state import app_state
 
 router = APIRouter(prefix="/api/playback", tags=["playback"], dependencies=[Depends(require_auth)])
 
@@ -23,7 +23,9 @@ async def get_playback(request: Request):
         "worker_running": app_state.worker_running,
         "last_checked": app_state.last_checked_timestamp.isoformat() if app_state.last_checked_timestamp else None,
         "last_check_message": app_state.last_check_message,
-        "poll_interval": settings["idle_poll_interval_seconds"] if app_state.idle_mode else settings["poll_interval_seconds"],
+        "poll_interval": settings["idle_poll_interval_seconds"]
+        if app_state.idle_mode
+        else settings["poll_interval_seconds"],
         "idle_mode": app_state.idle_mode,
         "skip_exempt_track_id": app_state.skip_exempt_track_id,
     }

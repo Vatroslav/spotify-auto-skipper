@@ -4,7 +4,7 @@ Logs API routes.
 
 from fastapi import APIRouter, Depends, Request
 
-from app.database import get_logs, get_log_dates, search_logs
+from app.database import get_log_dates, get_logs, search_logs
 from app.routers.deps import require_auth
 
 router = APIRouter(prefix="/api/logs", tags=["logs"], dependencies=[Depends(require_auth)])
@@ -28,8 +28,12 @@ async def search_log_entries(request: Request, q: str = "", date: str = "", tz: 
 
 @router.get("")
 async def get_log_entries(
-    request: Request, date: str = "", level: str = "all", tz: str = "",
-    limit: int = 0, before_id: int = 0,
+    request: Request,
+    date: str = "",
+    level: str = "all",
+    tz: str = "",
+    limit: int = 0,
+    before_id: int = 0,
 ):
     """Return log entries for a specific date, or today if omitted."""
     logs = await get_logs(date, level, tz, limit=limit, before_id=before_id)

@@ -1,0 +1,8 @@
+line-length = 120
+
+[lint]
+select = ["E", "F", "I", "W"]
+
+[lint.per-file-ignores]
+"cloud/app/database.py" = ["E501"]
+"cloud/app/main.py" = ["E402"]

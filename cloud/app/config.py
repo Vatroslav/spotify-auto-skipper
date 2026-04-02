@@ -3,6 +3,7 @@ Configuration: env vars for secrets, SQLite for user-adjustable settings.
 """
 
 import os
+
 from app.database import get_all_settings, set_many_settings
 
 # Settings that live in the database (user-adjustable)
@@ -22,13 +23,17 @@ CONFIG_DEFAULTS = {
 
 # Type mappings
 _INT_KEYS = {
-    "skip_window_days", "poll_interval_seconds",
-    "idle_threshold", "idle_poll_interval_seconds",
-    "restart_pattern_song_count", "restart_pattern_day_diff",
+    "skip_window_days",
+    "poll_interval_seconds",
+    "idle_threshold",
+    "idle_poll_interval_seconds",
+    "restart_pattern_song_count",
+    "restart_pattern_day_diff",
     "log_retention_days",
 }
 _BOOL_KEYS = {
-    "enable_restart_pattern", "always_play_liked_songs",
+    "enable_restart_pattern",
+    "always_play_liked_songs",
     "enable_never_skip_artists",
 }
 
@@ -54,36 +59,43 @@ def _serialize_value(key: str, value) -> str:
 
 # ── Environment variables (secrets) ──────────────────────────────
 
+
 def get_spotify_client_id() -> str:
     return os.environ.get("SPOTIFY_CLIENT_ID", "")
+
 
 def get_spotify_client_secret() -> str:
     return os.environ.get("SPOTIFY_CLIENT_SECRET", "")
 
+
 def get_lastfm_username() -> str:
     return os.environ.get("LASTFM_USERNAME", "")
 
+
 def get_lastfm_api_key() -> str:
     return os.environ.get("LASTFM_API_KEY", "")
+
 
 def get_secret_key() -> str:
     key = os.environ.get("SECRET_KEY", "")
     if not key or len(key) < 32:
         raise RuntimeError(
             "SECRET_KEY env var must be set and at least 32 characters. "
-            "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+            'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(32))"'
         )
     # Check for sufficient character diversity (reject low-entropy strings)
     unique_chars = len(set(key))
     if unique_chars < 10:
         raise RuntimeError(
             "SECRET_KEY has too little entropy (only %d unique characters). "
-            "Generate a random one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\"" % unique_chars
+            'Generate a random one with: python -c "import secrets; print(secrets.token_urlsafe(32))"' % unique_chars
         )
     return key
 
+
 def get_base_url() -> str:
     return os.environ.get("BASE_URL", "http://localhost:8000")
+
 
 def get_allowed_spotify_user() -> str:
     """Spotify user ID whitelist. Empty string means no restriction."""
@@ -91,6 +103,7 @@ def get_allowed_spotify_user() -> str:
 
 
 # ── Settings (from SQLite) ───────────────────────────────────────
+
 
 async def load_settings() -> dict:
     """Load all settings, merging DB values with defaults."""

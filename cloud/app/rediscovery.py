@@ -5,15 +5,15 @@ and creates a new playlist with tracks not listened to recently.
 
 import asyncio
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
-from app.lastfm_api import get_last_play_date, LASTFM_ERROR
+from app.lastfm_api import LASTFM_ERROR, get_last_play_date
 
 logger = logging.getLogger(__name__)
 
-LASTFM_DELAY = 0.25          # seconds between Last.fm calls (~4 req/s)
-LASTFM_ERROR_DELAY = 5.0     # seconds to wait after a Last.fm error
-LASTFM_MAX_RETRIES = 2       # retries per track on transient errors
+LASTFM_DELAY = 0.25  # seconds between Last.fm calls (~4 req/s)
+LASTFM_ERROR_DELAY = 5.0  # seconds to wait after a Last.fm error
+LASTFM_MAX_RETRIES = 2  # retries per track on transient errors
 REDISCOVERY_THRESHOLD_DAYS = 60
 
 
@@ -94,18 +94,19 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str):
                 qualifying.append({"artist": artist, "name": name, "uri": uri, "last_played": None})
             elif result < threshold:
                 # Last scrobble older than threshold — qualifies
-                qualifying.append({
-                    "artist": artist,
-                    "name": name,
-                    "uri": uri,
-                    "last_played": result.isoformat(),
-                })
+                qualifying.append(
+                    {
+                        "artist": artist,
+                        "name": name,
+                        "uri": uri,
+                        "last_played": result.isoformat(),
+                    }
+                )
 
             # Update progress every track
             app_state.rediscovery_progress["current"] = i + 1
             app_state.rediscovery_progress["message"] = (
-                f"Checking Last.fm... {i + 1}/{len(all_tracks)}"
-                f" | Found: {len(qualifying)}"
+                f"Checking Last.fm... {i + 1}/{len(all_tracks)} | Found: {len(qualifying)}"
             )
 
             # Throttle
@@ -113,7 +114,8 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str):
 
         logger.info(
             "[Rediscovery] Phase 2 done: %d qualifying, %d skipped (errors)",
-            len(qualifying), skipped_errors,
+            len(qualifying),
+            skipped_errors,
         )
 
         app_state.rediscovery_results = qualifying
@@ -160,10 +162,9 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str):
             "current": len(qualifying),
             "total": len(all_tracks),
             "message": (
-                f"Done! {len(qualifying)} tracks added to '{playlist_name}'."
-                f" ({skipped_errors} skipped due to errors)"
-                if skipped_errors else
-                f"Done! {len(qualifying)} tracks added to '{playlist_name}'."
+                f"Done! {len(qualifying)} tracks added to '{playlist_name}'. ({skipped_errors} skipped due to errors)"
+                if skipped_errors
+                else f"Done! {len(qualifying)} tracks added to '{playlist_name}'."
             ),
         }
         logger.info("[Rediscovery] Complete. Playlist URL: %s", new_playlist["url"])
