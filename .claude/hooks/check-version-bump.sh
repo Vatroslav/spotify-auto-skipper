@@ -6,7 +6,7 @@ CMD=$(python -c "import sys,json; print(json.load(sys.stdin)['tool_input']['comm
 
 # ── Check 1: Block VPS deploys without version bump ──────────────
 # Catch ANY ssh/tar command targeting the VPS that rebuilds docker
-if echo "$CMD" | grep -qE '(46\.225\.170\.120|autoskipper\.duckdns\.org).*docker compose|tar.*ssh.*(46\.225\.170\.120|autoskipper\.duckdns\.org)'; then
+if echo "$CMD" | grep -qE 'docker compose up.*--build|tar.*ssh.*docker'; then
     # Check if cloud/ files have been modified (staged or unstaged) since last commit
     CLOUD_CHANGES=$(git diff --name-only HEAD -- cloud/ 2>/dev/null; git diff --cached --name-only -- cloud/ 2>/dev/null)
     # Also check untracked cloud files

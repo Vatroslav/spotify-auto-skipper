@@ -5,14 +5,22 @@ description: Deploy the Spotify Auto-Skipper app to the VPS. Use this skill when
 
 # Deploy to VPS
 
-This skill deploys the Spotify Auto-Skipper to the Hetzner VPS at REDACTED_HOST. Follow these steps exactly — do not improvise or try alternative paths.
+This skill deploys the Spotify Auto-Skipper to the VPS. Follow these steps exactly — do not improvise or try alternative paths.
+
+## Environment Variables
+
+Before deploying, read these from the user's global CLAUDE.md or memory. The skill uses these placeholders:
+- `$DEPLOY_USER` — SSH user
+- `$DEPLOY_HOST` — VPS hostname
+- `$DEPLOY_REPO` — git repo path on VPS
+- `$DEPLOY_APP` — app/Docker context path on VPS
 
 ## Server Layout
 
-- **Git repo on VPS:** `REDACTED_PATH` (full repo clone)
-- **Symlink:** `REDACTED_PATH` → `REDACTED_PATH/cloud`
-- **Docker context:** `REDACTED_PATH` (which is `cloud/`)
-- **Environment:** `REDACTED_PATH/.env`
+- **Git repo on VPS:** `$DEPLOY_REPO` (full repo clone)
+- **Symlink:** `$DEPLOY_APP` → `$DEPLOY_REPO/cloud`
+- **Docker context:** `$DEPLOY_APP` (which is `cloud/`)
+- **Environment:** `$DEPLOY_APP/.env`
 - **Database:** Docker volume `skipper_skipper_data` (not a filesystem folder)
 - **Container:** `skipper-skipper-1`
 
@@ -45,7 +53,7 @@ git push origin $(git branch --show-current)
 Run this single SSH command (do NOT cd into subdirectories separately or try other paths):
 
 ```bash
-ssh REDACTED_SSH "cd REDACTED_PATH && git fetch --all && git checkout <BRANCH> && git pull && cd cloud && docker compose up -d --build"
+ssh $DEPLOY_USER@$DEPLOY_HOST "cd $DEPLOY_REPO && git fetch --all && git checkout <BRANCH> && git pull && cd cloud && docker compose up -d --build"
 ```
 
 Replace `<BRANCH>` with the current branch name. Use a 120-second timeout for this command since Docker builds can take a while.
@@ -55,7 +63,7 @@ Replace `<BRANCH>` with the current branch name. Use a 120-second timeout for th
 Wait 5 seconds for the container to start, then:
 
 ```bash
-ssh REDACTED_SSH "curl -s http://localhost:8000/health"
+ssh $DEPLOY_USER@$DEPLOY_HOST "curl -s http://localhost:8000/health"
 ```
 
 Verify the response contains:
@@ -74,7 +82,7 @@ Tell the user:
 
 If the SSH command fails with "not a git repository", the symlink or repo may be broken. Check:
 ```bash
-ssh REDACTED_SSH "ls -la REDACTED_PATH && ls -la REDACTED_PATH/.git"
+ssh $DEPLOY_USER@$DEPLOY_HOST "ls -la $DEPLOY_APP && ls -la $DEPLOY_REPO/.git"
 ```
 
 If the deploy hook blocks the build with "already deployed", the version suffix needs to be incremented in `cloud/app/__init__.py` before retrying.

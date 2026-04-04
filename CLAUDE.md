@@ -20,16 +20,9 @@ docker compose up -d --build
 
 # View logs
 docker compose logs -f
-
-# SSH deploy to VPS
-ssh REDACTED_SSH "cd REDACTED_PATH/cloud && git pull && docker compose up -d --build"
 ```
 
-No tests or linting are configured.
-
-**Server details:**
-- Docker container name: `skipper-skipper-1`
-- SQLite database path (inside container): `/app/data/skipper.db`
+No tests or linting are configured. For deployment, use the `/deploy` skill which reads connection details from the user's private config.
 
 ## Versioning
 
@@ -41,7 +34,7 @@ No tests or linting are configured.
 
 ## Architecture
 
-Self-hosted web app that auto-skips Spotify tracks based on Last.fm listening history. Deployed with Docker + Caddy on a Hetzner VPS at `REDACTED_HOST`.
+Self-hosted web app that auto-skips Spotify tracks based on Last.fm listening history. Deployed with Docker + Caddy on a VPS.
 
 **Stack:** Python/FastAPI backend, Jinja2 templates, vanilla JS frontend, SQLite database, Docker deployment with Caddy reverse proxy for automatic HTTPS.
 
