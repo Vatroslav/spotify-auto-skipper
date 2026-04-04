@@ -1,0 +1,48 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/check-version-bump.sh",
+            "statusMessage": "Checking version bump..."
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/check-delete-transaction.sh",
+            "statusMessage": "Checking DELETE safety..."
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__Claude_Preview__preview_start",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import sys,json; data=json.load(sys.stdin); name=data.get('tool_input',{}).get('name',''); print(json.dumps({'decision':'block','reason':'[Cloud Server Blocked] cloud-dev requires production secrets (SECRET_KEY, Spotify OAuth) and cannot run locally. Deploy to VPS instead. For import verification: cd cloud && python -c \\\"import app\\\"'})) if name=='cloud-dev' else None\"",
+            "statusMessage": "Checking server..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/scripts/format-on-save.sh",
+            "statusMessage": "Formatting..."
+          }
+        ]
+      }
+    ]
+  }
+}

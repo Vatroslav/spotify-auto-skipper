@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "cloud-dev",
+      "runtimeExecutable": "uvicorn",
+      "runtimeArgs": ["app.main:app", "--reload", "--host", "127.0.0.1"],
+      "port": 8000,
+      "cwd": "cloud"
+    }
+  ]
+}
