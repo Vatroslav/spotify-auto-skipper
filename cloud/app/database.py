@@ -174,6 +174,23 @@ async def init_db():
             "ON track_aliases(track_id) WHERE track_id IS NOT NULL"
         )
 
+        # Back-fill dismissals for tracks that already have an alias. The
+        # v3.6.0 migration dropped the old dismissals table; this restores
+        # the "aliasing auto-dismisses" effect for existing aliases. Safe to
+        # re-run thanks to INSERT OR IGNORE — won't overwrite real dismissals.
+        await db.execute(
+            """
+            INSERT OR IGNORE INTO mapping_fail_dismissals (track_id, dismissed_at)
+            SELECT DISTINCT te.track_id, CURRENT_TIMESTAMP
+            FROM track_events te
+            JOIN track_aliases a
+                ON (a.track_id = te.track_id)
+                OR (a.track_id IS NULL
+                    AND a.artist = te.artist_name
+                    AND a.spotify_name = te.track_name)
+            """
+        )
+
         await db.commit()
     finally:
         await db.close()
@@ -947,13 +964,6 @@ async def get_mapping_fail_candidates(skip_window_days: int) -> list[dict]:
                   WHERE te.track_id = grouped.track_id
                     AND te.timestamp >= datetime('now', ?)
                     AND te.outcome IN ('skipped', 'liked', 'never_skip', 'skip_paused')
-              )
-              AND NOT EXISTS (
-                  SELECT 1 FROM track_aliases a
-                  WHERE a.track_id = grouped.track_id
-                     OR (a.track_id IS NULL
-                         AND a.artist = grouped.artist_name
-                         AND a.spotify_name = grouped.track_name)
               )
             ORDER BY total_count DESC, last_seen DESC
             """,
