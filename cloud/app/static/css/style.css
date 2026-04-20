@@ -465,6 +465,19 @@ input:focus, select:focus {
     font-size: 0.75rem;
 }
 
+.mapping-fail-meta.editing .mapping-fail-info {
+    display: none;
+}
+
+.mapping-fail-meta.editing .mapping-fail-actions {
+    flex: 1;
+}
+
+.mapping-fail-meta.editing .mapping-fail-alias-input {
+    flex: 1;
+    min-width: 0;
+}
+
 /* ── Insights ────────────────────────────────────── */
 
 .insight-item {

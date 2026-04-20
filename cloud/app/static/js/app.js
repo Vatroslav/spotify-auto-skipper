@@ -588,6 +588,7 @@ function initInsights() {
             };
 
             const renderDefaultActions = (actions, artist, track) => {
+                actions.closest(".mapping-fail-meta").classList.remove("editing");
                 actions.innerHTML = `
                     <button class="btn btn-sm mapping-fail-alias">Add alias</button>
                     <button class="btn btn-sm mapping-fail-dismiss">Dismiss</button>
@@ -609,6 +610,7 @@ function initInsights() {
             };
 
             const startAliasEdit = (actions, artist, spotifyName) => {
+                actions.closest(".mapping-fail-meta").classList.add("editing");
                 actions.innerHTML = `
                     <input class="mapping-fail-alias-input" type="text" value="${escapeHtml(spotifyName)}">
                     <button class="btn btn-sm mapping-fail-alias-save">Save</button>
@@ -666,8 +668,8 @@ function initInsights() {
                     <div class="mapping-fail-row" data-artist="${escapeHtml(c.artist_name)}" data-track="${escapeHtml(c.track_name)}">
                         <div class="mapping-fail-title">${escapeHtml(c.track_name)} — ${escapeHtml(c.artist_name)}</div>
                         <div class="mapping-fail-meta">
-                            <span class="text-muted">${lastSeen}</span>
-                            <span class="text-muted">${c.total_count}x (${breakdown.join(", ")})</span>
+                            <span class="text-muted mapping-fail-info">${lastSeen}</span>
+                            <span class="text-muted mapping-fail-info">${c.total_count}x (${breakdown.join(", ")})</span>
                             <div class="mapping-fail-actions"></div>
                         </div>
                     </div>
