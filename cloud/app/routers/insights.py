@@ -62,20 +62,20 @@ async def get_mapping_fails(request: Request):
 
 
 class DismissRequest(BaseModel):
-    artist: str
-    track: str
+    track_id: str
 
 
 @router.post("/mapping-fails/dismiss")
 async def dismiss_mapping_fail_route(payload: DismissRequest):
     """Dismiss a mapping-fail candidate until new qualifying events occur."""
-    if not payload.artist or not payload.track:
-        raise HTTPException(status_code=400, detail="artist and track are required")
-    await dismiss_mapping_fail(payload.artist, payload.track)
+    if not payload.track_id:
+        raise HTTPException(status_code=400, detail="track_id is required")
+    await dismiss_mapping_fail(payload.track_id)
     return {"ok": True}
 
 
 class AliasRequest(BaseModel):
+    track_id: str
     artist: str
     spotify_name: str
     lastfm_name: str
@@ -83,13 +83,14 @@ class AliasRequest(BaseModel):
 
 @router.post("/track-aliases")
 async def add_track_alias_route(payload: AliasRequest):
-    """Upsert a Spotify-to-Last.fm track name mapping."""
+    """Upsert a Spotify-to-Last.fm track name mapping, keyed by track_id."""
+    track_id = payload.track_id.strip()
     artist = payload.artist.strip()
     spotify_name = payload.spotify_name.strip()
     lastfm_name = payload.lastfm_name.strip()
-    if not artist or not spotify_name or not lastfm_name:
-        raise HTTPException(status_code=400, detail="artist, spotify_name, and lastfm_name are required")
-    await add_track_alias(artist, spotify_name, lastfm_name)
+    if not track_id or not artist or not spotify_name or not lastfm_name:
+        raise HTTPException(status_code=400, detail="track_id, artist, spotify_name, and lastfm_name are required")
+    await add_track_alias(track_id, artist, spotify_name, lastfm_name)
     return {"ok": True}
 
 

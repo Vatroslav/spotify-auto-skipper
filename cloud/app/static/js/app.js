@@ -587,21 +587,21 @@ function initInsights() {
                 return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
             };
 
-            const renderDefaultActions = (actions, artist, track) => {
+            const renderDefaultActions = (actions, ctx) => {
                 actions.closest(".mapping-fail-meta").classList.remove("editing");
                 actions.innerHTML = `
                     <button class="btn btn-sm mapping-fail-alias">Add alias</button>
                     <button class="btn btn-sm mapping-fail-dismiss">Dismiss</button>
                 `;
-                actions.querySelector(".mapping-fail-alias").addEventListener("click", () => startAliasEdit(actions, artist, track));
-                actions.querySelector(".mapping-fail-dismiss").addEventListener("click", () => doDismiss(actions, artist, track));
+                actions.querySelector(".mapping-fail-alias").addEventListener("click", () => startAliasEdit(actions, ctx));
+                actions.querySelector(".mapping-fail-dismiss").addEventListener("click", () => doDismiss(actions, ctx));
             };
 
-            const doDismiss = async (actions, artist, track) => {
+            const doDismiss = async (actions, ctx) => {
                 actions.querySelectorAll("button").forEach(b => b.disabled = true);
                 try {
-                    await API.post("/api/insights/mapping-fails/dismiss", { artist, track });
-                    showToast(`Dismissed "${track}"`);
+                    await API.post("/api/insights/mapping-fails/dismiss", { track_id: ctx.trackId });
+                    showToast(`Dismissed "${ctx.trackName}"`);
                     loadMappingFails();
                 } catch (e) {
                     actions.querySelectorAll("button").forEach(b => b.disabled = false);
@@ -609,10 +609,10 @@ function initInsights() {
                 }
             };
 
-            const startAliasEdit = (actions, artist, spotifyName) => {
+            const startAliasEdit = (actions, ctx) => {
                 actions.closest(".mapping-fail-meta").classList.add("editing");
                 actions.innerHTML = `
-                    <input class="mapping-fail-alias-input" type="text" value="${escapeHtml(spotifyName)}">
+                    <input class="mapping-fail-alias-input" type="text" value="${escapeHtml(ctx.trackName)}">
                     <button class="btn btn-sm mapping-fail-alias-save">Save</button>
                     <button class="btn btn-sm mapping-fail-alias-cancel">Cancel</button>
                 `;
@@ -631,15 +631,15 @@ function initInsights() {
                     cancelBtn.disabled = true;
                     try {
                         await API.post("/api/insights/track-aliases", {
-                            artist,
-                            spotify_name: spotifyName,
+                            track_id: ctx.trackId,
+                            artist: ctx.artist,
+                            spotify_name: ctx.trackName,
                             lastfm_name: trimmed,
                         });
                         await API.post("/api/insights/mapping-fails/dismiss", {
-                            artist,
-                            track: spotifyName,
+                            track_id: ctx.trackId,
                         });
-                        showToast(`Alias saved: "${spotifyName}" → "${trimmed}"`);
+                        showToast(`Alias saved: "${ctx.trackName}" → "${trimmed}"`);
                         loadMappingFails();
                     } catch (e) {
                         input.disabled = false;
@@ -649,7 +649,7 @@ function initInsights() {
                     }
                 };
 
-                const cancel = () => renderDefaultActions(actions, artist, spotifyName);
+                const cancel = () => renderDefaultActions(actions, ctx);
 
                 saveBtn.addEventListener("click", save);
                 cancelBtn.addEventListener("click", cancel);
@@ -659,14 +659,15 @@ function initInsights() {
                 });
             };
 
-            container.innerHTML = candidates.map(c => {
+            container.innerHTML = candidates.map((c, i) => {
                 const breakdown = [];
                 if (c.no_scrobble_count > 0) breakdown.push(`${c.no_scrobble_count} no-scrobble`);
                 if (c.played_count > 0) breakdown.push(`${c.played_count} stale scrobble`);
                 const lastSeen = fmtLastSeen(c.last_seen);
+                const albumSuffix = c.album_name ? ` <span class="mapping-fail-album text-muted">(${escapeHtml(c.album_name)})</span>` : "";
                 return `
-                    <div class="mapping-fail-row" data-artist="${escapeHtml(c.artist_name)}" data-track="${escapeHtml(c.track_name)}">
-                        <div class="mapping-fail-title">${escapeHtml(c.track_name)} — ${escapeHtml(c.artist_name)}</div>
+                    <div class="mapping-fail-row" data-idx="${i}">
+                        <div class="mapping-fail-title">${escapeHtml(c.track_name)} — ${escapeHtml(c.artist_name)}${albumSuffix}</div>
                         <div class="mapping-fail-meta">
                             <span class="text-muted mapping-fail-info">${lastSeen}</span>
                             <span class="text-muted mapping-fail-info">${c.total_count}x (${breakdown.join(", ")})</span>
@@ -677,8 +678,14 @@ function initInsights() {
             }).join("");
 
             container.querySelectorAll(".mapping-fail-row").forEach(row => {
+                const c = candidates[parseInt(row.dataset.idx, 10)];
+                const ctx = {
+                    trackId: c.track_id,
+                    trackName: c.track_name,
+                    artist: c.artist_name,
+                };
                 const actions = row.querySelector(".mapping-fail-actions");
-                renderDefaultActions(actions, row.dataset.artist, row.dataset.track);
+                renderDefaultActions(actions, ctx);
             });
         } catch (e) {
             container.innerHTML = `<p class="text-muted text-center">Failed to load: ${escapeHtml(e.message)}</p>`;

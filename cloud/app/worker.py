@@ -136,7 +136,7 @@ async def polling_loop():
             # Get latest scrobble date from Last.fm (retry up to 3 times)
             last_played = None
             for attempt in range(3):
-                last_played = await get_last_play_date(track["artist"], track["name"])
+                last_played = await get_last_play_date(track["artist"], track["name"], track["id"])
                 if last_played is not LASTFM_ERROR:
                     break
                 if attempt < 2:
@@ -167,7 +167,7 @@ async def polling_loop():
                             track["artist"],
                             "skip_paused",
                             days_since,
-                            track.get("context_uri"),
+                            track.get("context_uri"), album_name=track.get("album"),
                         )
                     # Check never-skip list
                     elif settings["enable_never_skip_artists"] and await is_artist_never_skipped(
@@ -180,7 +180,7 @@ async def polling_loop():
                             track["artist"],
                             "never_skip",
                             days_since,
-                            track.get("context_uri"),
+                            track.get("context_uri"), album_name=track.get("album"),
                         )
                     # Check liked songs
                     elif settings["always_play_liked_songs"] and await client.is_track_liked(track["id"]):
@@ -191,7 +191,7 @@ async def polling_loop():
                             track["artist"],
                             "liked",
                             days_since,
-                            track.get("context_uri"),
+                            track.get("context_uri"), album_name=track.get("album"),
                         )
                     else:
                         # Re-check pause flag right before skipping (user may have
@@ -204,7 +204,7 @@ async def polling_loop():
                                 track["artist"],
                                 "skip_paused",
                                 days_since,
-                                track.get("context_uri"),
+                                track.get("context_uri"), album_name=track.get("album"),
                             )
                             await app_state.interruptible_sleep(poll_interval)
                             continue
@@ -222,7 +222,7 @@ async def polling_loop():
                             track["artist"],
                             "skipped",
                             days_since,
-                            track.get("context_uri"),
+                            track.get("context_uri"), album_name=track.get("album"),
                         )
 
                         # Track skip patterns for restart detection
@@ -255,7 +255,7 @@ async def polling_loop():
                         track["artist"],
                         "played",
                         days_since,
-                        track.get("context_uri"),
+                        track.get("context_uri"), album_name=track.get("album"),
                     )
             else:
                 await _log("No scrobble for this song \u2014 not skipping.")
@@ -266,7 +266,7 @@ async def polling_loop():
                     track["artist"],
                     "no_scrobble",
                     None,
-                    track.get("context_uri"),
+                    track.get("context_uri"), album_name=track.get("album"),
                 )
 
         except CredentialError as e:

@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS track_events (
     track_id    TEXT NOT NULL,
     track_name  TEXT NOT NULL,
     artist_name TEXT NOT NULL,
+    album_name  TEXT,
     outcome     TEXT NOT NULL,
     days_ago    INTEGER,
     context_uri TEXT
@@ -54,11 +55,12 @@ CREATE TABLE IF NOT EXISTS oauth_tokens (
 
 CREATE TABLE IF NOT EXISTS track_aliases (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    track_id     TEXT,
     artist       TEXT NOT NULL,
     spotify_name TEXT NOT NULL,
-    lastfm_name  TEXT NOT NULL,
-    UNIQUE(artist, spotify_name)
+    lastfm_name  TEXT NOT NULL
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_track_aliases_track_id ON track_aliases(track_id) WHERE track_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS overall_metrics (
     id              INTEGER PRIMARY KEY CHECK (id = 1),
@@ -93,10 +95,8 @@ CREATE TABLE IF NOT EXISTS overall_metrics (
 );
 
 CREATE TABLE IF NOT EXISTS mapping_fail_dismissals (
-    artist_name  TEXT NOT NULL,
-    track_name   TEXT NOT NULL,
-    dismissed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (artist_name, track_name)
+    track_id     TEXT PRIMARY KEY,
+    dismissed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_track_events_timestamp ON track_events(timestamp);
@@ -120,11 +120,55 @@ async def init_db():
     db = await get_db()
     try:
         await db.executescript(_CREATE_TABLES)
+
         # Migrate: add image_url column if missing
         cursor = await db.execute("PRAGMA table_info(never_skip_artists)")
         columns = {row[1] for row in await cursor.fetchall()}
         if "image_url" not in columns:
             await db.execute("ALTER TABLE never_skip_artists ADD COLUMN image_url TEXT DEFAULT ''")
+
+        # Migrate: add album_name to track_events
+        cursor = await db.execute("PRAGMA table_info(track_events)")
+        columns = {row[1] for row in await cursor.fetchall()}
+        if "album_name" not in columns:
+            await db.execute("ALTER TABLE track_events ADD COLUMN album_name TEXT")
+
+        # Migrate: add track_id to track_aliases and drop old UNIQUE(artist, spotify_name)
+        cursor = await db.execute("PRAGMA table_info(track_aliases)")
+        columns = {row[1] for row in await cursor.fetchall()}
+        if "track_id" not in columns:
+            await db.executescript(
+                """
+                CREATE TABLE track_aliases_new (
+                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    track_id     TEXT,
+                    artist       TEXT NOT NULL,
+                    spotify_name TEXT NOT NULL,
+                    lastfm_name  TEXT NOT NULL
+                );
+                INSERT INTO track_aliases_new (id, artist, spotify_name, lastfm_name)
+                    SELECT id, artist, spotify_name, lastfm_name FROM track_aliases;
+                DROP TABLE track_aliases;
+                ALTER TABLE track_aliases_new RENAME TO track_aliases;
+                CREATE UNIQUE INDEX idx_track_aliases_track_id
+                    ON track_aliases(track_id) WHERE track_id IS NOT NULL;
+                """
+            )
+
+        # Migrate: mapping_fail_dismissals keyed by track_id instead of (artist, track_name)
+        cursor = await db.execute("PRAGMA table_info(mapping_fail_dismissals)")
+        columns = {row[1] for row in await cursor.fetchall()}
+        if "track_id" not in columns:
+            await db.executescript(
+                """
+                DROP TABLE mapping_fail_dismissals;
+                CREATE TABLE mapping_fail_dismissals (
+                    track_id     TEXT PRIMARY KEY,
+                    dismissed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                """
+            )
+
         await db.commit()
     finally:
         await db.close()
@@ -133,29 +177,50 @@ async def init_db():
 # ── Track Aliases ────────────────────────────────────────────────
 
 
-async def get_track_alias(artist: str, spotify_name: str) -> str | None:
-    """Return the Last.fm name for a track, or None if no alias exists."""
+async def get_track_alias(track_id: str, artist: str = "", spotify_name: str = "") -> str | None:
+    """Return the Last.fm name for a track.
+
+    Primary lookup: by Spotify track_id (unambiguous — each album version of
+    a song has its own id). Falls back to (artist, spotify_name) match on
+    legacy rows that predate track_id (track_id IS NULL in those).
+    """
     db = await get_db()
     try:
-        cursor = await db.execute(
-            "SELECT lastfm_name FROM track_aliases WHERE artist = ? AND spotify_name = ?",
-            (artist, spotify_name),
-        )
-        row = await cursor.fetchone()
-        return row["lastfm_name"] if row else None
+        if track_id:
+            cursor = await db.execute(
+                "SELECT lastfm_name FROM track_aliases WHERE track_id = ?",
+                (track_id,),
+            )
+            row = await cursor.fetchone()
+            if row:
+                return row["lastfm_name"]
+
+        if artist and spotify_name:
+            cursor = await db.execute(
+                "SELECT lastfm_name FROM track_aliases WHERE track_id IS NULL AND artist = ? AND spotify_name = ?",
+                (artist, spotify_name),
+            )
+            row = await cursor.fetchone()
+            if row:
+                return row["lastfm_name"]
+
+        return None
     finally:
         await db.close()
 
 
-async def add_track_alias(artist: str, spotify_name: str, lastfm_name: str):
-    """Upsert a Spotify-to-Last.fm track name mapping."""
+async def add_track_alias(track_id: str, artist: str, spotify_name: str, lastfm_name: str):
+    """Upsert a Spotify-to-Last.fm track name mapping, keyed by track_id."""
     db = await get_db()
     try:
         await db.execute(
-            """INSERT INTO track_aliases (artist, spotify_name, lastfm_name)
-               VALUES (?, ?, ?)
-               ON CONFLICT(artist, spotify_name) DO UPDATE SET lastfm_name = excluded.lastfm_name""",
-            (artist, spotify_name, lastfm_name),
+            """INSERT INTO track_aliases (track_id, artist, spotify_name, lastfm_name)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(track_id) DO UPDATE SET
+                   artist = excluded.artist,
+                   spotify_name = excluded.spotify_name,
+                   lastfm_name = excluded.lastfm_name""",
+            (track_id, artist, spotify_name, lastfm_name),
         )
         await db.commit()
     finally:
@@ -272,13 +337,14 @@ async def add_track_event(
     outcome: str,
     days_ago: int | None = None,
     context_uri: str | None = None,
+    album_name: str | None = None,
 ):
     db = await get_db()
     try:
         await db.execute(
-            """INSERT INTO track_events (track_id, track_name, artist_name, outcome, days_ago, context_uri)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (track_id, track_name, artist_name, outcome, days_ago, context_uri),
+            """INSERT INTO track_events (track_id, track_name, artist_name, album_name, outcome, days_ago, context_uri)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (track_id, track_name, artist_name, album_name, outcome, days_ago, context_uri),
         )
         await db.commit()
     finally:
@@ -833,9 +899,11 @@ async def save_oauth_tokens(access_token: str, refresh_token: str, expires_at: s
 async def get_mapping_fail_candidates(skip_window_days: int) -> list[dict]:
     """Return tracks likely suffering from Last.fm mapping issues.
 
-    A candidate is a (artist, track) pair that appears 2+ times within
-    the skip window where every occurrence has outcome 'played' or
-    'no_scrobble' (never 'skipped', 'liked', 'never_skip', 'skip_paused').
+    A candidate is a Spotify track (identified by track_id) that appears
+    2+ times within the skip window where every occurrence has outcome
+    'played' or 'no_scrobble' (never 'skipped', 'liked', 'never_skip',
+    'skip_paused'). Grouping by track_id lets different album versions
+    of the same-named track be handled independently.
 
     Dismissed entries are filtered: a dismissal hides the track until new
     qualifying events are logged after dismissed_at.
@@ -845,32 +913,33 @@ async def get_mapping_fail_candidates(skip_window_days: int) -> list[dict]:
         cursor = await db.execute(
             """
             WITH recent AS (
-                SELECT artist_name, track_name, outcome, timestamp
+                SELECT track_id, track_name, artist_name, album_name, outcome, timestamp
                 FROM track_events
                 WHERE timestamp >= datetime('now', ?)
             ),
             grouped AS (
                 SELECT
-                    r.artist_name,
+                    r.track_id,
                     r.track_name,
+                    r.artist_name,
+                    MAX(r.album_name) AS album_name,
                     COUNT(*) AS total_count,
                     SUM(r.outcome = 'no_scrobble') AS no_scrobble_count,
                     SUM(r.outcome = 'played') AS played_count,
                     MAX(r.timestamp) AS last_seen
                 FROM recent r
-                LEFT JOIN mapping_fail_dismissals d
-                    ON d.artist_name = r.artist_name AND d.track_name = r.track_name
+                LEFT JOIN mapping_fail_dismissals d ON d.track_id = r.track_id
                 WHERE r.outcome IN ('played', 'no_scrobble')
                   AND (d.dismissed_at IS NULL OR r.timestamp > d.dismissed_at)
-                GROUP BY r.artist_name, r.track_name
+                GROUP BY r.track_id
             )
-            SELECT artist_name, track_name, total_count, no_scrobble_count, played_count, last_seen
+            SELECT track_id, track_name, artist_name, album_name,
+                   total_count, no_scrobble_count, played_count, last_seen
             FROM grouped
             WHERE total_count >= 2
               AND NOT EXISTS (
                   SELECT 1 FROM track_events te
-                  WHERE te.artist_name = grouped.artist_name
-                    AND te.track_name = grouped.track_name
+                  WHERE te.track_id = grouped.track_id
                     AND te.timestamp >= datetime('now', ?)
                     AND te.outcome IN ('skipped', 'liked', 'never_skip', 'skip_paused')
               )
@@ -884,16 +953,16 @@ async def get_mapping_fail_candidates(skip_window_days: int) -> list[dict]:
         await db.close()
 
 
-async def dismiss_mapping_fail(artist_name: str, track_name: str):
-    """Mark a (artist, track) pair as dismissed from the mapping-fails view."""
+async def dismiss_mapping_fail(track_id: str):
+    """Mark a Spotify track as dismissed from the mapping-fails view."""
     db = await get_db()
     try:
         await db.execute(
-            """INSERT INTO mapping_fail_dismissals (artist_name, track_name)
-               VALUES (?, ?)
-               ON CONFLICT(artist_name, track_name)
+            """INSERT INTO mapping_fail_dismissals (track_id)
+               VALUES (?)
+               ON CONFLICT(track_id)
                DO UPDATE SET dismissed_at = CURRENT_TIMESTAMP""",
-            (artist_name, track_name),
+            (track_id,),
         )
         await db.commit()
     finally:

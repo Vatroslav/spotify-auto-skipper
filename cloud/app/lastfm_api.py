@@ -81,7 +81,7 @@ async def _lookup_scrobbles(artist: str, track: str) -> datetime | str | None:
     return None
 
 
-async def get_last_play_date(artist: str, track: str) -> datetime | str | None:
+async def get_last_play_date(artist: str, track: str, track_id: str = "") -> datetime | str | None:
     """
     Returns:
       - datetime: last scrobble timestamp
@@ -91,10 +91,13 @@ async def get_last_play_date(artist: str, track: str) -> datetime | str | None:
     If the track has a user-defined alias in track_aliases, that alias takes
     priority over the original Spotify name (handles cases where Last.fm
     scrobbles the track under a different name than Spotify reports).
+
+    Aliases are keyed primarily by Spotify track_id. If no id-keyed alias
+    exists, falls back to (artist, track) matching for legacy rows.
     """
     from app.database import get_track_alias
 
-    alias = await get_track_alias(artist, track)
+    alias = await get_track_alias(track_id, artist, track)
     if alias:
         logger.info("[Last.fm] Using alias: '%s' → '%s'", track, alias)
         return await _lookup_scrobbles(artist, alias)
