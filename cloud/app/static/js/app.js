@@ -593,17 +593,20 @@ function initInsights() {
                 if (c.played_count > 0) breakdown.push(`${c.played_count} stale scrobble`);
                 const lastSeen = fmtLastSeen(c.last_seen);
                 return `
-                    <div class="detail-row">
-                        <span class="detail-label">${escapeHtml(c.track_name)} — ${escapeHtml(c.artist_name)}</span>
-                        <span class="detail-value">
-                            <span class="text-muted">${c.total_count}x (${breakdown.join(", ")}) · last ${lastSeen}</span>
-                            <button class="btn btn-sm mapping-fail-alias"
-                                data-artist="${escapeHtml(c.artist_name)}"
-                                data-track="${escapeHtml(c.track_name)}">Add alias</button>
-                            <button class="btn btn-sm mapping-fail-dismiss"
-                                data-artist="${escapeHtml(c.artist_name)}"
-                                data-track="${escapeHtml(c.track_name)}">Dismiss</button>
-                        </span>
+                    <div class="mapping-fail-row">
+                        <div class="mapping-fail-title">${escapeHtml(c.track_name)} — ${escapeHtml(c.artist_name)}</div>
+                        <div class="mapping-fail-meta">
+                            <span class="text-muted">${lastSeen}</span>
+                            <span class="text-muted">${c.total_count}x (${breakdown.join(", ")})</span>
+                            <div class="mapping-fail-actions">
+                                <button class="btn btn-sm mapping-fail-alias"
+                                    data-artist="${escapeHtml(c.artist_name)}"
+                                    data-track="${escapeHtml(c.track_name)}">Add alias</button>
+                                <button class="btn btn-sm mapping-fail-dismiss"
+                                    data-artist="${escapeHtml(c.artist_name)}"
+                                    data-track="${escapeHtml(c.track_name)}">Dismiss</button>
+                            </div>
+                        </div>
                     </div>
                 `;
             }).join("");

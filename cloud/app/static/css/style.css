@@ -425,6 +425,38 @@ input:focus, select:focus {
     margin-left: auto;
 }
 
+/* ── Mapping issues rows ──────────────────────────── */
+
+.mapping-fail-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-secondary);
+}
+
+.mapping-fail-row:last-child { border-bottom: none; }
+
+.mapping-fail-title {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+.mapping-fail-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+}
+
+.mapping-fail-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 6px;
+}
+
 /* ── Insights ────────────────────────────────────── */
 
 .insight-item {
