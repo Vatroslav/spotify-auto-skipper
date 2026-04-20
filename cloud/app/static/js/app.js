@@ -580,15 +580,23 @@ function initInsights() {
                 return;
             }
 
+            const fmtLastSeen = (ts) => {
+                if (!ts) return "";
+                const d = new Date(ts.endsWith("Z") ? ts : ts + "Z");
+                const pad = (n) => String(n).padStart(2, "0");
+                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            };
+
             container.innerHTML = candidates.map(c => {
                 const breakdown = [];
                 if (c.no_scrobble_count > 0) breakdown.push(`${c.no_scrobble_count} no-scrobble`);
                 if (c.played_count > 0) breakdown.push(`${c.played_count} stale scrobble`);
+                const lastSeen = fmtLastSeen(c.last_seen);
                 return `
                     <div class="detail-row">
                         <span class="detail-label">${escapeHtml(c.track_name)} — ${escapeHtml(c.artist_name)}</span>
                         <span class="detail-value">
-                            <span class="text-muted">${c.total_count}x (${breakdown.join(", ")})</span>
+                            <span class="text-muted">${c.total_count}x (${breakdown.join(", ")}) · last ${lastSeen}</span>
                             <button class="btn btn-sm mapping-fail-alias"
                                 data-artist="${escapeHtml(c.artist_name)}"
                                 data-track="${escapeHtml(c.track_name)}">Add alias</button>
