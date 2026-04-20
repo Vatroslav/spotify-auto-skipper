@@ -618,10 +618,11 @@ function initInsights() {
                     btn.disabled = true;
                     try {
                         await API.post("/api/insights/mapping-fails/dismiss", { artist, track });
+                        showToast(`Dismissed "${track}"`);
                         loadMappingFails();
                     } catch (e) {
                         btn.disabled = false;
-                        alert(`Dismiss failed: ${e.message}`);
+                        showToast(`Dismiss failed: ${e.message}`, 3000, "error");
                     }
                 });
             });
@@ -644,10 +645,15 @@ function initInsights() {
                             spotify_name: spotifyName,
                             lastfm_name: trimmed,
                         });
+                        await API.post("/api/insights/mapping-fails/dismiss", {
+                            artist,
+                            track: spotifyName,
+                        });
+                        showToast(`Alias saved: "${spotifyName}" → "${trimmed}"`);
                         loadMappingFails();
                     } catch (e) {
                         btn.disabled = false;
-                        alert(`Add alias failed: ${e.message}`);
+                        showToast(`Add alias failed: ${e.message}`, 3000, "error");
                     }
                 });
             });
