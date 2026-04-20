@@ -92,6 +92,13 @@ CREATE TABLE IF NOT EXISTS overall_metrics (
     longest_streak_day_streak INTEGER
 );
 
+CREATE TABLE IF NOT EXISTS mapping_fail_dismissals (
+    artist_name  TEXT NOT NULL,
+    track_name   TEXT NOT NULL,
+    dismissed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (artist_name, track_name)
+);
+
 CREATE INDEX IF NOT EXISTS idx_track_events_timestamp ON track_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
 """
@@ -799,6 +806,79 @@ async def save_oauth_tokens(access_token: str, refresh_token: str, expires_at: s
                VALUES (1, ?, ?, ?)
                ON CONFLICT(id) DO UPDATE SET access_token = ?, refresh_token = ?, expires_at = ?""",
             (enc_access, enc_refresh, expires_at, enc_access, enc_refresh, expires_at),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+# ── Mapping fail candidates ──────────────────────────────────────
+
+
+async def get_mapping_fail_candidates(skip_window_days: int) -> list[dict]:
+    """Return tracks likely suffering from Last.fm mapping issues.
+
+    A candidate is a (artist, track) pair that appears 2+ times within
+    the skip window where every occurrence has outcome 'played' or
+    'no_scrobble' (never 'skipped', 'liked', 'never_skip', 'skip_paused').
+
+    Dismissed entries are filtered: a dismissal hides the track until new
+    qualifying events are logged after dismissed_at.
+    """
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            """
+            WITH recent AS (
+                SELECT artist_name, track_name, outcome, timestamp
+                FROM track_events
+                WHERE timestamp >= datetime('now', ?)
+            ),
+            grouped AS (
+                SELECT
+                    r.artist_name,
+                    r.track_name,
+                    COUNT(*) AS total_count,
+                    SUM(r.outcome = 'no_scrobble') AS no_scrobble_count,
+                    SUM(r.outcome = 'played') AS played_count,
+                    MAX(r.timestamp) AS last_seen
+                FROM recent r
+                LEFT JOIN mapping_fail_dismissals d
+                    ON d.artist_name = r.artist_name AND d.track_name = r.track_name
+                WHERE r.outcome IN ('played', 'no_scrobble')
+                  AND (d.dismissed_at IS NULL OR r.timestamp > d.dismissed_at)
+                GROUP BY r.artist_name, r.track_name
+            )
+            SELECT artist_name, track_name, total_count, no_scrobble_count, played_count, last_seen
+            FROM grouped
+            WHERE total_count >= 2
+              AND NOT EXISTS (
+                  SELECT 1 FROM track_events te
+                  WHERE te.artist_name = grouped.artist_name
+                    AND te.track_name = grouped.track_name
+                    AND te.timestamp >= datetime('now', ?)
+                    AND te.outcome IN ('skipped', 'liked', 'never_skip', 'skip_paused')
+              )
+            ORDER BY total_count DESC, last_seen DESC
+            """,
+            (f"-{skip_window_days} days", f"-{skip_window_days} days"),
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        await db.close()
+
+
+async def dismiss_mapping_fail(artist_name: str, track_name: str):
+    """Mark a (artist, track) pair as dismissed from the mapping-fails view."""
+    db = await get_db()
+    try:
+        await db.execute(
+            """INSERT INTO mapping_fail_dismissals (artist_name, track_name)
+               VALUES (?, ?)
+               ON CONFLICT(artist_name, track_name)
+               DO UPDATE SET dismissed_at = CURRENT_TIMESTAMP""",
+            (artist_name, track_name),
         )
         await db.commit()
     finally:

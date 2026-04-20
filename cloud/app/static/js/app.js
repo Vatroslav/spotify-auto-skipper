@@ -564,8 +564,61 @@ function initInsights() {
         if (currentIdx < dates.length - 1) { currentIdx++; loadDailyInsights(dates[currentIdx]); updateButtons(); }
     });
 
+    // ── Mapping issues ────────────────────────────────────────────
+
+    async function loadMappingFails() {
+        const container = document.getElementById("mapping-fails-list");
+        if (!container) return;
+
+        try {
+            const data = await API.get("/api/insights/mapping-fails");
+            const candidates = data.candidates || [];
+            const windowDays = data.skip_window_days;
+
+            if (candidates.length === 0) {
+                container.innerHTML = `<p class="text-muted text-center">No mapping issues detected in the last ${windowDays} days.</p>`;
+                return;
+            }
+
+            container.innerHTML = candidates.map(c => {
+                const breakdown = [];
+                if (c.no_scrobble_count > 0) breakdown.push(`${c.no_scrobble_count} no-scrobble`);
+                if (c.played_count > 0) breakdown.push(`${c.played_count} stale scrobble`);
+                return `
+                    <div class="detail-row">
+                        <span class="detail-label">${escapeHtml(c.track_name)} — ${escapeHtml(c.artist_name)}</span>
+                        <span class="detail-value">
+                            <span class="text-muted">${c.total_count}x (${breakdown.join(", ")})</span>
+                            <button class="btn btn-sm mapping-fail-dismiss"
+                                data-artist="${escapeHtml(c.artist_name)}"
+                                data-track="${escapeHtml(c.track_name)}">Dismiss</button>
+                        </span>
+                    </div>
+                `;
+            }).join("");
+
+            container.querySelectorAll(".mapping-fail-dismiss").forEach(btn => {
+                btn.addEventListener("click", async () => {
+                    const artist = btn.dataset.artist;
+                    const track = btn.dataset.track;
+                    btn.disabled = true;
+                    try {
+                        await API.post("/api/insights/mapping-fails/dismiss", { artist, track });
+                        loadMappingFails();
+                    } catch (e) {
+                        btn.disabled = false;
+                        alert(`Dismiss failed: ${e.message}`);
+                    }
+                });
+            });
+        } catch (e) {
+            container.innerHTML = `<p class="text-muted text-center">Failed to load: ${escapeHtml(e.message)}</p>`;
+        }
+    }
+
     loadOverall();
     loadDates();
+    loadMappingFails();
 }
 
 

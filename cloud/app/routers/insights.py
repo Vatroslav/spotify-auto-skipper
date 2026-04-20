@@ -3,10 +3,13 @@ Insights API routes.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 
 from app.config import load_settings
 from app.database import (
+    dismiss_mapping_fail,
     get_cached_overall_metrics,
+    get_mapping_fail_candidates,
     get_track_event_dates,
     get_track_events,
     recompute_overall_metrics,
@@ -44,6 +47,31 @@ async def get_overall_insights(request: Request, tz: str = ""):
     insights = generate_insights_all(metrics, settings["skip_window_days"])
 
     return {"metrics": metrics, "insights": insights}
+
+
+@router.get("/mapping-fails")
+async def get_mapping_fails(request: Request):
+    """Return tracks suspected of Last.fm mapping issues."""
+    settings = await load_settings()
+    candidates = await get_mapping_fail_candidates(settings["skip_window_days"])
+    return {
+        "skip_window_days": settings["skip_window_days"],
+        "candidates": candidates,
+    }
+
+
+class DismissRequest(BaseModel):
+    artist: str
+    track: str
+
+
+@router.post("/mapping-fails/dismiss")
+async def dismiss_mapping_fail_route(payload: DismissRequest):
+    """Dismiss a mapping-fail candidate until new qualifying events occur."""
+    if not payload.artist or not payload.track:
+        raise HTTPException(status_code=400, detail="artist and track are required")
+    await dismiss_mapping_fail(payload.artist, payload.track)
+    return {"ok": True}
 
 
 @router.get("")
