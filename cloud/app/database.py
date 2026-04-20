@@ -948,6 +948,13 @@ async def get_mapping_fail_candidates(skip_window_days: int) -> list[dict]:
                     AND te.timestamp >= datetime('now', ?)
                     AND te.outcome IN ('skipped', 'liked', 'never_skip', 'skip_paused')
               )
+              AND NOT EXISTS (
+                  SELECT 1 FROM track_aliases a
+                  WHERE a.track_id = grouped.track_id
+                     OR (a.track_id IS NULL
+                         AND a.artist = grouped.artist_name
+                         AND a.spotify_name = grouped.track_name)
+              )
             ORDER BY total_count DESC, last_seen DESC
             """,
             (f"-{skip_window_days} days", f"-{skip_window_days} days"),
