@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from app.config import load_settings
 from app.database import (
+    add_track_alias,
     dismiss_mapping_fail,
     get_cached_overall_metrics,
     get_mapping_fail_candidates,
@@ -71,6 +72,24 @@ async def dismiss_mapping_fail_route(payload: DismissRequest):
     if not payload.artist or not payload.track:
         raise HTTPException(status_code=400, detail="artist and track are required")
     await dismiss_mapping_fail(payload.artist, payload.track)
+    return {"ok": True}
+
+
+class AliasRequest(BaseModel):
+    artist: str
+    spotify_name: str
+    lastfm_name: str
+
+
+@router.post("/track-aliases")
+async def add_track_alias_route(payload: AliasRequest):
+    """Upsert a Spotify-to-Last.fm track name mapping."""
+    artist = payload.artist.strip()
+    spotify_name = payload.spotify_name.strip()
+    lastfm_name = payload.lastfm_name.strip()
+    if not artist or not spotify_name or not lastfm_name:
+        raise HTTPException(status_code=400, detail="artist, spotify_name, and lastfm_name are required")
+    await add_track_alias(artist, spotify_name, lastfm_name)
     return {"ok": True}
 
 

@@ -147,6 +147,21 @@ async def get_track_alias(artist: str, spotify_name: str) -> str | None:
         await db.close()
 
 
+async def add_track_alias(artist: str, spotify_name: str, lastfm_name: str):
+    """Upsert a Spotify-to-Last.fm track name mapping."""
+    db = await get_db()
+    try:
+        await db.execute(
+            """INSERT INTO track_aliases (artist, spotify_name, lastfm_name)
+               VALUES (?, ?, ?)
+               ON CONFLICT(artist, spotify_name) DO UPDATE SET lastfm_name = excluded.lastfm_name""",
+            (artist, spotify_name, lastfm_name),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
 # ── Settings CRUD ────────────────────────────────────────────────
 
 

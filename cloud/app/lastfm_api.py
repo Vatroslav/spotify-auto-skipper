@@ -88,21 +88,15 @@ async def get_last_play_date(artist: str, track: str) -> datetime | str | None:
       - None: no scrobbles found for this track
       - LASTFM_ERROR: transient/network failure (caller should not treat as "never heard")
 
-    If exact match finds nothing, checks the track_aliases table for
-    a known Last.fm name mapping and retries with that.
+    If the track has a user-defined alias in track_aliases, that alias takes
+    priority over the original Spotify name (handles cases where Last.fm
+    scrobbles the track under a different name than Spotify reports).
     """
     from app.database import get_track_alias
 
-    result = await _lookup_scrobbles(artist, track)
-
-    # If we got a date or an error, return as-is
-    if result is not None:
-        return result
-
-    # No scrobbles — check for a known alias
     alias = await get_track_alias(artist, track)
     if alias:
         logger.info("[Last.fm] Using alias: '%s' → '%s'", track, alias)
         return await _lookup_scrobbles(artist, alias)
 
-    return None
+    return await _lookup_scrobbles(artist, track)

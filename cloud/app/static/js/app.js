@@ -589,6 +589,9 @@ function initInsights() {
                         <span class="detail-label">${escapeHtml(c.track_name)} — ${escapeHtml(c.artist_name)}</span>
                         <span class="detail-value">
                             <span class="text-muted">${c.total_count}x (${breakdown.join(", ")})</span>
+                            <button class="btn btn-sm mapping-fail-alias"
+                                data-artist="${escapeHtml(c.artist_name)}"
+                                data-track="${escapeHtml(c.track_name)}">Add alias</button>
                             <button class="btn btn-sm mapping-fail-dismiss"
                                 data-artist="${escapeHtml(c.artist_name)}"
                                 data-track="${escapeHtml(c.track_name)}">Dismiss</button>
@@ -608,6 +611,32 @@ function initInsights() {
                     } catch (e) {
                         btn.disabled = false;
                         alert(`Dismiss failed: ${e.message}`);
+                    }
+                });
+            });
+
+            container.querySelectorAll(".mapping-fail-alias").forEach(btn => {
+                btn.addEventListener("click", async () => {
+                    const artist = btn.dataset.artist;
+                    const spotifyName = btn.dataset.track;
+                    const lastfmName = prompt(
+                        `Enter the Last.fm track name for:\n"${spotifyName}" by ${artist}`,
+                        spotifyName
+                    );
+                    if (lastfmName === null) return;
+                    const trimmed = lastfmName.trim();
+                    if (!trimmed) return;
+                    btn.disabled = true;
+                    try {
+                        await API.post("/api/insights/track-aliases", {
+                            artist,
+                            spotify_name: spotifyName,
+                            lastfm_name: trimmed,
+                        });
+                        loadMappingFails();
+                    } catch (e) {
+                        btn.disabled = false;
+                        alert(`Add alias failed: ${e.message}`);
                     }
                 });
             });
