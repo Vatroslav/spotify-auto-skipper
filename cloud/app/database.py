@@ -232,13 +232,18 @@ async def get_track_alias(track_id: str, artist: str = "", spotify_name: str = "
 
 
 async def add_track_alias(track_id: str, artist: str, spotify_name: str, lastfm_name: str):
-    """Upsert a Spotify-to-Last.fm track name mapping, keyed by track_id."""
+    """Upsert a Spotify-to-Last.fm track name mapping, keyed by track_id.
+
+    The UNIQUE index on track_id is partial (WHERE track_id IS NOT NULL),
+    so a conflict target matching that same predicate is required for
+    SQLite to recognize it for UPSERT.
+    """
     db = await get_db()
     try:
         await db.execute(
             """INSERT INTO track_aliases (track_id, artist, spotify_name, lastfm_name)
                VALUES (?, ?, ?, ?)
-               ON CONFLICT(track_id) DO UPDATE SET
+               ON CONFLICT(track_id) WHERE track_id IS NOT NULL DO UPDATE SET
                    artist = excluded.artist,
                    spotify_name = excluded.spotify_name,
                    lastfm_name = excluded.lastfm_name""",
