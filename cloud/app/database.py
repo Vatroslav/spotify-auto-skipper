@@ -60,7 +60,6 @@ CREATE TABLE IF NOT EXISTS track_aliases (
     spotify_name TEXT NOT NULL,
     lastfm_name  TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_track_aliases_track_id ON track_aliases(track_id) WHERE track_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS overall_metrics (
     id              INTEGER PRIMARY KEY CHECK (id = 1),
@@ -168,6 +167,12 @@ async def init_db():
                 );
                 """
             )
+
+        # Indexes that depend on columns added above must run after migrations
+        await db.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_track_aliases_track_id "
+            "ON track_aliases(track_id) WHERE track_id IS NOT NULL"
+        )
 
         await db.commit()
     finally:
