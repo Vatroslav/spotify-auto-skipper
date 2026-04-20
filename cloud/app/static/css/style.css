@@ -455,6 +455,14 @@ input:focus, select:focus {
     margin-left: auto;
     display: flex;
     gap: 6px;
+    align-items: center;
+}
+
+.mapping-fail-alias-input {
+    width: auto;
+    min-width: 180px;
+    padding: 4px 8px;
+    font-size: 0.75rem;
 }
 
 /* ── Insights ────────────────────────────────────── */

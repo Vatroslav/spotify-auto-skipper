@@ -587,58 +587,46 @@ function initInsights() {
                 return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
             };
 
-            container.innerHTML = candidates.map(c => {
-                const breakdown = [];
-                if (c.no_scrobble_count > 0) breakdown.push(`${c.no_scrobble_count} no-scrobble`);
-                if (c.played_count > 0) breakdown.push(`${c.played_count} stale scrobble`);
-                const lastSeen = fmtLastSeen(c.last_seen);
-                return `
-                    <div class="mapping-fail-row">
-                        <div class="mapping-fail-title">${escapeHtml(c.track_name)} — ${escapeHtml(c.artist_name)}</div>
-                        <div class="mapping-fail-meta">
-                            <span class="text-muted">${lastSeen}</span>
-                            <span class="text-muted">${c.total_count}x (${breakdown.join(", ")})</span>
-                            <div class="mapping-fail-actions">
-                                <button class="btn btn-sm mapping-fail-alias"
-                                    data-artist="${escapeHtml(c.artist_name)}"
-                                    data-track="${escapeHtml(c.track_name)}">Add alias</button>
-                                <button class="btn btn-sm mapping-fail-dismiss"
-                                    data-artist="${escapeHtml(c.artist_name)}"
-                                    data-track="${escapeHtml(c.track_name)}">Dismiss</button>
-                            </div>
-                        </div>
-                    </div>
+            const renderDefaultActions = (actions, artist, track) => {
+                actions.innerHTML = `
+                    <button class="btn btn-sm mapping-fail-alias">Add alias</button>
+                    <button class="btn btn-sm mapping-fail-dismiss">Dismiss</button>
                 `;
-            }).join("");
+                actions.querySelector(".mapping-fail-alias").addEventListener("click", () => startAliasEdit(actions, artist, track));
+                actions.querySelector(".mapping-fail-dismiss").addEventListener("click", () => doDismiss(actions, artist, track));
+            };
 
-            container.querySelectorAll(".mapping-fail-dismiss").forEach(btn => {
-                btn.addEventListener("click", async () => {
-                    const artist = btn.dataset.artist;
-                    const track = btn.dataset.track;
-                    btn.disabled = true;
-                    try {
-                        await API.post("/api/insights/mapping-fails/dismiss", { artist, track });
-                        showToast(`Dismissed "${track}"`);
-                        loadMappingFails();
-                    } catch (e) {
-                        btn.disabled = false;
-                        showToast(`Dismiss failed: ${e.message}`, 3000, "error");
-                    }
-                });
-            });
+            const doDismiss = async (actions, artist, track) => {
+                actions.querySelectorAll("button").forEach(b => b.disabled = true);
+                try {
+                    await API.post("/api/insights/mapping-fails/dismiss", { artist, track });
+                    showToast(`Dismissed "${track}"`);
+                    loadMappingFails();
+                } catch (e) {
+                    actions.querySelectorAll("button").forEach(b => b.disabled = false);
+                    showToast(`Dismiss failed: ${e.message}`, 3000, "error");
+                }
+            };
 
-            container.querySelectorAll(".mapping-fail-alias").forEach(btn => {
-                btn.addEventListener("click", async () => {
-                    const artist = btn.dataset.artist;
-                    const spotifyName = btn.dataset.track;
-                    const lastfmName = prompt(
-                        `Enter the Last.fm track name for:\n"${spotifyName}" by ${artist}`,
-                        spotifyName
-                    );
-                    if (lastfmName === null) return;
-                    const trimmed = lastfmName.trim();
-                    if (!trimmed) return;
-                    btn.disabled = true;
+            const startAliasEdit = (actions, artist, spotifyName) => {
+                actions.innerHTML = `
+                    <input class="mapping-fail-alias-input" type="text" value="${escapeHtml(spotifyName)}">
+                    <button class="btn btn-sm mapping-fail-alias-save">Save</button>
+                    <button class="btn btn-sm mapping-fail-alias-cancel">Cancel</button>
+                `;
+                const input = actions.querySelector(".mapping-fail-alias-input");
+                const saveBtn = actions.querySelector(".mapping-fail-alias-save");
+                const cancelBtn = actions.querySelector(".mapping-fail-alias-cancel");
+
+                input.focus();
+                input.select();
+
+                const save = async () => {
+                    const trimmed = input.value.trim();
+                    if (!trimmed) { input.focus(); return; }
+                    input.disabled = true;
+                    saveBtn.disabled = true;
+                    cancelBtn.disabled = true;
                     try {
                         await API.post("/api/insights/track-aliases", {
                             artist,
@@ -652,10 +640,43 @@ function initInsights() {
                         showToast(`Alias saved: "${spotifyName}" → "${trimmed}"`);
                         loadMappingFails();
                     } catch (e) {
-                        btn.disabled = false;
+                        input.disabled = false;
+                        saveBtn.disabled = false;
+                        cancelBtn.disabled = false;
                         showToast(`Add alias failed: ${e.message}`, 3000, "error");
                     }
+                };
+
+                const cancel = () => renderDefaultActions(actions, artist, spotifyName);
+
+                saveBtn.addEventListener("click", save);
+                cancelBtn.addEventListener("click", cancel);
+                input.addEventListener("keydown", (e) => {
+                    if (e.key === "Enter") { e.preventDefault(); save(); }
+                    else if (e.key === "Escape") { e.preventDefault(); cancel(); }
                 });
+            };
+
+            container.innerHTML = candidates.map(c => {
+                const breakdown = [];
+                if (c.no_scrobble_count > 0) breakdown.push(`${c.no_scrobble_count} no-scrobble`);
+                if (c.played_count > 0) breakdown.push(`${c.played_count} stale scrobble`);
+                const lastSeen = fmtLastSeen(c.last_seen);
+                return `
+                    <div class="mapping-fail-row" data-artist="${escapeHtml(c.artist_name)}" data-track="${escapeHtml(c.track_name)}">
+                        <div class="mapping-fail-title">${escapeHtml(c.track_name)} — ${escapeHtml(c.artist_name)}</div>
+                        <div class="mapping-fail-meta">
+                            <span class="text-muted">${lastSeen}</span>
+                            <span class="text-muted">${c.total_count}x (${breakdown.join(", ")})</span>
+                            <div class="mapping-fail-actions"></div>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+
+            container.querySelectorAll(".mapping-fail-row").forEach(row => {
+                const actions = row.querySelector(".mapping-fail-actions");
+                renderDefaultActions(actions, row.dataset.artist, row.dataset.track);
             });
         } catch (e) {
             container.innerHTML = `<p class="text-muted text-center">Failed to load: ${escapeHtml(e.message)}</p>`;
