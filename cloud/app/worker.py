@@ -244,7 +244,7 @@ async def polling_loop():
                                 await client.restart_playlist(settings["dummy_playlist_id"])
                                 recent_skip_days.clear()
 
-                        await asyncio.sleep(3)
+                        await asyncio.sleep(1)
                         await _log("Checking the next song right away...")
                         continue
                 else:
