@@ -796,6 +796,69 @@ input:focus, select:focus {
     min-width: 0;
 }
 
+/* ── Loved Sync ──────────────────────────────────── */
+
+.sync-status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.sync-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 16px;
+    font-size: 0.85rem;
+}
+
+.sync-list {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.sync-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-secondary);
+}
+
+.sync-row:last-child { border-bottom: none; }
+
+.sync-row-info {
+    min-width: 0;
+    flex: 1;
+}
+
+.sync-row-artist {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sync-row-track {
+    font-size: 0.95rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sync-row-alias {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.sync-row-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
 /* ── Settings Grid ──────────────────────────────── */
 
 .settings-grid {

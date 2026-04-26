@@ -76,6 +76,10 @@ def get_lastfm_api_key() -> str:
     return os.environ.get("LASTFM_API_KEY", "")
 
 
+def get_lastfm_api_secret() -> str:
+    return os.environ.get("LASTFM_API_SECRET", "")
+
+
 def get_secret_key() -> str:
     key = os.environ.get("SECRET_KEY", "")
     if not key or len(key) < 32:

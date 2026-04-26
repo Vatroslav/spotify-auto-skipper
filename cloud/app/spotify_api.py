@@ -247,6 +247,39 @@ class SpotifyClient:
         await self._put("https://api.spotify.com/v1/me/player/play", json={"context_uri": context_uri})
         return True
 
+    async def get_all_saved_tracks(self) -> list[dict]:
+        """Return all of the user's Liked Songs (paginates automatically).
+
+        Each entry: {id, name, artist, added_at}.
+        """
+        results: list[dict] = []
+        offset = 0
+        while True:
+            r = await self._get(
+                "https://api.spotify.com/v1/me/tracks",
+                params={"limit": 50, "offset": offset},
+            )
+            if r is None or r.status_code != 200:
+                break
+            data = r.json() or {}
+            for entry in data.get("items") or []:
+                track = entry.get("track") or {}
+                if not track or not track.get("id"):
+                    continue
+                artists = track.get("artists") or []
+                results.append(
+                    {
+                        "id": track["id"],
+                        "name": track.get("name", ""),
+                        "artist": artists[0]["name"] if artists else "Unknown",
+                        "added_at": entry.get("added_at", ""),
+                    }
+                )
+            if not data.get("next"):
+                break
+            offset += 50
+        return results
+
     async def is_track_liked(self, track_id: str) -> bool:
         r = await self._get("https://api.spotify.com/v1/me/tracks/contains", params={"ids": track_id})
         if r is None or r.status_code != 200:
