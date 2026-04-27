@@ -108,6 +108,15 @@
             const actions = document.createElement('div');
             actions.className = 'sync-row-actions';
 
+            const hasCandidates = (track.candidates || []).length > 0;
+            if (hasCandidates) {
+                const matchBtn = document.createElement('button');
+                matchBtn.className = 'btn btn-sm';
+                matchBtn.textContent = 'Match';
+                matchBtn.addEventListener('click', () => toggleCandidates(row, track, matchBtn));
+                actions.appendChild(matchBtn);
+            }
+
             const loveBtn = document.createElement('button');
             loveBtn.className = 'btn btn-sm btn-accent';
             loveBtn.textContent = 'Love';
@@ -124,6 +133,76 @@
         }
 
         return row;
+    }
+
+    function toggleCandidates(row, track, btn) {
+        const existing = row.nextElementSibling;
+        if (existing && existing.classList.contains('sync-candidates')) {
+            existing.remove();
+            btn.classList.remove('btn-accent');
+            return;
+        }
+        btn.classList.add('btn-accent');
+
+        const panel = document.createElement('div');
+        panel.className = 'sync-candidates';
+
+        for (const cand of track.candidates) {
+            const item = document.createElement('button');
+            item.className = 'sync-candidate';
+            item.innerHTML =
+                '<div class="sync-candidate-info">' +
+                '<div class="sync-candidate-artist">' + escapeHtml(cand.artist) + '</div>' +
+                '<div class="sync-candidate-name">' + escapeHtml(cand.name) + '</div>' +
+                '</div>' +
+                '<span class="sync-candidate-score">' + Math.round(cand.score * 100) + '%</span>';
+            item.addEventListener('click', () => createMatch(track, cand, row, panel));
+            panel.appendChild(item);
+        }
+
+        const manual = document.createElement('button');
+        manual.className = 'sync-candidate sync-candidate-manual';
+        manual.textContent = 'None of these — enter Last.fm name manually';
+        manual.addEventListener('click', () => {
+            const lfName = prompt('Last.fm track name (artist will stay "' + track.artist + '"):', track.name);
+            if (!lfName || !lfName.trim()) return;
+            createMatch(track, {artist: track.artist, name: lfName.trim()}, row, panel);
+        });
+        panel.appendChild(manual);
+
+        row.insertAdjacentElement('afterend', panel);
+    }
+
+    async function createMatch(track, candidate, row, panel) {
+        try {
+            const r = await fetch('/api/loved-sync/match', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    track_id: track.id,
+                    artist: track.artist,
+                    spotify_name: track.name,
+                    lastfm_name: candidate.name,
+                }),
+            });
+            if (!r.ok) {
+                const err = await r.json().catch(() => ({}));
+                showError('Match failed: ' + (err.detail || r.status));
+                return;
+            }
+            // Alias created. Re-fetch the diff so both sides update consistently.
+            panel.remove();
+            row.remove();
+            await loadDiff();
+        } catch (e) {
+            showError('Network error.');
+        }
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
     }
 
     async function loveTrack(track, row, btn) {

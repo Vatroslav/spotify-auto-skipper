@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from app.config import get_base_url, get_lastfm_api_key, get_lastfm_api_secret, get_lastfm_username
 from app.database import (
     add_loved_sync_ignore,
+    add_track_alias,
     clear_lastfm_session,
     get_lastfm_session,
     remove_loved_sync_ignore,
@@ -113,6 +114,30 @@ async def love(body: LoveRequest):
     ok, err = await track_love(body.artist.strip(), body.track.strip(), session["session_key"])
     if not ok:
         raise HTTPException(status_code=502, detail=err or "Last.fm love failed")
+    return {"ok": True}
+
+
+class MatchRequest(BaseModel):
+    track_id: str
+    artist: str
+    spotify_name: str
+    lastfm_name: str
+
+
+@router.post("/api/loved-sync/match", dependencies=[Depends(require_auth)])
+async def match(body: MatchRequest):
+    """Create a track_alias mapping Spotify name -> Last.fm name.
+
+    Writes to the same track_aliases table the worker uses, so the alias
+    immediately applies to skip-check, mapping-fail, and Loved Sync diff.
+    """
+    track_id = body.track_id.strip()
+    artist = body.artist.strip()
+    spotify_name = body.spotify_name.strip()
+    lastfm_name = body.lastfm_name.strip()
+    if not (track_id and artist and spotify_name and lastfm_name):
+        raise HTTPException(status_code=400, detail="track_id, artist, spotify_name, and lastfm_name are required")
+    await add_track_alias(track_id, artist, spotify_name, lastfm_name)
     return {"ok": True}
 
 
