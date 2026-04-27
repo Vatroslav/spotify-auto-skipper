@@ -81,10 +81,42 @@
     refreshBtn.addEventListener('click', loadDiff);
 
     // ── Render ──────────────────────────────────────────
+    function normKey(s) {
+        return (s || '').trim().toLowerCase();
+    }
+
+    function decStat(el) {
+        const n = parseInt(el.textContent, 10);
+        if (!isNaN(n)) el.textContent = Math.max(0, n - 1);
+    }
+
+    function incStat(el) {
+        const n = parseInt(el.textContent, 10);
+        el.textContent = (isNaN(n) ? 0 : n) + 1;
+    }
+
+    function refreshEmptyState() {
+        if (!needsLoveList.children.length) needsLoveCard.classList.add('hidden');
+        if (!lovedOnlyList.children.length) lovedOnlyCard.classList.add('hidden');
+        if (!needsLoveList.children.length && !lovedOnlyList.children.length) {
+            allClean.classList.remove('hidden');
+        }
+    }
+
+    function findLovedRow(artist, name) {
+        const aKey = normKey(artist);
+        const nKey = normKey(name);
+        return Array.from(lovedOnlyList.querySelectorAll('.sync-row')).find(
+            r => r.dataset.artistKey === aKey && r.dataset.nameKey === nKey
+        );
+    }
+
     function renderRow(track, withButtons) {
         const row = document.createElement('div');
         row.className = 'sync-row';
         row.dataset.id = track.id || '';
+        row.dataset.artistKey = normKey(track.artist);
+        row.dataset.nameKey = normKey(track.name);
 
         const info = document.createElement('div');
         info.className = 'sync-row-info';
@@ -190,10 +222,16 @@
                 showError('Match failed: ' + (err.detail || r.status));
                 return;
             }
-            // Alias created. Re-fetch the diff so both sides update consistently.
+            // Optimistic update: drop both rows, fix counts, no full refresh.
             panel.remove();
             row.remove();
-            await loadDiff();
+            decStat(statNeedsLove);
+            const lovedRow = findLovedRow(candidate.artist, candidate.name);
+            if (lovedRow) {
+                lovedRow.remove();
+                decStat(statLovedOnly);
+            }
+            refreshEmptyState();
         } catch (e) {
             showError('Network error.');
         }
@@ -222,6 +260,8 @@
                 return false;
             }
             row.remove();
+            decStat(statNeedsLove);
+            refreshEmptyState();
             return true;
         } catch (e) {
             btn.textContent = 'Love';
@@ -245,6 +285,9 @@
                 return;
             }
             row.remove();
+            decStat(statNeedsLove);
+            incStat(statIgnored);
+            refreshEmptyState();
         } catch (e) {
             btn.disabled = false;
             showError('Network error.');
