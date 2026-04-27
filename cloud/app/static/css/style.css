@@ -798,6 +798,14 @@ input:focus, select:focus {
 
 /* ── Loved Sync ──────────────────────────────────── */
 
+.sync-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+}
+
+.sync-col > .card:last-child { margin-bottom: 0; }
+
 .sync-status-row {
     display: flex;
     justify-content: space-between;
@@ -941,5 +949,14 @@ input:focus, select:focus {
 
     .container:has(.insights-columns) {
         max-width: 1200px;
+    }
+
+    .sync-grid {
+        grid-template-columns: minmax(280px, 1fr) 1fr 1fr;
+        align-items: start;
+    }
+
+    .container:has(.sync-grid) {
+        max-width: 1400px;
     }
 }
