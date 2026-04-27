@@ -85,7 +85,7 @@ app.mount("/static", StaticFiles(directory=os.path.join(_app_dir, "static")), na
 templates = Jinja2Templates(directory=os.path.join(_app_dir, "templates"))
 
 # Include routers
-from app.routers import artists, auth, insights, logs, playback, rediscovery, settings
+from app.routers import artists, auth, insights, logs, loved_sync, playback, rediscovery, settings
 
 app.include_router(auth.router)
 app.include_router(playback.router)
@@ -94,6 +94,7 @@ app.include_router(artists.router)
 app.include_router(insights.router)
 app.include_router(logs.router)
 app.include_router(rediscovery.router)
+app.include_router(loved_sync.router)
 
 
 # ── Health check ─────────────────────────────────────────────────
@@ -159,6 +160,13 @@ async def rediscovery_page(request: Request):
     if not _is_authenticated(request):
         return templates.TemplateResponse("login.html", {"request": request, "version": APP_VERSION})
     return templates.TemplateResponse("rediscovery.html", {"request": request, "version": APP_VERSION})
+
+
+@app.get("/sync")
+async def sync_page(request: Request):
+    if not _is_authenticated(request):
+        return templates.TemplateResponse("login.html", {"request": request, "version": APP_VERSION})
+    return templates.TemplateResponse("loved_sync.html", {"request": request, "version": APP_VERSION})
 
 
 @app.get("/unauthorized")

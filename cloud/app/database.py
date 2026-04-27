@@ -98,6 +98,18 @@ CREATE TABLE IF NOT EXISTS mapping_fail_dismissals (
     dismissed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS lastfm_auth (
+    id            INTEGER PRIMARY KEY CHECK (id = 1),
+    session_key   TEXT NOT NULL,
+    username      TEXT NOT NULL DEFAULT '',
+    authorized_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS loved_sync_ignored (
+    track_id    TEXT PRIMARY KEY,
+    ignored_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_track_events_timestamp ON track_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
 """
@@ -227,6 +239,28 @@ async def get_track_alias(track_id: str, artist: str = "", spotify_name: str = "
                 return row["lastfm_name"]
 
         return None
+    finally:
+        await db.close()
+
+
+async def get_all_track_aliases() -> dict:
+    """Return all aliases as two lookup dicts:
+    {by_id: {track_id: lastfm_name}, by_artist_name: {(artist, spotify_name): lastfm_name}}.
+
+    Use this when batch-resolving many tracks instead of N x get_track_alias() calls.
+    """
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT track_id, artist, spotify_name, lastfm_name FROM track_aliases")
+        rows = await cursor.fetchall()
+        by_id = {}
+        by_artist_name = {}
+        for row in rows:
+            if row["track_id"]:
+                by_id[row["track_id"]] = row["lastfm_name"]
+            else:
+                by_artist_name[(row["artist"], row["spotify_name"])] = row["lastfm_name"]
+        return {"by_id": by_id, "by_artist_name": by_artist_name}
     finally:
         await db.close()
 
@@ -976,6 +1010,87 @@ async def get_mapping_fail_candidates(skip_window_days: int) -> list[dict]:
         )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
+    finally:
+        await db.close()
+
+
+# ── Last.fm session key (encrypted) ──────────────────────────────
+
+
+async def get_lastfm_session() -> dict | None:
+    """Return decrypted Last.fm session info, or None if not authorized."""
+    db = await get_db()
+    try:
+        row = await (
+            await db.execute("SELECT session_key, username, authorized_at FROM lastfm_auth WHERE id = 1")
+        ).fetchone()
+        if not row or not row["session_key"]:
+            return None
+        return {
+            "session_key": decrypt(row["session_key"]),
+            "username": row["username"] or "",
+            "authorized_at": row["authorized_at"],
+        }
+    finally:
+        await db.close()
+
+
+async def save_lastfm_session(session_key: str, username: str = ""):
+    enc = encrypt(session_key)
+    db = await get_db()
+    try:
+        await db.execute(
+            """INSERT INTO lastfm_auth (id, session_key, username, authorized_at)
+               VALUES (1, ?, ?, CURRENT_TIMESTAMP)
+               ON CONFLICT(id) DO UPDATE SET
+                   session_key = ?, username = ?, authorized_at = CURRENT_TIMESTAMP""",
+            (enc, username, enc, username),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def clear_lastfm_session():
+    db = await get_db()
+    try:
+        await db.execute("DELETE FROM lastfm_auth")
+        await db.commit()
+    finally:
+        await db.close()
+
+
+# ── Loved-sync ignore list ───────────────────────────────────────
+
+
+async def get_loved_sync_ignored() -> set[str]:
+    """Return Spotify track_ids hidden from the 'needs love' list."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT track_id FROM loved_sync_ignored")
+        rows = await cursor.fetchall()
+        return {row["track_id"] for row in rows}
+    finally:
+        await db.close()
+
+
+async def add_loved_sync_ignore(track_id: str):
+    db = await get_db()
+    try:
+        await db.execute(
+            "INSERT OR IGNORE INTO loved_sync_ignored (track_id) VALUES (?)",
+            (track_id,),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def remove_loved_sync_ignore(track_id: str):
+    db = await get_db()
+    try:
+        await db.execute("DELETE FROM loved_sync_ignored WHERE track_id = ?", (track_id,))
+        await db.commit()
     finally:
         await db.close()
 

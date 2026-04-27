@@ -796,6 +796,141 @@ input:focus, select:focus {
     min-width: 0;
 }
 
+/* ── Loved Sync ──────────────────────────────────── */
+
+.sync-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+}
+
+.sync-col > .card:last-child { margin-bottom: 0; }
+
+.sync-status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.sync-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 16px;
+    font-size: 0.85rem;
+}
+
+.sync-list {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.sync-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-secondary);
+}
+
+.sync-row:last-child { border-bottom: none; }
+
+.sync-row-info {
+    min-width: 0;
+    flex: 1;
+}
+
+.sync-row-artist {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sync-row-track {
+    font-size: 0.95rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sync-row-alias {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.sync-row-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* Inline candidates panel under a needs-love row */
+.sync-candidates {
+    background: var(--bg-input);
+    border: 1px solid var(--border-primary);
+    border-radius: 6px;
+    padding: 6px;
+    margin: 4px 0 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sync-candidate {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-secondary);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: left;
+    font-size: 0.85rem;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.sync-candidate:hover {
+    border-color: var(--accent);
+    background: var(--bg-hover);
+}
+
+.sync-candidate-info {
+    min-width: 0;
+    flex: 1;
+}
+
+.sync-candidate-artist {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sync-candidate-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sync-candidate-score {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    flex-shrink: 0;
+}
+
+.sync-candidate-manual {
+    color: var(--text-secondary);
+    font-style: italic;
+    justify-content: center;
+}
+
 /* ── Settings Grid ──────────────────────────────── */
 
 .settings-grid {
@@ -878,5 +1013,14 @@ input:focus, select:focus {
 
     .container:has(.insights-columns) {
         max-width: 1200px;
+    }
+
+    .sync-grid {
+        grid-template-columns: minmax(280px, 1fr) 1fr 1fr;
+        align-items: start;
+    }
+
+    .container:has(.sync-grid) {
+        max-width: 1400px;
     }
 }

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Loved Sync - Spotify Auto-Skipper{% endblock %}
+{% block content %}
+<div class="container">
+    <h1 class="page-title">Loved Sync</h1>
+    <p class="text-secondary mb-16">Compare your Spotify Liked Songs to your Last.fm Loved Tracks. Love missing tracks on Last.fm with one click.</p>
+
+    <div id="error-banner" class="card hidden" style="border-color: var(--color-error);">
+        <div id="error-text"></div>
+    </div>
+
+    <div id="auth-card" class="card hidden">
+        <div class="card-title">Connect Last.fm</div>
+        <p class="text-secondary mb-16">Authorize this app to mark tracks as Loved on your Last.fm account. Session never expires.</p>
+        <a id="auth-btn" href="/lastfm/auth/login" class="btn btn-accent btn-full">Authorize Last.fm</a>
+    </div>
+
+    <div id="content" class="hidden">
+        <div class="sync-grid">
+            <div class="sync-col">
+                <div class="card">
+                    <div class="card-title">Status</div>
+                    <div class="sync-status-row">
+                        <span>Authorized as <strong id="lastfm-username">-</strong></span>
+                        <button id="disconnect-btn" class="btn btn-sm btn-danger">Disconnect</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">Summary</div>
+                    <div class="sync-summary">
+                        <div><span class="text-secondary">Spotify Liked:</span> <strong id="stat-spotify">-</strong></div>
+                        <div><span class="text-secondary">Last.fm Loved:</span> <strong id="stat-lastfm">-</strong></div>
+                        <div><span class="text-secondary">Needs love:</span> <strong id="stat-needs-love">-</strong></div>
+                        <div><span class="text-secondary">Loved, not Liked:</span> <strong id="stat-loved-only">-</strong></div>
+                        <div><span class="text-secondary">Ignored:</span> <strong id="stat-ignored">-</strong></div>
+                    </div>
+                    <button id="refresh-btn" class="btn btn-full mt-8">Refresh</button>
+                </div>
+
+                <div id="loading" class="card hidden">
+                    <div class="text-secondary text-center">Comparing libraries...</div>
+                </div>
+
+                <div id="all-clean" class="card hidden">
+                    <div class="text-center text-secondary">Everything in sync.</div>
+                </div>
+            </div>
+
+            <div class="sync-col">
+                <div id="needs-love-card" class="card hidden">
+                    <div class="card-title">Liked on Spotify, not Loved on Last.fm</div>
+                    <button id="love-all-btn" class="btn btn-accent btn-sm mb-16">Love all</button>
+                    <div id="needs-love-list" class="sync-list"></div>
+                </div>
+            </div>
+
+            <div class="sync-col">
+                <div id="loved-only-card" class="card hidden">
+                    <div class="card-title">Loved on Last.fm, not Liked on Spotify</div>
+                    <p class="help-text mb-16">Read-only. Like these on Spotify yourself if you want.</p>
+                    <div id="loved-only-list" class="sync-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/loved_sync.js?v={{ version }}"></script>
+{% endblock %}
