@@ -115,8 +115,9 @@ async def remove_from_playlist(request: Request):
             status_code=502,
         )
 
-    # Skip to next
+    # Skip to next, then trigger an immediate check on the new track
     await client.skip_current_track()
+    app_state.check_now_event.set()
 
     backup_suffix = f", backed up to {trash_id}" if trash_id else ""
     await add_log(
