@@ -29,6 +29,7 @@ function initDashboard() {
     const pauseBtn = document.getElementById("pause-btn");
     const checkNowBtn = document.getElementById("check-now-btn");
     const skipOnePauseBtn = document.getElementById("skip-one-pause-btn");
+    const removeFromPlaylistBtn = document.getElementById("remove-from-playlist-btn");
 
     if (!trackName) return; // Not on dashboard
 
@@ -98,6 +99,18 @@ function initDashboard() {
                     skipOnePauseBtn.disabled = false;
                 }
             }
+
+            // "Remove from Playlist" button — only enabled when context is a playlist
+            if (removeFromPlaylistBtn) {
+                const ctx = data.track && data.track.context_uri;
+                if (ctx && ctx.startsWith("spotify:playlist:")) {
+                    removeFromPlaylistBtn.disabled = false;
+                    removeFromPlaylistBtn.title = "";
+                } else {
+                    removeFromPlaylistBtn.disabled = true;
+                    removeFromPlaylistBtn.title = data.track ? "Not playing from a playlist" : "Nothing is playing";
+                }
+            }
         } catch (e) {
             console.error("Failed to fetch playback:", e);
         }
@@ -134,6 +147,27 @@ function initDashboard() {
                 updatePlayback();
             } catch (e) {
                 showToast(e.message || "Failed", 2000, "error");
+            }
+        });
+    }
+
+    // Remove from playlist (mirrors AHK Ctrl+Media_Next: backup + remove + skip)
+    if (removeFromPlaylistBtn) {
+        removeFromPlaylistBtn.addEventListener("click", async () => {
+            const originalText = removeFromPlaylistBtn.textContent;
+            removeFromPlaylistBtn.disabled = true;
+            removeFromPlaylistBtn.textContent = "Removing...";
+            try {
+                const result = await API.post("/api/playback/remove-from-playlist");
+                const msg = result.backed_up
+                    ? `Removed: ${result.track_name}`
+                    : `Removed (no backup): ${result.track_name}`;
+                showToast(msg);
+            } catch (e) {
+                showToast(e.message || "Failed", 3000, "error");
+            } finally {
+                removeFromPlaylistBtn.textContent = originalText;
+                setTimeout(updatePlayback, 1500);
             }
         });
     }
@@ -200,49 +234,66 @@ function initSettings() {
         }
     });
 
-    // Resolve playlist button
-    const resolveBtn = document.getElementById("resolve-playlist-btn");
-    const playlistInput = document.getElementById("dummy-playlist");
-    const playlistStatus = document.getElementById("playlist-status");
-    if (resolveBtn && playlistInput) {
-        function formatPlaylistInfo(data) {
-            let text = `\u2713 ${data.name}`;
-            if (data.owner) text += ` \u2014 by ${data.owner}`;
-            if (data.description) text += `\n${data.description}`;
-            return text;
+    // Playlist resolve fields (dummy + trash)
+    function formatPlaylistInfo(data) {
+        let text = `\u2713 ${data.name}`;
+        if (data.owner) text += ` \u2014 by ${data.owner}`;
+        if (data.description) text += `\n${data.description}`;
+        return text;
+    }
+
+    function bindPlaylistResolver(btnId, inputId, statusId) {
+        const btn = document.getElementById(btnId);
+        const input = document.getElementById(inputId);
+        const status = document.getElementById(statusId);
+        if (!btn || !input || !status) return null;
+
+        async function autoResolve() {
+            if (!input.value) return;
+            try {
+                const data = await API.get(`/api/settings/resolve-playlist?q=${encodeURIComponent(input.value)}`);
+                if (data.name) {
+                    status.textContent = formatPlaylistInfo(data);
+                    status.className = "help-text text-success";
+                    input.value = data.id;
+                }
+            } catch { /* leave status blank if not resolvable */ }
         }
 
-        // Auto-resolve on load
-        loadSettings().then(async () => {
-            if (playlistInput.value) {
-                const data = await API.get(`/api/settings/resolve-playlist?q=${encodeURIComponent(playlistInput.value)}`);
-                if (data.name) {
-                    playlistStatus.textContent = formatPlaylistInfo(data);
-                    playlistStatus.className = "help-text text-success";
-                    playlistInput.value = data.id;
-                }
+        btn.addEventListener("click", async () => {
+            const q = input.value.trim();
+            if (!q) {
+                status.textContent = "";
+                return;
             }
-        });
-
-        resolveBtn.addEventListener("click", async () => {
-            const q = playlistInput.value.trim();
-            if (!q) return;
-            resolveBtn.disabled = true;
-            resolveBtn.textContent = "...";
+            btn.disabled = true;
+            btn.textContent = "...";
             try {
                 const data = await API.get(`/api/settings/resolve-playlist?q=${encodeURIComponent(q)}`);
-                playlistStatus.textContent = formatPlaylistInfo(data);
-                playlistStatus.className = "help-text text-success";
-                playlistInput.value = data.id;
+                status.textContent = formatPlaylistInfo(data);
+                status.className = "help-text text-success";
+                input.value = data.id;
             } catch (err) {
-                playlistStatus.textContent = `\u2717 ${err.message || "Not found"}`;
-                playlistStatus.className = "help-text text-error";
+                status.textContent = `\u2717 ${err.message || "Not found"}`;
+                status.className = "help-text text-error";
             }
-            resolveBtn.disabled = false;
-            resolveBtn.textContent = "Resolve";
+            btn.disabled = false;
+            btn.textContent = "Resolve";
+        });
+
+        return autoResolve;
+    }
+
+    const dummyResolve = bindPlaylistResolver("resolve-playlist-btn", "dummy-playlist", "playlist-status");
+    const trashResolve = bindPlaylistResolver("resolve-trash-btn", "trash-playlist", "trash-status");
+
+    if (dummyResolve || trashResolve) {
+        loadSettings().then(() => {
+            if (dummyResolve) dummyResolve();
+            if (trashResolve) trashResolve();
         });
         bindLogout();
-        return; // loadSettings already called above
+        return;
     }
 
     loadSettings();

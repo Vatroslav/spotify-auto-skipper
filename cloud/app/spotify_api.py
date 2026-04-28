@@ -120,7 +120,7 @@ class SpotifyClient:
             try:
                 token = await self.get_token()
                 headers = {"Authorization": f"Bearer {token}"}
-                if method in ("PUT", "POST") and "json" in kwargs:
+                if method in ("PUT", "POST", "DELETE") and "json" in kwargs:
                     headers["Content-Type"] = "application/json"
 
                 r = await self._http.request(method, url, headers=headers, **kwargs)
@@ -399,6 +399,28 @@ class SpotifyClient:
             if r is None or r.status_code not in (200, 201):
                 return False
         return True
+
+    async def remove_tracks_from_playlist(self, playlist_id: str, uris: list[str]) -> tuple[bool, str | None]:
+        """Remove tracks from a playlist in batches of 100.
+
+        Returns (ok, error_message). On success, error_message is None.
+        """
+        for i in range(0, len(uris), 100):
+            batch = uris[i : i + 100]
+            r = await self._request(
+                "DELETE",
+                f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks",
+                json={"tracks": [{"uri": u} for u in batch]},
+            )
+            if r is None:
+                return False, "Network error"
+            if r.status_code not in (200, 201):
+                try:
+                    msg = (r.json().get("error") or {}).get("message", "")
+                except Exception:
+                    msg = r.text[:200] if r.text else ""
+                return False, msg or f"HTTP {r.status_code}"
+        return True, None
 
     async def search_artists(self, query: str, limit: int = 5) -> list[dict]:
         if not query or not query.strip():

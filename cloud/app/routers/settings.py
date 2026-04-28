@@ -25,6 +25,7 @@ class SettingsUpdate(BaseModel):
     restart_pattern_song_count: Optional[int] = None
     restart_pattern_day_diff: Optional[int] = None
     dummy_playlist_id: Optional[str] = None
+    trash_playlist_id: Optional[str] = None
     always_play_liked_songs: Optional[bool] = None
     enable_never_skip_artists: Optional[bool] = None
     log_retention_days: Optional[int] = None

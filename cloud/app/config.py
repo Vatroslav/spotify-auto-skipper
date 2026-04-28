@@ -16,6 +16,7 @@ CONFIG_DEFAULTS = {
     "restart_pattern_song_count": 5,
     "restart_pattern_day_diff": 2,
     "dummy_playlist_id": "37i9dQZF1DX0XUsuxWHRQd",
+    "trash_playlist_id": "",
     "always_play_liked_songs": True,
     "enable_never_skip_artists": True,
     "log_retention_days": 30,

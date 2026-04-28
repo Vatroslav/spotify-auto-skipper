@@ -82,6 +82,19 @@
             </div>
 
             <div class="card">
+                <div class="card-title">Remove from Playlist</div>
+
+                <div class="form-group">
+                    <label for="trash-playlist">Trash playlist &mdash; Removed tracks are backed up here. Leave empty to skip backup.</label>
+                    <div class="input-with-btn">
+                        <input type="text" id="trash-playlist" data-setting="trash_playlist_id" placeholder="Playlist ID or Spotify link (optional)">
+                        <button type="button" id="resolve-trash-btn" class="btn">Resolve</button>
+                    </div>
+                    <div id="trash-status" class="help-text"></div>
+                </div>
+            </div>
+
+            <div class="card">
                 <div class="card-title">Data</div>
 
                 <div class="form-group">
