@@ -289,6 +289,32 @@ class SpotifyClient:
             return data[0]
         return False
 
+    async def save_track_to_liked(self, track_id: str) -> tuple[bool, str | None]:
+        """Add a track to the user's Liked Songs. Returns (ok, error_message)."""
+        r = await self._put("https://api.spotify.com/v1/me/tracks", params={"ids": track_id})
+        if r is None:
+            return False, "Network error"
+        if r.status_code not in (200, 201):
+            try:
+                msg = (r.json().get("error") or {}).get("message", "")
+            except Exception:
+                msg = r.text[:200] if r.text else ""
+            return False, msg or f"HTTP {r.status_code}"
+        return True, None
+
+    async def remove_track_from_liked(self, track_id: str) -> tuple[bool, str | None]:
+        """Remove a track from the user's Liked Songs. Returns (ok, error_message)."""
+        r = await self._request("DELETE", "https://api.spotify.com/v1/me/tracks", params={"ids": track_id})
+        if r is None:
+            return False, "Network error"
+        if r.status_code not in (200, 201):
+            try:
+                msg = (r.json().get("error") or {}).get("message", "")
+            except Exception:
+                msg = r.text[:200] if r.text else ""
+            return False, msg or f"HTTP {r.status_code}"
+        return True, None
+
     async def get_playlist_info(self, playlist_id: str) -> dict | None:
         """Resolve a playlist ID to its info. Returns None if not found."""
         r = await self._get(

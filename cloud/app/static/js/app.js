@@ -30,10 +30,12 @@ function initDashboard() {
     const checkNowBtn = document.getElementById("check-now-btn");
     const skipOnePauseBtn = document.getElementById("skip-one-pause-btn");
     const removeFromPlaylistBtn = document.getElementById("remove-from-playlist-btn");
+    const likeBtn = document.getElementById("like-btn");
 
     if (!trackName) return; // Not on dashboard
 
     let nextCheckAt = null; // epoch ms when next check fires
+    let likeBtnBusy = false;
 
     async function updatePlayback() {
         try {
@@ -111,6 +113,27 @@ function initDashboard() {
                     removeFromPlaylistBtn.title = data.track ? "Not playing from a playlist" : "Nothing is playing";
                 }
             }
+
+            // Like / Unlike button — reflects current Spotify Liked status
+            if (likeBtn && !likeBtnBusy) {
+                if (!data.track) {
+                    likeBtn.disabled = true;
+                    likeBtn.textContent = "Add to Liked Songs";
+                    likeBtn.classList.remove("btn-accent");
+                } else if (data.is_liked === true) {
+                    likeBtn.disabled = false;
+                    likeBtn.textContent = "♥ Remove from Liked Songs";
+                    likeBtn.classList.add("btn-accent");
+                } else if (data.is_liked === false) {
+                    likeBtn.disabled = false;
+                    likeBtn.textContent = "♡ Add to Liked Songs";
+                    likeBtn.classList.remove("btn-accent");
+                } else {
+                    likeBtn.disabled = true;
+                    likeBtn.textContent = "Add to Liked Songs";
+                    likeBtn.classList.remove("btn-accent");
+                }
+            }
         } catch (e) {
             console.error("Failed to fetch playback:", e);
         }
@@ -147,6 +170,33 @@ function initDashboard() {
                 updatePlayback();
             } catch (e) {
                 showToast(e.message || "Failed", 2000, "error");
+            }
+        });
+    }
+
+    // Like / Unlike (Spotify Liked Songs + Last.fm Loved)
+    if (likeBtn) {
+        likeBtn.addEventListener("click", async () => {
+            const originalText = likeBtn.textContent;
+            likeBtnBusy = true;
+            likeBtn.disabled = true;
+            likeBtn.textContent = "Working...";
+            try {
+                const result = await API.post("/api/playback/toggle-like");
+                const verb = result.is_liked ? "Liked" : "Unliked";
+                let msg = `${verb}: ${result.track_name}`;
+                if (result.lastfm_synced === false) {
+                    msg += " (Last.fm sync failed)";
+                    showToast(msg, 3000, "error");
+                } else {
+                    showToast(msg);
+                }
+            } catch (e) {
+                likeBtn.textContent = originalText;
+                showToast(e.message || "Failed", 3000, "error");
+            } finally {
+                likeBtnBusy = false;
+                updatePlayback();
             }
         });
     }
