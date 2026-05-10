@@ -8,11 +8,14 @@ from pydantic import BaseModel
 from app.config import load_settings
 from app.database import (
     add_track_alias,
+    confirm_track_alias,
+    delete_track_alias,
     dismiss_mapping_fail,
     get_cached_overall_metrics,
     get_mapping_fail_candidates,
     get_track_event_dates,
     get_track_events,
+    get_unconfirmed_track_aliases,
     recompute_overall_metrics,
 )
 from app.insights import (
@@ -90,7 +93,42 @@ async def add_track_alias_route(payload: AliasRequest):
     lastfm_name = payload.lastfm_name.strip()
     if not track_id or not artist or not spotify_name or not lastfm_name:
         raise HTTPException(status_code=400, detail="track_id, artist, spotify_name, and lastfm_name are required")
-    await add_track_alias(track_id, artist, spotify_name, lastfm_name)
+    await add_track_alias(track_id, artist, spotify_name, lastfm_name, user_confirmed=True)
+    return {"ok": True}
+
+
+@router.get("/unconfirmed-aliases")
+async def list_unconfirmed_aliases():
+    """List aliases auto-created by toggle-like that the user hasn't reviewed."""
+    aliases = await get_unconfirmed_track_aliases()
+    return {"aliases": aliases}
+
+
+class TrackIdRequest(BaseModel):
+    track_id: str
+
+
+@router.post("/track-aliases/confirm")
+async def confirm_alias_route(payload: TrackIdRequest):
+    """Mark an auto-created alias as user-confirmed."""
+    track_id = payload.track_id.strip()
+    if not track_id:
+        raise HTTPException(status_code=400, detail="track_id is required")
+    updated = await confirm_track_alias(track_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Alias not found")
+    return {"ok": True}
+
+
+@router.post("/track-aliases/delete")
+async def delete_alias_route(payload: TrackIdRequest):
+    """Delete an alias by track_id."""
+    track_id = payload.track_id.strip()
+    if not track_id:
+        raise HTTPException(status_code=400, detail="track_id is required")
+    deleted = await delete_track_alias(track_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Alias not found")
     return {"ok": True}
 
 

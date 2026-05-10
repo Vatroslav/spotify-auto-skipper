@@ -54,11 +54,12 @@ CREATE TABLE IF NOT EXISTS oauth_tokens (
 );
 
 CREATE TABLE IF NOT EXISTS track_aliases (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    track_id     TEXT,
-    artist       TEXT NOT NULL,
-    spotify_name TEXT NOT NULL,
-    lastfm_name  TEXT NOT NULL
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    track_id       TEXT,
+    artist         TEXT NOT NULL,
+    spotify_name   TEXT NOT NULL,
+    lastfm_name    TEXT NOT NULL,
+    user_confirmed INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS overall_metrics (
@@ -166,6 +167,14 @@ async def init_db():
                 """
             )
 
+        # Migrate: add user_confirmed to track_aliases (existing rows are user-created)
+        cursor = await db.execute("PRAGMA table_info(track_aliases)")
+        columns = {row[1] for row in await cursor.fetchall()}
+        if "user_confirmed" not in columns:
+            await db.execute(
+                "ALTER TABLE track_aliases ADD COLUMN user_confirmed INTEGER NOT NULL DEFAULT 1"
+            )
+
         # Migrate: mapping_fail_dismissals keyed by track_id instead of (artist, track_name)
         cursor = await db.execute("PRAGMA table_info(mapping_fail_dismissals)")
         columns = {row[1] for row in await cursor.fetchall()}
@@ -265,25 +274,92 @@ async def get_all_track_aliases() -> dict:
         await db.close()
 
 
-async def add_track_alias(track_id: str, artist: str, spotify_name: str, lastfm_name: str):
+async def add_track_alias(
+    track_id: str,
+    artist: str,
+    spotify_name: str,
+    lastfm_name: str,
+    user_confirmed: bool = True,
+):
     """Upsert a Spotify-to-Last.fm track name mapping, keyed by track_id.
 
     The UNIQUE index on track_id is partial (WHERE track_id IS NOT NULL),
     so a conflict target matching that same predicate is required for
     SQLite to recognize it for UPSERT.
+
+    `user_confirmed` defaults to True because every existing caller (manual
+    alias from Loved Sync or Mapping issues) represents an explicit user
+    decision. Auto-generated aliases (e.g. from Last.fm nowplaying inference
+    in the toggle-like flow) must pass user_confirmed=False so they can be
+    surfaced for review.
     """
+    confirmed = 1 if user_confirmed else 0
     db = await get_db()
     try:
         await db.execute(
-            """INSERT INTO track_aliases (track_id, artist, spotify_name, lastfm_name)
-               VALUES (?, ?, ?, ?)
+            """INSERT INTO track_aliases (track_id, artist, spotify_name, lastfm_name, user_confirmed)
+               VALUES (?, ?, ?, ?, ?)
                ON CONFLICT(track_id) WHERE track_id IS NOT NULL DO UPDATE SET
                    artist = excluded.artist,
                    spotify_name = excluded.spotify_name,
-                   lastfm_name = excluded.lastfm_name""",
-            (track_id, artist, spotify_name, lastfm_name),
+                   lastfm_name = excluded.lastfm_name,
+                   user_confirmed = excluded.user_confirmed""",
+            (track_id, artist, spotify_name, lastfm_name, confirmed),
         )
         await db.commit()
+    finally:
+        await db.close()
+
+
+async def get_unconfirmed_track_aliases() -> list[dict]:
+    """Return aliases auto-created without user confirmation, newest first."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            """SELECT id, track_id, artist, spotify_name, lastfm_name
+               FROM track_aliases
+               WHERE user_confirmed = 0
+               ORDER BY id DESC"""
+        )
+        rows = await cursor.fetchall()
+        return [
+            {
+                "id": row["id"],
+                "track_id": row["track_id"],
+                "artist": row["artist"],
+                "spotify_name": row["spotify_name"],
+                "lastfm_name": row["lastfm_name"],
+            }
+            for row in rows
+        ]
+    finally:
+        await db.close()
+
+
+async def confirm_track_alias(track_id: str) -> bool:
+    """Mark an alias as user-confirmed. Returns True if a row was updated."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "UPDATE track_aliases SET user_confirmed = 1 WHERE track_id = ?",
+            (track_id,),
+        )
+        await db.commit()
+        return cursor.rowcount > 0
+    finally:
+        await db.close()
+
+
+async def delete_track_alias(track_id: str) -> bool:
+    """Delete an alias by track_id. Returns True if a row was deleted."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "DELETE FROM track_aliases WHERE track_id = ?",
+            (track_id,),
+        )
+        await db.commit()
+        return cursor.rowcount > 0
     finally:
         await db.close()
 

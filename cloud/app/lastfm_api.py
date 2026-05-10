@@ -125,6 +125,70 @@ async def get_last_play_date(artist: str, track: str, track_id: str = "") -> dat
     return await _lookup_scrobbles(artist, track)
 
 
+# ── Now playing (read) ───────────────────────────────────────────
+
+
+async def get_nowplaying(username: str = "") -> dict | None:
+    """Return the user's currently-scrobbling track, or None if nothing live.
+
+    Last.fm's `user.getRecentTracks` puts the live track first with
+    `@attr.nowplaying == "true"`. If the first item is just a recent scrobble
+    (has a `date` field), there is nothing currently playing.
+
+    Returns {"artist": str, "name": str} or None. Network/HTTP failures also
+    map to None — caller treats absence as "no signal" rather than an error.
+    """
+    user = username or get_lastfm_username()
+    if not user:
+        return None
+    api_key = get_lastfm_api_key()
+    if not api_key:
+        return None
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(
+                LASTFM_API_URL,
+                params={
+                    "method": "user.getrecenttracks",
+                    "user": user,
+                    "api_key": api_key,
+                    "format": "json",
+                    "limit": 1,
+                },
+            )
+    except httpx.RequestError as e:
+        logger.warning("[Last.fm] Network error fetching nowplaying: %s", e)
+        return None
+
+    if r.status_code != 200:
+        logger.warning("[Last.fm] getRecentTracks status %d: %s", r.status_code, r.text[:200])
+        return None
+
+    try:
+        data = r.json() or {}
+    except ValueError:
+        return None
+
+    tracks = (data.get("recenttracks") or {}).get("track") or []
+    if isinstance(tracks, dict):
+        tracks = [tracks]
+    if not tracks:
+        return None
+
+    first = tracks[0]
+    attr = first.get("@attr") or {}
+    if str(attr.get("nowplaying", "")).lower() != "true":
+        return None
+
+    artist_obj = first.get("artist") or {}
+    artist_name = artist_obj.get("#text") if isinstance(artist_obj, dict) else str(artist_obj)
+    name = first.get("name", "")
+    if not artist_name or not name:
+        return None
+    return {"artist": artist_name, "name": name}
+
+
 # ── Loved tracks (read) ──────────────────────────────────────────
 
 
