@@ -209,7 +209,8 @@ input:focus, select:focus {
     margin-bottom: 6px;
 }
 
-.form-group .help-text {
+.form-group .help-text,
+.toggle + .help-text {
     font-size: 0.8rem;
     color: var(--text-muted);
     margin-top: 4px;
