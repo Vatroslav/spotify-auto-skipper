@@ -30,10 +30,12 @@ function initDashboard() {
     const checkNowBtn = document.getElementById("check-now-btn");
     const skipOnePauseBtn = document.getElementById("skip-one-pause-btn");
     const removeFromPlaylistBtn = document.getElementById("remove-from-playlist-btn");
+    const likeBtn = document.getElementById("like-btn");
 
     if (!trackName) return; // Not on dashboard
 
     let nextCheckAt = null; // epoch ms when next check fires
+    let likeBtnBusy = false;
 
     async function updatePlayback() {
         try {
@@ -111,6 +113,27 @@ function initDashboard() {
                     removeFromPlaylistBtn.title = data.track ? "Not playing from a playlist" : "Nothing is playing";
                 }
             }
+
+            // Like / Unlike button — reflects current Spotify Liked status
+            if (likeBtn && !likeBtnBusy) {
+                if (!data.track) {
+                    likeBtn.disabled = true;
+                    likeBtn.textContent = "Add to Liked Songs";
+                    likeBtn.classList.remove("btn-accent");
+                } else if (data.is_liked === true) {
+                    likeBtn.disabled = false;
+                    likeBtn.textContent = "♥ Remove from Liked Songs";
+                    likeBtn.classList.add("btn-accent");
+                } else if (data.is_liked === false) {
+                    likeBtn.disabled = false;
+                    likeBtn.textContent = "♡ Add to Liked Songs";
+                    likeBtn.classList.remove("btn-accent");
+                } else {
+                    likeBtn.disabled = true;
+                    likeBtn.textContent = "Add to Liked Songs";
+                    likeBtn.classList.remove("btn-accent");
+                }
+            }
         } catch (e) {
             console.error("Failed to fetch playback:", e);
         }
@@ -147,6 +170,48 @@ function initDashboard() {
                 updatePlayback();
             } catch (e) {
                 showToast(e.message || "Failed", 2000, "error");
+            }
+        });
+    }
+
+    // Like / Unlike (Spotify Liked Songs + Last.fm Loved)
+    if (likeBtn) {
+        likeBtn.addEventListener("click", async () => {
+            const originalText = likeBtn.textContent;
+            likeBtnBusy = true;
+            likeBtn.disabled = true;
+            likeBtn.textContent = "Working...";
+            try {
+                const result = await API.post("/api/playback/toggle-like");
+                const action = result.is_liked ? "Liked" : "Unliked";
+                const lfVerb = result.is_liked ? "Loved" : "Unloved";
+
+                let msg = `${action}: ${result.track_name}`;
+                let isError = false;
+                let duration = 2500;
+
+                if (result.lastfm_synced === true) {
+                    if (result.auto_alias_created) {
+                        msg += ` · ${lfVerb} as '${result.lastfm_name_used}' — verify on Insights`;
+                        duration = 4500;
+                    } else {
+                        msg += ` · ${lfVerb} on Last.fm`;
+                    }
+                } else if (result.lastfm_synced === false) {
+                    msg += ` · Last.fm sync failed: ${result.lastfm_error || "unknown error"}`;
+                    isError = true;
+                    duration = 4000;
+                } else {
+                    msg += " · Last.fm not authorized";
+                }
+
+                showToast(msg, duration, isError ? "error" : "success");
+            } catch (e) {
+                likeBtn.textContent = originalText;
+                showToast(e.message || "Failed", 3000, "error");
+            } finally {
+                likeBtnBusy = false;
+                updatePlayback();
             }
         });
     }
@@ -743,9 +808,131 @@ function initInsights() {
         }
     }
 
+    // ── Unconfirmed aliases ───────────────────────────────────────
+
+    async function loadUnconfirmedAliases() {
+        const container = document.getElementById("unconfirmed-aliases-list");
+        if (!container) return;
+
+        try {
+            const data = await API.get("/api/insights/unconfirmed-aliases");
+            const aliases = data.aliases || [];
+
+            if (aliases.length === 0) {
+                container.innerHTML = '<p class="text-muted text-center">No unconfirmed aliases. All track-name mappings have been verified.</p>';
+                return;
+            }
+
+            container.innerHTML = aliases.map((a, i) => `
+                <div class="mapping-fail-row" data-idx="${i}">
+                    <div class="mapping-fail-title">
+                        ${escapeHtml(a.spotify_name)} <span class="text-muted">→</span> ${escapeHtml(a.lastfm_name)}
+                    </div>
+                    <div class="mapping-fail-meta">
+                        <span class="text-muted mapping-fail-info">${escapeHtml(a.artist)}</span>
+                        <div class="mapping-fail-actions"></div>
+                    </div>
+                </div>
+            `).join("");
+
+            container.querySelectorAll(".mapping-fail-row").forEach(row => {
+                const a = aliases[parseInt(row.dataset.idx, 10)];
+                const actions = row.querySelector(".mapping-fail-actions");
+                renderUnconfirmedDefault(actions, a);
+            });
+        } catch (e) {
+            container.innerHTML = `<p class="text-muted text-center">Failed to load: ${escapeHtml(e.message)}</p>`;
+        }
+    }
+
+    function renderUnconfirmedDefault(actions, alias) {
+        actions.closest(".mapping-fail-meta").classList.remove("editing");
+        actions.innerHTML = `
+            <button class="btn btn-sm unconfirmed-confirm">Confirm</button>
+            <button class="btn btn-sm unconfirmed-edit">Edit</button>
+            <button class="btn btn-sm unconfirmed-delete">Delete</button>
+        `;
+
+        actions.querySelector(".unconfirmed-confirm").addEventListener("click", async () => {
+            actions.querySelectorAll("button").forEach(b => b.disabled = true);
+            try {
+                await API.post("/api/insights/track-aliases/confirm", { track_id: alias.track_id });
+                showToast(`Confirmed: ${alias.spotify_name} → ${alias.lastfm_name}`);
+                loadUnconfirmedAliases();
+            } catch (e) {
+                actions.querySelectorAll("button").forEach(b => b.disabled = false);
+                showToast(`Confirm failed: ${e.message}`, 3000, "error");
+            }
+        });
+
+        actions.querySelector(".unconfirmed-delete").addEventListener("click", async () => {
+            actions.querySelectorAll("button").forEach(b => b.disabled = true);
+            try {
+                await API.post("/api/insights/track-aliases/delete", { track_id: alias.track_id });
+                showToast(`Deleted alias for: ${alias.spotify_name}`);
+                loadUnconfirmedAliases();
+            } catch (e) {
+                actions.querySelectorAll("button").forEach(b => b.disabled = false);
+                showToast(`Delete failed: ${e.message}`, 3000, "error");
+            }
+        });
+
+        actions.querySelector(".unconfirmed-edit").addEventListener("click", () => {
+            startUnconfirmedEdit(actions, alias);
+        });
+    }
+
+    function startUnconfirmedEdit(actions, alias) {
+        actions.closest(".mapping-fail-meta").classList.add("editing");
+        actions.innerHTML = `
+            <input class="mapping-fail-alias-input" type="text" value="${escapeHtml(alias.lastfm_name)}">
+            <button class="btn btn-sm unconfirmed-save">Save</button>
+            <button class="btn btn-sm unconfirmed-cancel">Cancel</button>
+        `;
+        const input = actions.querySelector(".mapping-fail-alias-input");
+        const saveBtn = actions.querySelector(".unconfirmed-save");
+        const cancelBtn = actions.querySelector(".unconfirmed-cancel");
+
+        input.focus();
+        input.select();
+
+        const save = async () => {
+            const trimmed = input.value.trim();
+            if (!trimmed) { input.focus(); return; }
+            input.disabled = true;
+            saveBtn.disabled = true;
+            cancelBtn.disabled = true;
+            try {
+                await API.post("/api/insights/track-aliases", {
+                    track_id: alias.track_id,
+                    artist: alias.artist,
+                    spotify_name: alias.spotify_name,
+                    lastfm_name: trimmed,
+                });
+                showToast(`Alias saved: ${alias.spotify_name} → ${trimmed}`);
+                loadUnconfirmedAliases();
+            } catch (e) {
+                input.disabled = false;
+                saveBtn.disabled = false;
+                cancelBtn.disabled = false;
+                showToast(`Save failed: ${e.message}`, 3000, "error");
+            }
+        };
+
+        const cancel = () => renderUnconfirmedDefault(actions, alias);
+
+        saveBtn.addEventListener("click", save);
+        cancelBtn.addEventListener("click", cancel);
+        input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") { e.preventDefault(); save(); }
+            else if (e.key === "Escape") { e.preventDefault(); cancel(); }
+        });
+    }
+
     loadOverall();
     loadDates();
     loadMappingFails();
+    loadUnconfirmedAliases();
 }
 
 
