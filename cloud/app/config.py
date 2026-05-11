@@ -15,6 +15,7 @@ CONFIG_DEFAULTS = {
     "enable_restart_pattern": True,
     "restart_pattern_song_count": 5,
     "restart_pattern_day_diff": 2,
+    "enable_adaptive_skip_window": True,
     "dummy_playlist_id": "37i9dQZF1DX0XUsuxWHRQd",
     "trash_playlist_id": "",
     "always_play_liked_songs": True,
@@ -36,6 +37,7 @@ _BOOL_KEYS = {
     "enable_restart_pattern",
     "always_play_liked_songs",
     "enable_never_skip_artists",
+    "enable_adaptive_skip_window",
 }
 
 

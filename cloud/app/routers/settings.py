@@ -24,6 +24,7 @@ class SettingsUpdate(BaseModel):
     enable_restart_pattern: Optional[bool] = None
     restart_pattern_song_count: Optional[int] = None
     restart_pattern_day_diff: Optional[int] = None
+    enable_adaptive_skip_window: Optional[bool] = None
     dummy_playlist_id: Optional[str] = None
     trash_playlist_id: Optional[str] = None
     always_play_liked_songs: Optional[bool] = None

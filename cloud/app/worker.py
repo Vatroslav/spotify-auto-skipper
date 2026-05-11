@@ -27,6 +27,21 @@ async def _log(message: str, level: str = "info"):
     await add_log(message, level)
 
 
+# Adaptive skip window: after N consecutive skips, temporarily narrow the window
+# so more songs pass through. Each level cuts the window by 33% of the base.
+ADAPTIVE_STEP_SIZE = 5
+ADAPTIVE_MAX_LEVEL = 2
+ADAPTIVE_REDUCTION_PER_LEVEL = 0.33
+
+
+def _adaptive_level(consecutive_skips: int) -> int:
+    return min(consecutive_skips // ADAPTIVE_STEP_SIZE, ADAPTIVE_MAX_LEVEL)
+
+
+def _effective_window(base_days: int, level: int) -> int:
+    return max(1, int(round(base_days * (1 - ADAPTIVE_REDUCTION_PER_LEVEL * level))))
+
+
 async def polling_loop():
     """
     Continuously check what's playing, ask Last.fm if it was scrobbled recently,
@@ -34,6 +49,31 @@ async def polling_loop():
     """
     recent_skip_days: list[int] = []
     consecutive_idle: int = 0
+    consecutive_skips: int = 0
+    adaptive_level: int = 0
+
+    async def _update_skip_streak(was_skip: bool):
+        nonlocal consecutive_skips, adaptive_level
+        new_count = consecutive_skips + 1 if was_skip else 0
+        if not settings.get("enable_adaptive_skip_window"):
+            consecutive_skips = new_count
+            adaptive_level = 0
+            return
+        new_level = _adaptive_level(new_count)
+        if new_level != adaptive_level:
+            base = settings["skip_window_days"]
+            if new_level > 0:
+                await _log(
+                    f"Adaptive skip window: {new_count} consecutive skips — "
+                    f"narrowing window to {_effective_window(base, new_level)}d (base {base}d)",
+                    "warning",
+                )
+            else:
+                await _log(
+                    f"Adaptive skip window: streak broken — restoring window to {base}d"
+                )
+        consecutive_skips = new_count
+        adaptive_level = new_level
 
     # Wait for OAuth tokens to be available
     while True:
@@ -60,7 +100,8 @@ async def polling_loop():
         f"idle_threshold={settings['idle_threshold']}, "
         f"idle_poll_interval={settings['idle_poll_interval_seconds']}s, "
         f"liked_songs={'on' if settings['always_play_liked_songs'] else 'off'}, "
-        f"restart_pattern={'on' if settings['enable_restart_pattern'] else 'off'}"
+        f"restart_pattern={'on' if settings['enable_restart_pattern'] else 'off'}, "
+        f"adaptive_window={'on' if settings['enable_adaptive_skip_window'] else 'off'}"
     )
 
     # Purge old data on startup, then every 24 hours
@@ -154,7 +195,12 @@ async def polling_loop():
                 await _log(f"Last scrobble: {last_played.strftime('%Y-%m-%d')} - {days_since} days ago")
                 app_state.last_check_message = f"Last heard {days_since} day{'s' if days_since != 1 else ''} ago"
 
-                cutoff = datetime.now(timezone.utc) - timedelta(days=settings["skip_window_days"])
+                effective_window_days = (
+                    _effective_window(settings["skip_window_days"], adaptive_level)
+                    if settings.get("enable_adaptive_skip_window")
+                    else settings["skip_window_days"]
+                )
+                cutoff = datetime.now(timezone.utc) - timedelta(days=effective_window_days)
 
                 if last_played > cutoff:
                     # Check one-time skip pause
@@ -169,6 +215,7 @@ async def polling_loop():
                             days_since,
                             track.get("context_uri"), album_name=track.get("album"),
                         )
+                        await _update_skip_streak(False)
                     # Check never-skip list
                     elif settings["enable_never_skip_artists"] and await is_artist_never_skipped(
                         track.get("artist_ids", [])
@@ -182,6 +229,7 @@ async def polling_loop():
                             days_since,
                             track.get("context_uri"), album_name=track.get("album"),
                         )
+                        await _update_skip_streak(False)
                     # Check liked songs
                     elif settings["always_play_liked_songs"] and await client.is_track_liked(track["id"]):
                         await _log("Track is in Liked Songs \u2014 not skipping")
@@ -193,6 +241,7 @@ async def polling_loop():
                             days_since,
                             track.get("context_uri"), album_name=track.get("album"),
                         )
+                        await _update_skip_streak(False)
                     else:
                         # Re-check pause flag right before skipping (user may have
                         # pressed Pause while we were querying Last.fm)
@@ -206,6 +255,7 @@ async def polling_loop():
                                 days_since,
                                 track.get("context_uri"), album_name=track.get("album"),
                             )
+                            await _update_skip_streak(False)
                             await app_state.interruptible_sleep(poll_interval)
                             continue
 
@@ -224,6 +274,7 @@ async def polling_loop():
                             days_since,
                             track.get("context_uri"), album_name=track.get("album"),
                         )
+                        await _update_skip_streak(True)
 
                         # Track skip patterns for restart detection
                         if settings["enable_restart_pattern"]:
@@ -257,6 +308,7 @@ async def polling_loop():
                         days_since,
                         track.get("context_uri"), album_name=track.get("album"),
                     )
+                    await _update_skip_streak(False)
             else:
                 await _log("No scrobble for this song \u2014 not skipping.")
                 app_state.last_check_message = "Never heard before"
@@ -268,6 +320,7 @@ async def polling_loop():
                     None,
                     track.get("context_uri"), album_name=track.get("album"),
                 )
+                await _update_skip_streak(False)
 
         except CredentialError as e:
             await _log(f"Credential error: {e}", "error")
