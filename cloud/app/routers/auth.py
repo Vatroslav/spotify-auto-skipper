@@ -19,7 +19,7 @@ router = APIRouter(tags=["auth"])
 
 SCOPES = (
     "user-read-currently-playing user-read-playback-state user-modify-playback-state "
-    "user-library-read playlist-read-private playlist-modify-private"
+    "user-library-read user-library-modify playlist-read-private playlist-modify-private"
 )
 
 
