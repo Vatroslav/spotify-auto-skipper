@@ -210,7 +210,7 @@ input:focus, select:focus {
 }
 
 .form-group .help-text,
-.toggle + .help-text {
+.toggle-text .help-text {
     font-size: 0.8rem;
     color: var(--text-muted);
     margin-top: 4px;
@@ -240,6 +240,13 @@ input:focus, select:focus {
 
 .toggle-label {
     font-size: 0.9rem;
+}
+
+.toggle-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    margin-right: 16px;
 }
 
 .toggle-switch {
