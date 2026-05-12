@@ -119,19 +119,19 @@ function initDashboard() {
                 if (!data.track) {
                     likeBtn.disabled = true;
                     likeBtn.textContent = "Add to Liked Songs";
-                    likeBtn.classList.remove("btn-accent");
+                    likeBtn.classList.remove("btn-danger");
                 } else if (data.is_liked === true) {
                     likeBtn.disabled = false;
                     likeBtn.textContent = "♥ Remove from Liked Songs";
-                    likeBtn.classList.add("btn-accent");
+                    likeBtn.classList.add("btn-danger");
                 } else if (data.is_liked === false) {
                     likeBtn.disabled = false;
                     likeBtn.textContent = "♡ Add to Liked Songs";
-                    likeBtn.classList.remove("btn-accent");
+                    likeBtn.classList.remove("btn-danger");
                 } else {
                     likeBtn.disabled = true;
                     likeBtn.textContent = "Add to Liked Songs";
-                    likeBtn.classList.remove("btn-accent");
+                    likeBtn.classList.remove("btn-danger");
                 }
             }
         } catch (e) {
