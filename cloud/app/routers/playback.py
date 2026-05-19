@@ -2,6 +2,8 @@
 Playback API routes — current track, check now, pause/resume.
 """
 
+import asyncio
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
@@ -132,8 +134,12 @@ async def remove_from_playlist(request: Request):
             status_code=502,
         )
 
-    # Skip to next, then trigger an immediate check on the new track
+    # Skip to next, then trigger an immediate check on the new track.
+    # Wait 1s so Spotify propagates the new track before the worker polls —
+    # otherwise /currently-playing still returns the removed track and the
+    # worker treats it as "same song" and sleeps a full poll interval.
     await client.skip_current_track()
+    await asyncio.sleep(1)
     app_state.check_now_event.set()
 
     backup_suffix = f", backed up to {trash_id}" if trash_id else ""
