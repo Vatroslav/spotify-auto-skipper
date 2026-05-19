@@ -2,11 +2,11 @@
 
 I have a [playlist with over 5,000 songs](https://open.spotify.com/playlist/2DTe0ztu8OB5c1B80pjdfc?si=7b1c5cb732394d14), but Spotify's shuffle keeps playing the same ones over and over. This app fixes that — it checks your Last.fm scrobble history and automatically skips any song you've already heard recently, so you actually get to hear the rest of your library.
 
-Available as a **self-hosted cloud app** (v3.2.1) or a legacy **Windows desktop app** (v2.5.0).
+Available as a **self-hosted cloud app** (v3.10.1) or a legacy **Windows desktop app** (v2.5.0).
 
 ---
 
-## Cloud Version (v3.2.1)
+## Cloud Version (v3.10.1)
 
 A self-hosted web app you can run on any VPS with Docker. Access it from any device via browser — no desktop client needed.
 
@@ -23,8 +23,11 @@ A self-hosted web app you can run on any VPS with Docker. Access it from any dev
 ### Features
 
 - **Web dashboard** — see what's playing, skip status, and countdown to next check
-- **Settings page** — configure skip window, poll interval, liked songs, restart pattern
+- **Manual track actions** — remove the current track from its playlist (with optional backup to a trash playlist), like/unlike (synced to Last.fm), or exempt the current song from skipping once
+- **Adaptive skip window** — temporarily narrows the skip window after a run of consecutive skips so more songs get through
+- **Adaptive polling** — slows down polling when nothing is playing, speeds back up on playback
 - **Never-skip artists** — search Spotify and add artists directly from the browser
+- **Settings page** — configure skip window, poll interval, liked songs, restart pattern
 - **Insights** — daily metrics: songs played, skipped, skip rate, streaks, and more
 - **Logs viewer** — filterable log browser with date navigation
 - **Browser-based OAuth** — connect Spotify with one click, no manual token copying
