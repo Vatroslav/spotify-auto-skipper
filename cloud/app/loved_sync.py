@@ -20,7 +20,10 @@ def _norm_key(artist: str, name: str) -> tuple[str, str]:
 
 
 _PAREN_RE = re.compile(r"[\(\[].*?[\)\]]")
-_SUFFIX_RE = re.compile(r"\s*-\s*(remaster(ed)?|remix|version|edit|mix|anniversary|single|live|demo|instrumental).*", re.I)
+_SUFFIX_RE = re.compile(
+    r"\s*-\s*(remaster(ed)?|remix|version|edit|mix|anniversary|single|live|demo|instrumental).*",
+    re.I,
+)
 _FEAT_RE = re.compile(r"\s+(feat\.?|ft\.?)\s+.*", re.I)
 _PUNCT_RE = re.compile(r"[^\w\s]")
 _SPACE_RE = re.compile(r"\s+")
