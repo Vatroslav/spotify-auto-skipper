@@ -224,9 +224,12 @@ function initDashboard() {
             removeFromPlaylistBtn.textContent = "Removing...";
             try {
                 const result = await API.post("/api/playback/remove-from-playlist");
+                const trackLabel = result.artist
+                    ? `${result.track_name} — ${result.artist}`
+                    : result.track_name;
                 const msg = result.backed_up
-                    ? `Removed: ${result.track_name}`
-                    : `Removed (no backup): ${result.track_name}`;
+                    ? `Removed: ${trackLabel}`
+                    : `Removed (no backup): ${trackLabel}`;
                 showToast(msg);
             } catch (e) {
                 showToast(e.message || "Failed", 3000, "error");
