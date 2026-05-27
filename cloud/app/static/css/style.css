@@ -473,6 +473,16 @@ input:focus, select:focus {
     font-size: 0.75rem;
 }
 
+.mapping-fail-lastseen {
+    color: var(--text-secondary);
+    text-decoration: none;
+}
+
+.mapping-fail-lastseen:hover {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
 .mapping-fail-meta.editing .mapping-fail-info {
     display: none;
 }

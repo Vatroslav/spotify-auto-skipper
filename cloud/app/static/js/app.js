@@ -693,17 +693,34 @@ function initInsights() {
             const data = await API.get("/api/insights/mapping-fails");
             const candidates = data.candidates || [];
             const windowDays = data.skip_window_days;
+            const lastfmUsername = data.lastfm_username || "";
 
             if (candidates.length === 0) {
                 container.innerHTML = `<p class="text-muted text-center">No mapping issues detected in the last ${windowDays} days.</p>`;
                 return;
             }
 
-            const fmtLastSeen = (ts) => {
-                if (!ts) return "";
-                const d = new Date(ts.endsWith("Z") ? ts : ts + "Z");
+            const parseLastSeen = (ts) => {
+                if (!ts) return null;
+                return new Date(ts.endsWith("Z") ? ts : ts + "Z");
+            };
+
+            const fmtLastSeen = (d) => {
+                if (!d) return "";
                 const pad = (n) => String(n).padStart(2, "0");
                 return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            };
+
+            const fmtLocalDate = (d) => {
+                if (!d) return "";
+                const pad = (n) => String(n).padStart(2, "0");
+                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+            };
+
+            const lastfmDayLink = (d) => {
+                if (!d || !lastfmUsername) return "";
+                const date = fmtLocalDate(d);
+                return `https://www.last.fm/user/${encodeURIComponent(lastfmUsername)}/library?from=${date}&rangetype=1day`;
             };
 
             const renderDefaultActions = (actions, ctx) => {
@@ -782,13 +799,18 @@ function initInsights() {
                 const breakdown = [];
                 if (c.no_scrobble_count > 0) breakdown.push(`${c.no_scrobble_count} no-scrobble`);
                 if (c.played_count > 0) breakdown.push(`${c.played_count} stale scrobble`);
-                const lastSeen = fmtLastSeen(c.last_seen);
+                const lastSeenDate = parseLastSeen(c.last_seen);
+                const lastSeen = fmtLastSeen(lastSeenDate);
+                const link = lastfmDayLink(lastSeenDate);
+                const lastSeenHtml = link
+                    ? `<a class="mapping-fail-info mapping-fail-lastseen" href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer" title="Open Last.fm scrobbles for this day">${escapeHtml(lastSeen)}</a>`
+                    : `<span class="text-muted mapping-fail-info">${escapeHtml(lastSeen)}</span>`;
                 const albumSuffix = c.album_name ? ` <span class="mapping-fail-album text-muted">(${escapeHtml(c.album_name)})</span>` : "";
                 return `
                     <div class="mapping-fail-row" data-idx="${i}">
                         <div class="mapping-fail-title">${escapeHtml(c.track_name)} — ${escapeHtml(c.artist_name)}${albumSuffix}</div>
                         <div class="mapping-fail-meta">
-                            <span class="text-muted mapping-fail-info">${lastSeen}</span>
+                            ${lastSeenHtml}
                             <span class="text-muted mapping-fail-info">${c.total_count}x (${breakdown.join(", ")})</span>
                             <div class="mapping-fail-actions"></div>
                         </div>

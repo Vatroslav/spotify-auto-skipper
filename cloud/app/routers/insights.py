@@ -5,7 +5,7 @@ Insights API routes.
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from app.config import load_settings
+from app.config import get_lastfm_username, load_settings
 from app.database import (
     add_track_alias,
     confirm_track_alias,
@@ -60,6 +60,7 @@ async def get_mapping_fails(request: Request):
     candidates = await get_mapping_fail_candidates(settings["skip_window_days"])
     return {
         "skip_window_days": settings["skip_window_days"],
+        "lastfm_username": get_lastfm_username(),
         "candidates": candidates,
     }
 
