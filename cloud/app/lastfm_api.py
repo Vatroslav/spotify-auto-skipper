@@ -189,6 +189,83 @@ async def get_nowplaying(username: str = "") -> dict | None:
     return {"artist": artist_name, "name": name}
 
 
+# ── Recent tracks (read) ─────────────────────────────────────────
+
+
+async def get_recent_tracks(from_uts: int, to_uts: int, username: str = "") -> list[dict] | str:
+    """Return scrobbles with a UTS in [from_uts, to_uts], paginated.
+
+    Each entry: {"artist": str, "name": str, "uts": int}. The live nowplaying
+    entry (which has no `date`) is skipped. Returns LASTFM_ERROR on failure.
+    """
+    user = username or get_lastfm_username()
+    if not user:
+        return []
+    api_key = get_lastfm_api_key()
+    if not api_key:
+        return []
+
+    results: list[dict] = []
+    page = 1
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            while True:
+                r = await client.get(
+                    LASTFM_API_URL,
+                    params={
+                        "method": "user.getrecenttracks",
+                        "user": user,
+                        "api_key": api_key,
+                        "format": "json",
+                        "limit": 200,
+                        "page": page,
+                        "from": from_uts,
+                        "to": to_uts,
+                    },
+                )
+                if r.status_code != 200:
+                    logger.warning(
+                        "[Last.fm] getRecentTracks status %d: %s", r.status_code, r.text[:200]
+                    )
+                    return LASTFM_ERROR
+                data = r.json() or {}
+                rt = data.get("recenttracks", {})
+                tracks = rt.get("track", [])
+                if isinstance(tracks, dict):
+                    tracks = [tracks]
+                for t in tracks:
+                    attr = t.get("@attr") or {}
+                    if str(attr.get("nowplaying", "")).lower() == "true":
+                        continue  # live track, not a completed scrobble
+                    artist_obj = t.get("artist") or {}
+                    artist_name = (
+                        artist_obj.get("#text") if isinstance(artist_obj, dict) else str(artist_obj)
+                    )
+                    name = t.get("name", "")
+                    date_obj = t.get("date") or {}
+                    uts_raw = date_obj.get("uts") if isinstance(date_obj, dict) else None
+                    try:
+                        uts = int(uts_raw) if uts_raw else None
+                    except (ValueError, TypeError):
+                        uts = None
+                    if artist_name and name and uts is not None:
+                        results.append({"artist": artist_name, "name": name, "uts": uts})
+
+                attr = rt.get("@attr", {})
+                try:
+                    total_pages = int(attr.get("totalPages", 1))
+                except (ValueError, TypeError):
+                    total_pages = 1
+                if page >= total_pages:
+                    break
+                page += 1
+    except httpx.RequestError as e:
+        logger.warning("[Last.fm] Network error fetching recent tracks: %s", e)
+        return LASTFM_ERROR
+
+    return results
+
+
 # ── Loved tracks (read) ──────────────────────────────────────────
 
 

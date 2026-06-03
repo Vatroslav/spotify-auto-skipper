@@ -1,26 +1,42 @@
 {% extends "base.html" %}
 {% block title %}Dashboard - Spotify Auto-Skipper{% endblock %}
 {% block content %}
-<div class="container">
-    <div class="card now-playing">
-        <div id="last-checked-time" class="last-checked-time">&nbsp;</div>
-        <div id="next-check" class="next-check">&nbsp;</div>
-        <img id="album-art" class="album-art hidden" src="" alt="">
-        <div id="track-info" class="hidden">
-            <div id="track-name" class="track-name"></div>
-            <div id="artist-name" class="artist-name"></div>
-            <div id="last-check" class="last-check"></div>
-        </div>
-        <div id="nothing-playing" class="nothing-playing">Nothing is playing</div>
-        <div id="status-badge" class="status-badge offline">Connecting...</div>
-    </div>
+<div class="container container-wide">
+    <div class="dashboard-grid">
+        <div class="dashboard-main">
+            <div class="card now-playing">
+                <div id="last-checked-time" class="last-checked-time">&nbsp;</div>
+                <div id="next-check" class="next-check">&nbsp;</div>
+                <img id="album-art" class="album-art hidden" src="" alt="">
+                <div id="track-info" class="hidden">
+                    <div id="track-name" class="track-name"></div>
+                    <div id="artist-name" class="artist-name"></div>
+                    <div id="last-check" class="last-check"></div>
+                </div>
+                <div id="nothing-playing" class="nothing-playing">Nothing is playing</div>
+                <div id="status-badge" class="status-badge offline">Connecting...</div>
+            </div>
 
-    <div class="btn-group">
-        <button id="pause-btn" class="btn btn-full">Pause Skipping</button>
-        <button id="skip-one-pause-btn" class="btn btn-full">Don't Skip This Song</button>
-        <button id="like-btn" class="btn btn-full" disabled>Add to Liked Songs</button>
-        <button id="check-now-btn" class="btn btn-accent btn-full">Check Now</button>
-        <button id="remove-from-playlist-btn" class="btn btn-danger btn-full" disabled>Remove from Playlist</button>
+            <div class="btn-group">
+                <button id="pause-btn" class="btn btn-full">Pause Skipping</button>
+                <button id="skip-one-pause-btn" class="btn btn-full">Don't Skip This Song</button>
+                <button id="like-btn" class="btn btn-full" disabled>Add to Liked Songs</button>
+                <button id="check-now-btn" class="btn btn-accent btn-full">Check Now</button>
+                <button id="remove-from-playlist-btn" class="btn btn-danger btn-full" disabled>Remove from Playlist</button>
+            </div>
+
+            <button id="chart-toggle" class="chart-toggle" aria-expanded="false">Show artist chart</button>
+        </div>
+
+        <div class="dashboard-side">
+            <div class="card artist-chart-card">
+                <div class="card-title">Last 7 days by artist</div>
+                <div id="artist-chart" class="artist-chart">
+                    <div class="artist-chart-empty text-muted">Loading…</div>
+                </div>
+                <div id="artist-chart-legend" class="artist-chart-legend"></div>
+            </div>
+        </div>
     </div>
 
     <div class="version-text"><a href="https://github.com/Vatroslav/spotify-auto-skipper" target="_blank" rel="noopener">{{ version }}</a></div>

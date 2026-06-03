@@ -755,6 +755,131 @@ input:focus, select:focus {
     padding: 16px 0;
 }
 
+/* ── Dashboard layout (chart beside Now Playing) ─── */
+
+.dashboard-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Chart hidden by default; revealed via the toggle (adds .chart-open). */
+.dashboard-side { display: none; }
+.container-wide.chart-open .dashboard-side { display: block; }
+
+.chart-toggle {
+    display: block;
+    margin: 4px auto 0;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    padding: 4px 8px;
+    cursor: pointer;
+}
+
+.chart-toggle:hover { color: var(--text-secondary); }
+
+@media (min-width: 820px) {
+    .container-wide.chart-open { max-width: 1040px; }
+    .container-wide.chart-open .dashboard-grid {
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 16px;
+    }
+    .container-wide.chart-open .dashboard-main { flex: 0 0 380px; }
+    .container-wide.chart-open .dashboard-side {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .container-wide.chart-open .dashboard-side .card { margin-bottom: 0; }
+}
+
+/* ── Artist chart (dashboard) ────────────────────── */
+
+.artist-chart {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 3px;
+}
+
+.artist-chart-col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.artist-chart-total {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    min-height: 1em;
+    line-height: 1;
+}
+
+.artist-chart-bar {
+    width: 100%;
+    max-width: 64px;
+    display: flex;
+    flex-direction: column-reverse;
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--bg-input);
+}
+
+.artist-chart-seg {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+    overflow: hidden;
+}
+
+.artist-chart-label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.artist-chart-empty {
+    width: 100%;
+    text-align: center;
+    padding: 56px 0;
+    font-size: 0.85rem;
+}
+
+.artist-chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    justify-content: center;
+    margin-top: 14px;
+}
+
+.artist-chart-legend:empty { margin-top: 0; }
+
+.artist-chart-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.artist-chart-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
 /* ── Toast ───────────────────────────────────────── */
 
 .toast {

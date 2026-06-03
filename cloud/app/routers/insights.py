@@ -5,6 +5,7 @@ Insights API routes.
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
+from app.artist_stats import get_artist_daily
 from app.config import get_lastfm_username, load_settings
 from app.database import (
     add_track_alias,
@@ -51,6 +52,12 @@ async def get_overall_insights(request: Request, tz: str = ""):
     insights = generate_insights_all(metrics, settings["skip_window_days"])
 
     return {"metrics": metrics, "insights": insights}
+
+
+@router.get("/artist-daily")
+async def artist_daily(request: Request, tz: str = ""):
+    """Per-day, per-artist scrobble counts for the last 7 full days (Last.fm)."""
+    return await get_artist_daily(tz)
 
 
 @router.get("/mapping-fails")

@@ -1173,6 +1173,132 @@ function initLogs() {
 }
 
 
+// ── Artist chart (dashboard) ────────────────────────────────────
+
+function initArtistChart() {
+    const chart = document.getElementById("artist-chart");
+    const legendEl = document.getElementById("artist-chart-legend");
+    const toggleBtn = document.getElementById("chart-toggle");
+    if (!chart || !toggleBtn) return; // Not on dashboard
+
+    const container = chart.closest(".container");
+    const STORE_KEY = "artistChartVisible";
+    const COLORS = ["#1DB954", "#60a5fa", "#fb923c", "#c084fc", "#f87171", "#4ade80"];
+    const BAR_HEIGHT = 170; // px — full bar = 100% of that day's plays
+    const LABEL_MIN = 15; // min segment height (px) to show the play count inside
+    const tz = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
+
+    let loaded = false; // fetch lazily, only once the chart is first revealed
+
+    function weekday(dateStr) {
+        const d = new Date(dateStr + "T00:00:00");
+        return d.toLocaleDateString([], { weekday: "short" });
+    }
+
+    function showMessage(msg) {
+        chart.innerHTML = `<div class="artist-chart-empty text-muted">${escapeHtml(msg)}</div>`;
+        if (legendEl) legendEl.innerHTML = "";
+    }
+
+    async function load() {
+        let data;
+        try {
+            data = await API.get(`/api/insights/artist-daily?tz=${tz}`);
+        } catch {
+            showMessage("Failed to load chart.");
+            return;
+        }
+        if (data.error) {
+            showMessage(data.error);
+            return;
+        }
+        const artists = data.artists || [];
+        const days = data.days || [];
+        if (!artists.length || !days.some(d => d.total > 0)) {
+            showMessage("No scrobbles in the last 7 days.");
+            return;
+        }
+
+        chart.innerHTML = "";
+        days.forEach(day => {
+            const dayTotal = day.total; // sum across top artists this day
+            const col = document.createElement("div");
+            col.className = "artist-chart-col";
+
+            const total = document.createElement("div");
+            total.className = "artist-chart-total";
+            total.textContent = dayTotal > 0 ? dayTotal : "";
+
+            const bar = document.createElement("div");
+            bar.className = "artist-chart-bar";
+            bar.style.height = `${BAR_HEIGHT}px`;
+
+            // Each bar fills to 100%: segment = artist's share of the day's plays.
+            // Segments stack bottom→top (column-reverse) in top-artist order.
+            artists.forEach((name, i) => {
+                const c = day.counts[i] || 0;
+                if (c <= 0) return;
+                const share = c / dayTotal;
+                const h = share * BAR_HEIGHT;
+                const seg = document.createElement("div");
+                seg.className = "artist-chart-seg";
+                seg.style.height = `${h}px`;
+                seg.style.background = COLORS[i % COLORS.length];
+                seg.title = `${name}: ${c} (${Math.round(share * 100)}%) on ${day.date}`;
+                if (h >= LABEL_MIN) seg.textContent = c; // show count only if it fits
+                bar.appendChild(seg);
+            });
+
+            const label = document.createElement("div");
+            label.className = "artist-chart-label";
+            label.textContent = weekday(day.date);
+            label.title = day.date;
+
+            col.appendChild(total);
+            col.appendChild(bar);
+            col.appendChild(label);
+            chart.appendChild(col);
+        });
+
+        // Legend
+        if (legendEl) {
+            legendEl.innerHTML = "";
+            artists.forEach((name, i) => {
+                const li = document.createElement("div");
+                li.className = "artist-chart-legend-item";
+                const swatch = document.createElement("span");
+                swatch.className = "artist-chart-swatch";
+                swatch.style.background = COLORS[i % COLORS.length];
+                const span = document.createElement("span");
+                span.textContent = name;
+                li.appendChild(swatch);
+                li.appendChild(span);
+                legendEl.appendChild(li);
+            });
+        }
+    }
+
+    function setOpen(open) {
+        if (container) container.classList.toggle("chart-open", open);
+        toggleBtn.textContent = open ? "Hide artist chart" : "Show artist chart";
+        toggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        try { localStorage.setItem(STORE_KEY, open ? "1" : "0"); } catch { /* ignore */ }
+        if (open && !loaded) {
+            loaded = true;
+            load();
+        }
+    }
+
+    toggleBtn.addEventListener("click", () => {
+        setOpen(!(container && container.classList.contains("chart-open")));
+    });
+
+    let initialOpen = false;
+    try { initialOpen = localStorage.getItem(STORE_KEY) === "1"; } catch { /* ignore */ }
+    setOpen(initialOpen);
+}
+
+
 // ── Utilities ───────────────────────────────────────────────────
 
 function escapeHtml(text) {
@@ -1186,6 +1312,7 @@ function escapeHtml(text) {
 
 document.addEventListener("DOMContentLoaded", () => {
     initDashboard();
+    initArtistChart();
     initSettings();
     initArtists();
     initInsights();
