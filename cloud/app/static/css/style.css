@@ -761,7 +761,7 @@ input:focus, select:focus {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: 6px;
+    gap: 3px;
 }
 
 .artist-chart-col {
@@ -782,7 +782,7 @@ input:focus, select:focus {
 
 .artist-chart-bar {
     width: 100%;
-    max-width: 40px;
+    max-width: 64px;
     display: flex;
     flex-direction: column-reverse;
     border-radius: 4px;
