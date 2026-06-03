@@ -1178,12 +1178,17 @@ function initLogs() {
 function initArtistChart() {
     const chart = document.getElementById("artist-chart");
     const legendEl = document.getElementById("artist-chart-legend");
-    if (!chart) return; // Not on dashboard
+    const toggleBtn = document.getElementById("chart-toggle");
+    if (!chart || !toggleBtn) return; // Not on dashboard
 
+    const container = chart.closest(".container");
+    const STORE_KEY = "artistChartVisible";
     const COLORS = ["#1DB954", "#60a5fa", "#fb923c", "#c084fc", "#f87171", "#4ade80"];
     const BAR_HEIGHT = 170; // px — full bar = 100% of that day's plays
     const LABEL_MIN = 15; // min segment height (px) to show the play count inside
     const tz = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
+
+    let loaded = false; // fetch lazily, only once the chart is first revealed
 
     function weekday(dateStr) {
         const d = new Date(dateStr + "T00:00:00");
@@ -1273,7 +1278,24 @@ function initArtistChart() {
         }
     }
 
-    load();
+    function setOpen(open) {
+        if (container) container.classList.toggle("chart-open", open);
+        toggleBtn.textContent = open ? "Hide artist chart" : "Show artist chart";
+        toggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        try { localStorage.setItem(STORE_KEY, open ? "1" : "0"); } catch { /* ignore */ }
+        if (open && !loaded) {
+            loaded = true;
+            load();
+        }
+    }
+
+    toggleBtn.addEventListener("click", () => {
+        setOpen(!(container && container.classList.contains("chart-open")));
+    });
+
+    let initialOpen = false;
+    try { initialOpen = localStorage.getItem(STORE_KEY) === "1"; } catch { /* ignore */ }
+    setOpen(initialOpen);
 }
 
 

@@ -763,19 +763,36 @@ input:focus, select:focus {
     gap: 12px;
 }
 
+/* Chart hidden by default; revealed via the toggle (adds .chart-open). */
+.dashboard-side { display: none; }
+.container-wide.chart-open .dashboard-side { display: block; }
+
+.chart-toggle {
+    display: block;
+    margin: 4px auto 0;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    padding: 4px 8px;
+    cursor: pointer;
+}
+
+.chart-toggle:hover { color: var(--text-secondary); }
+
 @media (min-width: 820px) {
-    .container-wide { max-width: 1040px; }
-    .dashboard-grid {
+    .container-wide.chart-open { max-width: 1040px; }
+    .container-wide.chart-open .dashboard-grid {
         flex-direction: row;
         align-items: flex-start;
         gap: 16px;
     }
-    .dashboard-main { flex: 0 0 380px; }
-    .dashboard-side {
+    .container-wide.chart-open .dashboard-main { flex: 0 0 380px; }
+    .container-wide.chart-open .dashboard-side {
         flex: 1 1 auto;
         min-width: 0;
     }
-    .dashboard-side .card { margin-bottom: 0; }
+    .container-wide.chart-open .dashboard-side .card { margin-bottom: 0; }
 }
 
 /* ── Artist chart (dashboard) ────────────────────── */
