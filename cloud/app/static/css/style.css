@@ -758,24 +758,54 @@ input:focus, select:focus {
 /* ── Artist chart (dashboard) ────────────────────── */
 
 .artist-chart {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.artist-chart-col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.artist-chart-total {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    min-height: 1em;
+    line-height: 1;
+}
+
+.artist-chart-bar {
     width: 100%;
+    max-width: 40px;
+    display: flex;
+    flex-direction: column-reverse;
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--bg-input);
 }
 
-.artist-chart-svg {
-    display: block;
+.artist-chart-seg {
     width: 100%;
-    height: auto;
-    overflow: visible;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+    overflow: hidden;
 }
 
-.artist-chart-grid {
-    stroke: var(--border-secondary);
-    stroke-width: 1;
-}
-
-.artist-chart-axis {
-    fill: var(--text-muted);
-    font-size: 11px;
+.artist-chart-label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
 }
 
 .artist-chart-empty {
