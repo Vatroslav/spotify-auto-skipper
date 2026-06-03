@@ -5,8 +5,8 @@ own `track_events`, which only capture skip-detection while the worker runs and
 would distort actual play counts (skipped tracks inflate, off-app plays vanish).
 
 Counts are per-artist scrobbles (plays) per local day, for the last
-WINDOW_DAYS full days, excluding today. Results are cached per (tz, end_date)
-since the data only changes once a day.
+WINDOW_DAYS full days, excluding today, limited to the global top artists.
+Results are cached per (tz, end_date) since the data only changes once a day.
 """
 
 import logging
@@ -39,7 +39,7 @@ async def get_artist_daily(tz: str = "") -> dict:
       {
         "start": "YYYY-MM-DD", "end": "YYYY-MM-DD",
         "artists": [name, ...],            # global top artists, count desc
-        "days": [{"date", "counts": [int per top artist], "other", "total"}],
+        "days": [{"date", "counts": [int per top artist], "total"}],
         "error"?: str,                     # present only on Last.fm failure
       }
     """
@@ -86,19 +86,16 @@ async def get_artist_daily(tz: str = "") -> dict:
     # Global top artists (count desc, then name for stable ordering/colors).
     top = sorted(total_by_artist.items(), key=lambda kv: (-kv[1], kv[0]))[:TOP_ARTISTS]
     top_artists = [name for name, _ in top]
-    top_set = set(top_artists)
 
     days = []
     for d in day_dates:
         day_map = per_day[d.isoformat()]
         counts = [day_map.get(a, 0) for a in top_artists]
-        other = sum(c for a, c in day_map.items() if a not in top_set)
         days.append(
             {
                 "date": d.isoformat(),
                 "counts": counts,
-                "other": other,
-                "total": sum(day_map.values()),
+                "total": sum(counts),  # total across top artists only
             }
         )
 

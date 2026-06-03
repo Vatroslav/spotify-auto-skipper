@@ -1181,9 +1181,12 @@ function initArtistChart() {
     if (!chart) return; // Not on dashboard
 
     const COLORS = ["#1DB954", "#60a5fa", "#fb923c", "#c084fc", "#f87171", "#4ade80"];
-    const OTHER_COLOR = "#4b5563";
-    const CHART_HEIGHT = 140; // px — plot area for the tallest day
+    const HEIGHT = 180; // px
+    const PAD = { top: 14, right: 12, bottom: 24, left: 30 };
+    const SVG_NS = "http://www.w3.org/2000/svg";
     const tz = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
+
+    let lastData = null; // cached payload so resize can re-render without refetch
 
     function weekday(dateStr) {
         const d = new Date(dateStr + "T00:00:00");
@@ -1193,6 +1196,113 @@ function initArtistChart() {
     function showMessage(msg) {
         chart.innerHTML = `<div class="artist-chart-empty text-muted">${escapeHtml(msg)}</div>`;
         if (legendEl) legendEl.innerHTML = "";
+    }
+
+    function svgEl(name, attrs) {
+        const el = document.createElementNS(SVG_NS, name);
+        for (const k in attrs) el.setAttribute(k, attrs[k]);
+        return el;
+    }
+
+    // "Nice" axis maximum so y gridlines land on round numbers.
+    function niceMax(value) {
+        if (value <= 4) return Math.max(1, value);
+        const pow = Math.pow(10, Math.floor(Math.log10(value)));
+        for (const m of [1, 2, 2.5, 5, 10]) {
+            const step = m * pow;
+            if (Math.ceil(value / step) * step >= value) {
+                const candidate = Math.ceil(value / step) * step;
+                if (candidate >= value) return candidate;
+            }
+        }
+        return value;
+    }
+
+    function render() {
+        const data = lastData;
+        if (!data) return;
+        const artists = data.artists || [];
+        const days = data.days || [];
+
+        const width = Math.max(260, chart.clientWidth || 320);
+        const plotW = width - PAD.left - PAD.right;
+        const plotH = HEIGHT - PAD.top - PAD.bottom;
+        const n = days.length;
+
+        const rawMax = Math.max(1, ...days.flatMap(d => d.counts));
+        const yMax = niceMax(rawMax);
+        const x = i => PAD.left + (n <= 1 ? plotW / 2 : (plotW * i) / (n - 1));
+        const y = v => PAD.top + plotH * (1 - v / yMax);
+
+        const svg = svgEl("svg", {
+            class: "artist-chart-svg",
+            viewBox: `0 0 ${width} ${HEIGHT}`,
+            width: width,
+            height: HEIGHT,
+            role: "img",
+        });
+
+        // Horizontal gridlines + y labels (0 and yMax, plus midpoint when even).
+        const yTicks = yMax % 2 === 0 ? [0, yMax / 2, yMax] : [0, yMax];
+        yTicks.forEach(t => {
+            svg.appendChild(svgEl("line", {
+                x1: PAD.left, y1: y(t), x2: width - PAD.right, y2: y(t),
+                class: "artist-chart-grid",
+            }));
+            const label = svgEl("text", {
+                x: PAD.left - 6, y: y(t) + 3, class: "artist-chart-axis", "text-anchor": "end",
+            });
+            label.textContent = t;
+            svg.appendChild(label);
+        });
+
+        // X labels (weekday under each point).
+        days.forEach((d, i) => {
+            const label = svgEl("text", {
+                x: x(i), y: HEIGHT - 8, class: "artist-chart-axis", "text-anchor": "middle",
+            });
+            label.textContent = weekday(d.date);
+            label.appendChild(svgEl("title", {})).textContent = d.date;
+            svg.appendChild(label);
+        });
+
+        // One line + points per artist.
+        artists.forEach((name, ai) => {
+            const color = COLORS[ai % COLORS.length];
+            const pts = days.map((d, i) => `${x(i)},${y(d.counts[ai] || 0)}`).join(" ");
+            svg.appendChild(svgEl("polyline", {
+                points: pts, fill: "none", stroke: color, "stroke-width": 2,
+                "stroke-linejoin": "round", "stroke-linecap": "round",
+            }));
+            days.forEach((d, i) => {
+                const c = d.counts[ai] || 0;
+                const dot = svgEl("circle", { cx: x(i), cy: y(c), r: 2.5, fill: color });
+                const title = svgEl("title", {});
+                title.textContent = `${name}: ${c} on ${d.date}`;
+                dot.appendChild(title);
+                svg.appendChild(dot);
+            });
+        });
+
+        chart.innerHTML = "";
+        chart.appendChild(svg);
+
+        // Legend
+        if (legendEl) {
+            legendEl.innerHTML = "";
+            artists.forEach((name, i) => {
+                const li = document.createElement("div");
+                li.className = "artist-chart-legend-item";
+                const swatch = document.createElement("span");
+                swatch.className = "artist-chart-swatch";
+                swatch.style.background = COLORS[i % COLORS.length];
+                const span = document.createElement("span");
+                span.textContent = name;
+                li.appendChild(swatch);
+                li.appendChild(span);
+                legendEl.appendChild(li);
+            });
+        }
     }
 
     async function load() {
@@ -1207,76 +1317,20 @@ function initArtistChart() {
             showMessage(data.error);
             return;
         }
-
-        const artists = data.artists || [];
-        const days = data.days || [];
-        if (!days.some(d => d.total > 0)) {
+        if (!(data.artists || []).length || !(data.days || []).some(d => d.total > 0)) {
             showMessage("No scrobbles in the last 7 days.");
             return;
         }
-
-        const maxTotal = Math.max(1, ...days.map(d => d.total));
-        chart.innerHTML = "";
-
-        days.forEach(day => {
-            const col = document.createElement("div");
-            col.className = "artist-chart-col";
-
-            const total = document.createElement("div");
-            total.className = "artist-chart-total";
-            total.textContent = day.total > 0 ? day.total : "";
-
-            const bar = document.createElement("div");
-            bar.className = "artist-chart-bar";
-            bar.style.height = `${CHART_HEIGHT}px`;
-
-            // Segments bottom→top (column-reverse): top artists in order, then Other.
-            const segs = [];
-            artists.forEach((name, i) => {
-                const c = day.counts[i] || 0;
-                if (c > 0) segs.push({ name, count: c, color: COLORS[i % COLORS.length] });
-            });
-            if (day.other > 0) segs.push({ name: "Other", count: day.other, color: OTHER_COLOR });
-
-            segs.forEach(s => {
-                const seg = document.createElement("div");
-                seg.className = "artist-chart-seg";
-                seg.style.height = `${(s.count / maxTotal) * CHART_HEIGHT}px`;
-                seg.style.background = s.color;
-                seg.title = `${s.name}: ${s.count} on ${day.date}`;
-                bar.appendChild(seg);
-            });
-
-            const label = document.createElement("div");
-            label.className = "artist-chart-label";
-            label.textContent = weekday(day.date);
-            label.title = day.date;
-
-            col.appendChild(total);
-            col.appendChild(bar);
-            col.appendChild(label);
-            chart.appendChild(col);
-        });
-
-        // Legend
-        if (legendEl) {
-            legendEl.innerHTML = "";
-            const items = artists.map((name, i) => ({ name, color: COLORS[i % COLORS.length] }));
-            if (days.some(d => d.other > 0)) items.push({ name: "Other", color: OTHER_COLOR });
-            items.forEach(item => {
-                const li = document.createElement("div");
-                li.className = "artist-chart-legend-item";
-                const swatch = document.createElement("span");
-                swatch.className = "artist-chart-swatch";
-                swatch.style.background = item.color;
-                const span = document.createElement("span");
-                span.textContent = item.name;
-                li.appendChild(swatch);
-                li.appendChild(span);
-                legendEl.appendChild(li);
-            });
-        }
+        lastData = data;
+        render();
     }
+
+    // Re-render on resize (debounced) so the SVG stays crisp at any width.
+    let resizeTimer = null;
+    window.addEventListener("resize", () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => { if (lastData) render(); }, 150);
+    });
 
     load();
 }

@@ -758,10 +758,24 @@ input:focus, select:focus {
 /* ── Artist chart (dashboard) ────────────────────── */
 
 .artist-chart {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 6px;
+    width: 100%;
+}
+
+.artist-chart-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.artist-chart-grid {
+    stroke: var(--border-secondary);
+    stroke-width: 1;
+}
+
+.artist-chart-axis {
+    fill: var(--text-muted);
+    font-size: 11px;
 }
 
 .artist-chart-empty {
@@ -769,41 +783,6 @@ input:focus, select:focus {
     text-align: center;
     padding: 56px 0;
     font-size: 0.85rem;
-}
-
-.artist-chart-col {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    min-width: 0;
-}
-
-.artist-chart-total {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    min-height: 1em;
-    line-height: 1;
-}
-
-.artist-chart-bar {
-    width: 100%;
-    max-width: 36px;
-    display: flex;
-    flex-direction: column-reverse;
-    justify-content: flex-start;
-    border-radius: 4px;
-    overflow: hidden;
-    background: var(--bg-input);
-}
-
-.artist-chart-seg { width: 100%; }
-
-.artist-chart-label {
-    font-size: 0.7rem;
-    color: var(--text-secondary);
-    white-space: nowrap;
 }
 
 .artist-chart-legend {
