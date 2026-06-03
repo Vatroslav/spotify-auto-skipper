@@ -23,6 +23,14 @@
         <button id="remove-from-playlist-btn" class="btn btn-danger btn-full" disabled>Remove from Playlist</button>
     </div>
 
+    <div class="card artist-chart-card">
+        <div class="card-title">Last 7 days by artist</div>
+        <div id="artist-chart" class="artist-chart">
+            <div class="artist-chart-empty text-muted">Loading…</div>
+        </div>
+        <div id="artist-chart-legend" class="artist-chart-legend"></div>
+    </div>
+
     <div class="version-text"><a href="https://github.com/Vatroslav/spotify-auto-skipper" target="_blank" rel="noopener">{{ version }}</a></div>
 </div>
 {% endblock %}

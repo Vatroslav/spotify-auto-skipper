@@ -1173,6 +1173,115 @@ function initLogs() {
 }
 
 
+// ── Artist chart (dashboard) ────────────────────────────────────
+
+function initArtistChart() {
+    const chart = document.getElementById("artist-chart");
+    const legendEl = document.getElementById("artist-chart-legend");
+    if (!chart) return; // Not on dashboard
+
+    const COLORS = ["#1DB954", "#60a5fa", "#fb923c", "#c084fc", "#f87171", "#4ade80"];
+    const OTHER_COLOR = "#4b5563";
+    const CHART_HEIGHT = 140; // px — plot area for the tallest day
+    const tz = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
+
+    function weekday(dateStr) {
+        const d = new Date(dateStr + "T00:00:00");
+        return d.toLocaleDateString([], { weekday: "short" });
+    }
+
+    function showMessage(msg) {
+        chart.innerHTML = `<div class="artist-chart-empty text-muted">${escapeHtml(msg)}</div>`;
+        if (legendEl) legendEl.innerHTML = "";
+    }
+
+    async function load() {
+        let data;
+        try {
+            data = await API.get(`/api/insights/artist-daily?tz=${tz}`);
+        } catch {
+            showMessage("Failed to load chart.");
+            return;
+        }
+        if (data.error) {
+            showMessage(data.error);
+            return;
+        }
+
+        const artists = data.artists || [];
+        const days = data.days || [];
+        if (!days.some(d => d.total > 0)) {
+            showMessage("No scrobbles in the last 7 days.");
+            return;
+        }
+
+        const maxTotal = Math.max(1, ...days.map(d => d.total));
+        chart.innerHTML = "";
+
+        days.forEach(day => {
+            const col = document.createElement("div");
+            col.className = "artist-chart-col";
+
+            const total = document.createElement("div");
+            total.className = "artist-chart-total";
+            total.textContent = day.total > 0 ? day.total : "";
+
+            const bar = document.createElement("div");
+            bar.className = "artist-chart-bar";
+            bar.style.height = `${CHART_HEIGHT}px`;
+
+            // Segments bottom→top (column-reverse): top artists in order, then Other.
+            const segs = [];
+            artists.forEach((name, i) => {
+                const c = day.counts[i] || 0;
+                if (c > 0) segs.push({ name, count: c, color: COLORS[i % COLORS.length] });
+            });
+            if (day.other > 0) segs.push({ name: "Other", count: day.other, color: OTHER_COLOR });
+
+            segs.forEach(s => {
+                const seg = document.createElement("div");
+                seg.className = "artist-chart-seg";
+                seg.style.height = `${(s.count / maxTotal) * CHART_HEIGHT}px`;
+                seg.style.background = s.color;
+                seg.title = `${s.name}: ${s.count} on ${day.date}`;
+                bar.appendChild(seg);
+            });
+
+            const label = document.createElement("div");
+            label.className = "artist-chart-label";
+            label.textContent = weekday(day.date);
+            label.title = day.date;
+
+            col.appendChild(total);
+            col.appendChild(bar);
+            col.appendChild(label);
+            chart.appendChild(col);
+        });
+
+        // Legend
+        if (legendEl) {
+            legendEl.innerHTML = "";
+            const items = artists.map((name, i) => ({ name, color: COLORS[i % COLORS.length] }));
+            if (days.some(d => d.other > 0)) items.push({ name: "Other", color: OTHER_COLOR });
+            items.forEach(item => {
+                const li = document.createElement("div");
+                li.className = "artist-chart-legend-item";
+                const swatch = document.createElement("span");
+                swatch.className = "artist-chart-swatch";
+                swatch.style.background = item.color;
+                const span = document.createElement("span");
+                span.textContent = item.name;
+                li.appendChild(swatch);
+                li.appendChild(span);
+                legendEl.appendChild(li);
+            });
+        }
+    }
+
+    load();
+}
+
+
 // ── Utilities ───────────────────────────────────────────────────
 
 function escapeHtml(text) {
@@ -1186,6 +1295,7 @@ function escapeHtml(text) {
 
 document.addEventListener("DOMContentLoaded", () => {
     initDashboard();
+    initArtistChart();
     initSettings();
     initArtists();
     initInsights();
