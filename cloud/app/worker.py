@@ -15,9 +15,10 @@ from app.database import (
     is_artist_never_skipped,
     purge_old_logs,
     recompute_overall_metrics,
+    set_reauth_required,
 )
 from app.lastfm_api import LASTFM_ERROR, get_last_play_date
-from app.spotify_api import CredentialError
+from app.spotify_api import CredentialError, ReauthRequiredError
 from app.state import app_state
 
 
@@ -87,7 +88,14 @@ async def polling_loop():
 
     try:
         await client.get_token()
+        # A successful token acquisition means any prior re-auth requirement is
+        # resolved — self-heal the persisted flag in case it was left stale.
+        await set_reauth_required(False)
         await _log("Spotify token acquired. Worker started.")
+    except ReauthRequiredError as e:
+        await _log(f"Spotify re-authorization required: {e} — visit /auth/login to reconnect.", "error")
+        app_state.worker_running = False
+        return
     except CredentialError as e:
         await _log(f"Credential error: {e}", "error")
         app_state.worker_running = False
@@ -322,6 +330,13 @@ async def polling_loop():
                 )
                 await _update_skip_streak(False)
 
+        except ReauthRequiredError as e:
+            # Refresh token died (e.g. six-month expiry). The dead token and the
+            # persisted re-auth flag are already handled in refresh_access_token;
+            # surface it and stop so the dashboard can prompt a reconnect.
+            await _log(f"Spotify re-authorization required: {e} — visit /auth/login to reconnect.", "error")
+            app_state.worker_running = False
+            return
         except CredentialError as e:
             await _log(f"Credential error: {e}", "error")
             app_state.worker_running = False

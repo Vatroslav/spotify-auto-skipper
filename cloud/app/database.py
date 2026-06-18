@@ -1030,6 +1030,23 @@ async def save_oauth_tokens(access_token: str, refresh_token: str, expires_at: s
         await db.close()
 
 
+# Persisted across container restarts (the in-memory worker state is not), so a
+# dead refresh token still surfaces the re-auth prompt after Docker recreates
+# the container. Lives in the settings table — untouched by load/save_settings,
+# which only handle keys in CONFIG_DEFAULTS.
+_REAUTH_FLAG_KEY = "spotify_reauth_required"
+
+
+async def set_reauth_required(value: bool):
+    """Persist whether the user must re-authorize Spotify (refresh token died)."""
+    await set_setting(_REAUTH_FLAG_KEY, "true" if value else "false")
+
+
+async def is_reauth_required() -> bool:
+    """Return True if a refresh failed with invalid_grant and no re-auth happened since."""
+    return (await get_setting(_REAUTH_FLAG_KEY, "false")) == "true"
+
+
 # ── Mapping fail candidates ──────────────────────────────────────
 
 

@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
 from app.config import get_allowed_spotify_user, get_base_url, get_spotify_client_id, get_spotify_client_secret
-from app.database import clear_oauth_tokens, save_oauth_tokens
+from app.database import clear_oauth_tokens, save_oauth_tokens, set_reauth_required
 from app.routers.deps import require_auth
 from app.state import app_state
 
@@ -108,6 +108,9 @@ async def callback(request: Request, code: str = "", state: str = "", error: str
             return RedirectResponse("/unauthorized")
 
     await save_oauth_tokens(access_token, refresh_token, expires_at.isoformat())
+    # Fresh token — clear any "re-authorization required" state so the dashboard
+    # banner disappears immediately on redirect.
+    await set_reauth_required(False)
 
     request.session["authenticated"] = True
     request.session.pop("oauth_state", None)
