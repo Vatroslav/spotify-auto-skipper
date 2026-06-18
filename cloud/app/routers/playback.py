@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from app.config import load_settings
-from app.database import add_log, add_track_alias, get_lastfm_session, get_track_alias
+from app.database import add_log, add_track_alias, get_lastfm_session, get_track_alias, is_reauth_required
 from app.lastfm_api import get_nowplaying, track_love, track_unlove
 from app.loved_sync import _normalize, _similarity
 from app.routers.deps import require_auth
@@ -40,6 +40,7 @@ async def get_playback(request: Request):
         "track": track,
         "skipping_paused": app_state.skipping_paused,
         "worker_running": app_state.worker_running,
+        "reauth_required": await is_reauth_required(),
         "last_checked": app_state.last_checked_timestamp.isoformat() if app_state.last_checked_timestamp else None,
         "last_check_message": app_state.last_check_message,
         "poll_interval": settings["idle_poll_interval_seconds"]

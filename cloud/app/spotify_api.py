@@ -9,11 +9,23 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 
-from app.database import get_oauth_tokens, save_oauth_tokens
+from app.database import clear_oauth_tokens, get_oauth_tokens, save_oauth_tokens, set_reauth_required
 
 
 class CredentialError(Exception):
     """Raised when Spotify credentials are invalid or expired."""
+
+    pass
+
+
+class ReauthRequiredError(CredentialError):
+    """Raised when the stored refresh token is dead and the user must sign in again.
+
+    Subclass of CredentialError so existing ``except CredentialError`` handlers
+    still catch it, but callers can distinguish the "send the user back through
+    Spotify sign-in" case (expired/revoked refresh token) from transient or
+    config credential errors (network blip, bad client secret).
+    """
 
     pass
 
@@ -84,7 +96,16 @@ class SpotifyClient:
             if err_type == "invalid_client":
                 raise CredentialError(f"Invalid Spotify client ID or secret. ({err_desc})")
             elif err_type == "invalid_grant":
-                raise CredentialError(f"Invalid or expired refresh token. Please re-authorize. ({err_desc})")
+                # Refresh token expired or revoked. Spotify expires refresh
+                # tokens after six months (effective 2026-07-20). Per Spotify's
+                # guidance: discard the dead token so we never retry it, flag
+                # that re-auth is needed, then send the user back to sign-in.
+                await clear_oauth_tokens()
+                self._access_token = None
+                await set_reauth_required(True)
+                raise ReauthRequiredError(
+                    f"Spotify refresh token expired or revoked — re-authorization required. ({err_desc})"
+                )
             else:
                 raise CredentialError(f"Token refresh failed (HTTP {r.status_code}): {r.text}")
 

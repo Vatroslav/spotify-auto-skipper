@@ -31,6 +31,7 @@ function initDashboard() {
     const skipOnePauseBtn = document.getElementById("skip-one-pause-btn");
     const removeFromPlaylistBtn = document.getElementById("remove-from-playlist-btn");
     const likeBtn = document.getElementById("like-btn");
+    const reauthBanner = document.getElementById("reauth-banner");
 
     if (!trackName) return; // Not on dashboard
 
@@ -71,8 +72,16 @@ function initDashboard() {
                 }
             }
 
+            // Re-authorization banner (Spotify refresh token expired/revoked)
+            if (reauthBanner) {
+                reauthBanner.classList.toggle("hidden", !data.reauth_required);
+            }
+
             // Status badge
-            if (!data.worker_running) {
+            if (data.reauth_required) {
+                statusBadge.textContent = "Re-authorization Required";
+                statusBadge.className = "status-badge offline";
+            } else if (!data.worker_running) {
                 statusBadge.textContent = "Worker Offline";
                 statusBadge.className = "status-badge offline";
             } else if (data.skipping_paused) {

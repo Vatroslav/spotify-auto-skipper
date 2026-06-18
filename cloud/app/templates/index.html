@@ -2,6 +2,14 @@
 {% block title %}Dashboard - Spotify Auto-Skipper{% endblock %}
 {% block content %}
 <div class="container container-wide">
+    <div id="reauth-banner" class="reauth-banner hidden" role="alert">
+        <div class="reauth-banner-text">
+            <strong>Spotify re-authorization required</strong>
+            <span>Your Spotify access expired and skipping has stopped. Reconnect to resume.</span>
+        </div>
+        <a href="/auth/login" class="btn btn-accent reauth-banner-btn">Reconnect Spotify</a>
+    </div>
+
     <div class="dashboard-grid">
         <div class="dashboard-main">
             <div class="card now-playing">
