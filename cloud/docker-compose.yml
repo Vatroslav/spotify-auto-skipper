@@ -1,3 +1,10 @@
+# Pin the Compose project name so it never derives from the working directory.
+# The live container and its data volume (skipper_skipper_data) were created
+# under project "skipper". Without this, deploying from the cloud/ directory
+# would default the project to "cloud", create a separate empty volume, and
+# fail on a container-name conflict — which once detached the app from its DB.
+name: skipper
+
 services:
   skipper:
     container_name: skipper
