@@ -6,7 +6,7 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -78,11 +78,30 @@ class CSPMiddleware(BaseHTTPMiddleware):
 app.add_middleware(CSPMiddleware)
 
 # Static files and templates
+import mimetypes
 import os
+
+# Ensure the web manifest is served with the correct content type by StaticFiles
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 _app_dir = os.path.dirname(os.path.abspath(__file__))
 app.mount("/static", StaticFiles(directory=os.path.join(_app_dir, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(_app_dir, "templates"))
+
+# Service worker must be served from the root so its scope covers the whole app.
+# The cache name is templated with APP_VERSION so each deploy busts the old cache.
+_sw_path = os.path.join(_app_dir, "static", "js", "sw.js")
+
+
+@app.get("/sw.js")
+async def service_worker():
+    with open(_sw_path, encoding="utf-8") as f:
+        body = f.read().replace("{{VERSION}}", APP_VERSION)
+    return Response(
+        content=body,
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"},
+    )
 
 # Include routers
 from app.routers import artists, auth, insights, logs, loved_sync, playback, rediscovery, settings

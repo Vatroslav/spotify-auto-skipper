@@ -6,6 +6,15 @@
     <title>{% block title %}Spotify Auto-Skipper{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/style.css?v={{ version }}">
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+
+    <!-- PWA -->
+    <link rel="manifest" href="/static/manifest.webmanifest">
+    <meta name="theme-color" content="#121212">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Auto-Skipper">
+    <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 </head>
 <body>
     {% block content %}{% endblock %}
@@ -35,5 +44,6 @@
 
     <script src="/static/js/api.js?v={{ version }}"></script>
     <script src="/static/js/app.js?v={{ version }}"></script>
+    <script src="/static/js/pwa.js?v={{ version }}"></script>
 </body>
 </html>
