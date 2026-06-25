@@ -4,7 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Spotify Auto-Skipper</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v={{ version }}">
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+
+    <!-- PWA -->
+    <link rel="manifest" href="/static/manifest.webmanifest">
+    <meta name="theme-color" content="#121212">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Auto-Skipper">
+    <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 </head>
 <body>
     <div class="login-container">
@@ -15,5 +25,7 @@
         </a>
         <div class="version-text">{{ version }}</div>
     </div>
+
+    <script src="/static/js/pwa.js?v={{ version }}"></script>
 </body>
 </html>
