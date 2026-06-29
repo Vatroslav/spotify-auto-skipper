@@ -206,13 +206,19 @@ a:hover { color: var(--accent-hover); }
     border-color: var(--remove-hover);
     color: var(--remove-hover);
 }
-.btn-danger:hover { background: var(--remove-hover); color: #fff; }
+.btn-danger:hover { background: var(--remove-hover); border-color: var(--remove-hover); color: #fff; }
 
 .btn-group {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
 }
+
+.btn-row {
+    display: flex;
+    gap: 8px;
+}
+.btn-row .btn { flex: 1; min-width: 0; }
 
 .btn-full { width: 100%; }
 
