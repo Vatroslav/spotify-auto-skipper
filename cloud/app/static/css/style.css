@@ -217,6 +217,7 @@ a:hover { color: var(--accent-hover); }
 .btn-row {
     display: flex;
     gap: 8px;
+    width: 100%;
 }
 .btn-row .btn { flex: 1; min-width: 0; }
 
