@@ -8,7 +8,12 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
-from app.database import add_never_skip_artist, get_never_skip_artists, remove_never_skip_artist
+from app.database import (
+    add_never_skip_artist,
+    get_never_skip_artists,
+    remove_never_skip_artist,
+    set_never_skip_artist_enabled,
+)
 from app.routers.deps import require_auth
 from app.spotify_api import CredentialError
 from app.state import app_state
@@ -56,6 +61,10 @@ class ArtistCreate(BaseModel):
         return _validate_image_url(v.strip())
 
 
+class ArtistUpdate(BaseModel):
+    enabled: bool
+
+
 @router.get("")
 async def list_artists(request: Request):
     """List all never-skip artists."""
@@ -72,6 +81,17 @@ async def add_artist(body: ArtistCreate):
     if not artist_id or not name:
         raise HTTPException(status_code=400, detail="id and name are required")
     await add_never_skip_artist(artist_id, name, image_url)
+    return {"ok": True}
+
+
+@router.patch("/{artist_id}")
+async def update_artist(artist_id: str, body: ArtistUpdate):
+    """Toggle whether an artist's never-skip protection is active."""
+    if not _SPOTIFY_ID_RE.match(artist_id):
+        raise HTTPException(status_code=400, detail="Invalid artist ID")
+    updated = await set_never_skip_artist_enabled(artist_id, body.enabled)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Artist not found")
     return {"ok": True}
 
 

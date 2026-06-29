@@ -6,7 +6,10 @@
 
     <div class="card">
         <div class="toggle">
-            <span class="toggle-label">Enable never-skip artists</span>
+            <div class="toggle-text">
+                <span class="toggle-label">Enable never-skip artists</span>
+                <div class="help-text">Tracks by the artists below are never skipped &mdash; even when they'd normally be skipped by your rules. Turn this off to pause protection for everyone at once.</div>
+            </div>
             <label class="toggle-switch">
                 <input type="checkbox" id="toggle-never-skip" data-setting="enable_never_skip_artists">
                 <span class="toggle-slider"></span>
@@ -22,6 +25,7 @@
 
     <div class="card">
         <div class="card-title">Your Artists</div>
+        <div class="help-text mt-8 mb-16">Each artist's switch turns their protection on or off without removing them from the list &mdash; handy for pausing one artist temporarily. These switches are disabled while the feature above is off.</div>
         <div id="artist-list"></div>
     </div>
 </div>

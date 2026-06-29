@@ -400,6 +400,22 @@ async function initArtists() {
     const toggleNeverSkip = document.getElementById("toggle-never-skip");
     if (!list) return;
 
+    // Per-artist switches only matter while the whole feature is on, so
+    // disable them (and lock the list) whenever the master toggle is off.
+    function applyGlobalEnabledState() {
+        const enabled = toggleNeverSkip ? toggleNeverSkip.checked : true;
+        list.classList.toggle("artists-locked", !enabled);
+        list.querySelectorAll(".artist-toggle-input").forEach(inp => {
+            inp.disabled = !enabled;
+            const lbl = inp.closest(".toggle-switch");
+            if (lbl) {
+                lbl.title = enabled
+                    ? "Never-skip protection on/off"
+                    : "Enable never-skip artists above to use this";
+            }
+        });
+    }
+
     // Load and bind the enable toggle
     if (toggleNeverSkip) {
         const settings = await API.get("/api/settings");
@@ -407,10 +423,12 @@ async function initArtists() {
         toggleNeverSkip.addEventListener("change", async () => {
             try {
                 await API.put("/api/settings", { enable_never_skip_artists: toggleNeverSkip.checked });
+                applyGlobalEnabledState();
                 showToast(toggleNeverSkip.checked ? "Never-skip enabled" : "Never-skip disabled");
             } catch (err) {
                 showToast(err.message || "Failed to update setting", 3000, "error");
                 toggleNeverSkip.checked = !toggleNeverSkip.checked;
+                applyGlobalEnabledState();
             }
         });
     }
@@ -425,6 +443,7 @@ async function initArtists() {
         data.artists.forEach(a => {
             const div = document.createElement("div");
             div.className = "artist-item";
+            if (!a.enabled) div.classList.add("artist-disabled");
 
             const info = document.createElement("div");
             info.className = "artist-info";
@@ -446,6 +465,34 @@ async function initArtists() {
             nameSpan.textContent = a.name;
             info.appendChild(nameSpan);
 
+            const controls = document.createElement("div");
+            controls.className = "artist-controls";
+
+            const toggle = document.createElement("label");
+            toggle.className = "toggle-switch";
+            toggle.title = "Never-skip protection on/off";
+            const toggleInput = document.createElement("input");
+            toggleInput.type = "checkbox";
+            toggleInput.className = "artist-toggle-input";
+            toggleInput.checked = !!a.enabled;
+            toggleInput.addEventListener("change", async () => {
+                const enabled = toggleInput.checked;
+                try {
+                    await API.patch(`/api/artists/${encodeURIComponent(a.id)}`, { enabled });
+                    div.classList.toggle("artist-disabled", !enabled);
+                    a.enabled = enabled;
+                    showToast(enabled ? `Protecting ${a.name}` : `Skipping ${a.name} again`);
+                } catch (err) {
+                    showToast(err.message || "Failed to update artist", 3000, "error");
+                    toggleInput.checked = !enabled;
+                }
+            });
+            const toggleSlider = document.createElement("span");
+            toggleSlider.className = "toggle-slider";
+            toggle.appendChild(toggleInput);
+            toggle.appendChild(toggleSlider);
+            controls.appendChild(toggle);
+
             const removeBtn = document.createElement("button");
             removeBtn.className = "artist-remove";
             removeBtn.title = "Remove";
@@ -454,11 +501,13 @@ async function initArtists() {
                 await API.del(`/api/artists/${encodeURIComponent(a.id)}`);
                 loadArtists();
             });
+            controls.appendChild(removeBtn);
 
             div.appendChild(info);
-            div.appendChild(removeBtn);
+            div.appendChild(controls);
             list.appendChild(div);
         });
+        applyGlobalEnabledState();
     }
 
     let searchTimeout = null;
