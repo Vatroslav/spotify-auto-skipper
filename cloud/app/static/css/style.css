@@ -251,10 +251,13 @@ input:focus, select:focus {
     margin-bottom: 6px;
 }
 
-.form-group .help-text,
-.toggle-text .help-text {
+.help-text {
     font-size: 0.8rem;
     color: var(--text-muted);
+}
+
+.form-group .help-text,
+.toggle-text .help-text {
     margin-top: 4px;
 }
 
@@ -323,6 +326,11 @@ input:focus, select:focus {
 
 .toggle-switch input:checked + .toggle-slider { background: var(--accent); }
 .toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+.toggle-switch input:disabled + .toggle-slider {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
 
 /* ── Artist List ─────────────────────────────────── */
 

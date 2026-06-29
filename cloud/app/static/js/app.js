@@ -400,6 +400,22 @@ async function initArtists() {
     const toggleNeverSkip = document.getElementById("toggle-never-skip");
     if (!list) return;
 
+    // Per-artist switches only matter while the whole feature is on, so
+    // disable them (and lock the list) whenever the master toggle is off.
+    function applyGlobalEnabledState() {
+        const enabled = toggleNeverSkip ? toggleNeverSkip.checked : true;
+        list.classList.toggle("artists-locked", !enabled);
+        list.querySelectorAll(".artist-toggle-input").forEach(inp => {
+            inp.disabled = !enabled;
+            const lbl = inp.closest(".toggle-switch");
+            if (lbl) {
+                lbl.title = enabled
+                    ? "Never-skip protection on/off"
+                    : "Enable never-skip artists above to use this";
+            }
+        });
+    }
+
     // Load and bind the enable toggle
     if (toggleNeverSkip) {
         const settings = await API.get("/api/settings");
@@ -407,10 +423,12 @@ async function initArtists() {
         toggleNeverSkip.addEventListener("change", async () => {
             try {
                 await API.put("/api/settings", { enable_never_skip_artists: toggleNeverSkip.checked });
+                applyGlobalEnabledState();
                 showToast(toggleNeverSkip.checked ? "Never-skip enabled" : "Never-skip disabled");
             } catch (err) {
                 showToast(err.message || "Failed to update setting", 3000, "error");
                 toggleNeverSkip.checked = !toggleNeverSkip.checked;
+                applyGlobalEnabledState();
             }
         });
     }
@@ -455,6 +473,7 @@ async function initArtists() {
             toggle.title = "Never-skip protection on/off";
             const toggleInput = document.createElement("input");
             toggleInput.type = "checkbox";
+            toggleInput.className = "artist-toggle-input";
             toggleInput.checked = !!a.enabled;
             toggleInput.addEventListener("change", async () => {
                 const enabled = toggleInput.checked;
@@ -488,6 +507,7 @@ async function initArtists() {
             div.appendChild(controls);
             list.appendChild(div);
         });
+        applyGlobalEnabledState();
     }
 
     let searchTimeout = null;
