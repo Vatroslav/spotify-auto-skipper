@@ -47,10 +47,6 @@ class ArtistCreate(BaseModel):
     name: str
     image_url: str = ""
 
-
-class ArtistUpdate(BaseModel):
-    enabled: bool
-
     @field_validator("id")
     @classmethod
     def validate_id(cls, v: str) -> str:
@@ -63,6 +59,10 @@ class ArtistUpdate(BaseModel):
     @classmethod
     def validate_image_url(cls, v: str) -> str:
         return _validate_image_url(v.strip())
+
+
+class ArtistUpdate(BaseModel):
+    enabled: bool
 
 
 @router.get("")
