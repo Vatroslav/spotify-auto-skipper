@@ -369,6 +369,17 @@ input:focus, select:focus {
     text-overflow: ellipsis;
 }
 
+.artist-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+/* Dim the row when never-skip protection is toggled off, but keep the
+   toggle itself fully legible so it stays easy to switch back on. */
+.artist-disabled .artist-info { opacity: 0.4; }
+
 .artist-remove {
     background: none;
     border: none;

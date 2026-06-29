@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS never_skip_artists (
     id        TEXT PRIMARY KEY,
     name      TEXT NOT NULL,
     image_url TEXT DEFAULT '',
+    enabled   INTEGER NOT NULL DEFAULT 1,
     added_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -133,11 +134,13 @@ async def init_db():
     try:
         await db.executescript(_CREATE_TABLES)
 
-        # Migrate: add image_url column if missing
+        # Migrate: add image_url / enabled columns if missing
         cursor = await db.execute("PRAGMA table_info(never_skip_artists)")
         columns = {row[1] for row in await cursor.fetchall()}
         if "image_url" not in columns:
             await db.execute("ALTER TABLE never_skip_artists ADD COLUMN image_url TEXT DEFAULT ''")
+        if "enabled" not in columns:
+            await db.execute("ALTER TABLE never_skip_artists ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1")
 
         # Migrate: add album_name to track_events
         cursor = await db.execute("PRAGMA table_info(track_events)")
@@ -420,7 +423,9 @@ async def set_many_settings(settings: dict):
 async def get_never_skip_artists() -> list[dict]:
     db = await get_db()
     try:
-        cursor = await db.execute("SELECT id, name, image_url, added_at FROM never_skip_artists ORDER BY name")
+        cursor = await db.execute(
+            "SELECT id, name, image_url, enabled, added_at FROM never_skip_artists ORDER BY name"
+        )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
     finally:
@@ -448,6 +453,20 @@ async def remove_never_skip_artist(artist_id: str):
         await db.close()
 
 
+async def set_never_skip_artist_enabled(artist_id: str, enabled: bool) -> bool:
+    """Toggle whether an artist's never-skip protection is active. Returns True if a row was updated."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "UPDATE never_skip_artists SET enabled = ? WHERE id = ?",
+            (1 if enabled else 0, artist_id),
+        )
+        await db.commit()
+        return cursor.rowcount > 0
+    finally:
+        await db.close()
+
+
 async def is_artist_never_skipped(artist_ids: list[str]) -> bool:
     if not artist_ids:
         return False
@@ -455,7 +474,7 @@ async def is_artist_never_skipped(artist_ids: list[str]) -> bool:
     try:
         placeholders = ",".join("?" for _ in artist_ids)
         cursor = await db.execute(
-            f"SELECT COUNT(*) as cnt FROM never_skip_artists WHERE id IN ({placeholders})",
+            f"SELECT COUNT(*) as cnt FROM never_skip_artists WHERE enabled = 1 AND id IN ({placeholders})",
             artist_ids,
         )
         row = await cursor.fetchone()

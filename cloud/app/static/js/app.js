@@ -425,6 +425,7 @@ async function initArtists() {
         data.artists.forEach(a => {
             const div = document.createElement("div");
             div.className = "artist-item";
+            if (!a.enabled) div.classList.add("artist-disabled");
 
             const info = document.createElement("div");
             info.className = "artist-info";
@@ -446,6 +447,33 @@ async function initArtists() {
             nameSpan.textContent = a.name;
             info.appendChild(nameSpan);
 
+            const controls = document.createElement("div");
+            controls.className = "artist-controls";
+
+            const toggle = document.createElement("label");
+            toggle.className = "toggle-switch";
+            toggle.title = "Never-skip protection on/off";
+            const toggleInput = document.createElement("input");
+            toggleInput.type = "checkbox";
+            toggleInput.checked = !!a.enabled;
+            toggleInput.addEventListener("change", async () => {
+                const enabled = toggleInput.checked;
+                try {
+                    await API.patch(`/api/artists/${encodeURIComponent(a.id)}`, { enabled });
+                    div.classList.toggle("artist-disabled", !enabled);
+                    a.enabled = enabled;
+                    showToast(enabled ? `Protecting ${a.name}` : `Skipping ${a.name} again`);
+                } catch (err) {
+                    showToast(err.message || "Failed to update artist", 3000, "error");
+                    toggleInput.checked = !enabled;
+                }
+            });
+            const toggleSlider = document.createElement("span");
+            toggleSlider.className = "toggle-slider";
+            toggle.appendChild(toggleInput);
+            toggle.appendChild(toggleSlider);
+            controls.appendChild(toggle);
+
             const removeBtn = document.createElement("button");
             removeBtn.className = "artist-remove";
             removeBtn.title = "Remove";
@@ -454,9 +482,10 @@ async function initArtists() {
                 await API.del(`/api/artists/${encodeURIComponent(a.id)}`);
                 loadArtists();
             });
+            controls.appendChild(removeBtn);
 
             div.appendChild(info);
-            div.appendChild(removeBtn);
+            div.appendChild(controls);
             list.appendChild(div);
         });
     }

@@ -44,6 +44,15 @@ const API = {
         return _handleResponse(r);
     },
 
+    async patch(url, body) {
+        const r = await fetch(url, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+        return _handleResponse(r);
+    },
+
     async del(url) {
         const r = await fetch(url, { method: "DELETE" });
         return _handleResponse(r);
