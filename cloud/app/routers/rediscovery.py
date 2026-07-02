@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from app.rediscovery import run_rediscovery_job
 from app.routers.deps import require_auth
-from app.spotify_api import CredentialError
+from app.spotify_api import CredentialError, SpotifyAPIError
 from app.state import app_state
 
 router = APIRouter(prefix="/api/rediscovery", tags=["rediscovery"], dependencies=[Depends(require_auth)])
@@ -30,6 +30,8 @@ async def list_playlists():
         playlists = await client.get_user_playlists()
     except CredentialError:
         raise HTTPException(status_code=401, detail="Spotify credentials expired.")
+    except SpotifyAPIError as e:
+        raise HTTPException(status_code=502, detail=f"Could not load playlists from Spotify: {e}")
     return {"playlists": playlists}
 
 
