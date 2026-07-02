@@ -355,3 +355,63 @@ async def polling_loop():
             await _log(f"Unexpected error: {e}", "error")
 
         await app_state.interruptible_sleep(poll_interval)
+
+
+# ── Worker supervision ──────────────────────────────────────────────
+#
+# The polling loop catches its own runtime errors, but a few paths can still
+# take the whole task down: an exception in the pre-loop setup (token/DB/settings),
+# or anything that escapes the `while` body (the historical NameError, v3.16.1).
+# `restart: unless-stopped` only reacts to the *process* exiting, not to a dead
+# worker task, so a crashed worker would otherwise leave the app up-but-idle
+# (health 503) until someone noticed. The supervisor closes that gap in-process.
+#
+# It restarts the worker ONLY on a crash. A clean return — re-auth / credential
+# needed — is left alone on purpose: the token in the DB is dead, so restarting
+# would just re-hit the same path and loop; that state waits for the user to
+# reconnect at /auth/login (which calls restart_worker_if_dead itself).
+#
+# A fully wedged process (blocked event loop, dead uvicorn) is out of scope here
+# — the supervisor runs on the same loop, so it can't fix that. That tail is left
+# as signal-only via the Docker HEALTHCHECK; see CLAUDE.md (Health Monitoring).
+
+WORKER_CHECK_INTERVAL = 30  # seconds between health checks of the worker task
+WORKER_RESTART_BACKOFF_MAX = 300  # cap on the crash backoff so logs don't spam
+
+
+async def worker_supervisor():
+    """Watch the polling loop and restart it if it died from an unexpected crash."""
+    consecutive_crashes = 0
+    while True:
+        delay = (
+            min(WORKER_CHECK_INTERVAL * (2 ** (consecutive_crashes - 1)), WORKER_RESTART_BACKOFF_MAX)
+            if consecutive_crashes
+            else WORKER_CHECK_INTERVAL
+        )
+        try:
+            await asyncio.sleep(delay)
+        except asyncio.CancelledError:
+            break
+
+        task = app_state.worker_task
+        if task is None or not task.done():
+            consecutive_crashes = 0
+            continue
+        if task.cancelled():
+            # App is shutting down (worker was cancelled) — stop supervising.
+            break
+
+        exc = task.exception()  # also marks it retrieved, silencing asyncio's warning
+        if exc is None:
+            # Clean stop: re-auth / credential needed. Not a crash — wait for the
+            # user to reconnect rather than loop on a dead token.
+            consecutive_crashes = 0
+            continue
+
+        consecutive_crashes += 1
+        await _log(
+            f"Worker crashed ({type(exc).__name__}: {exc}) — restarting "
+            f"(attempt {consecutive_crashes}).",
+            "error",
+        )
+        app_state.restart_worker_if_dead()
