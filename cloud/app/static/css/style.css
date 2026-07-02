@@ -842,13 +842,16 @@ input:focus, select:focus {
 .chart-toggle:hover { color: var(--text-secondary); }
 
 @media (min-width: 820px) {
-    .container-wide.chart-open { max-width: 1040px; }
+    .container-wide.chart-open { max-width: 1024px; }
     .container-wide.chart-open .dashboard-grid {
         flex-direction: row;
         align-items: flex-start;
         gap: 16px;
     }
-    .container-wide.chart-open .dashboard-main { flex: 0 0 380px; }
+    /* Keep the Now Playing column at its closed width (608px = 640px container
+       minus 16px padding each side) so opening the chart only adds to the right,
+       instead of shrinking the left column. */
+    .container-wide.chart-open .dashboard-main { flex: 0 0 608px; }
     .container-wide.chart-open .dashboard-side {
         flex: 1 1 auto;
         min-width: 0;
