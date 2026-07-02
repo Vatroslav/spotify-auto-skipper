@@ -12,7 +12,7 @@ from difflib import SequenceMatcher
 
 from app.database import get_all_track_aliases, get_loved_sync_ignored
 from app.lastfm_api import LASTFM_ERROR, get_loved_tracks
-from app.spotify_api import CredentialError
+from app.spotify_api import CredentialError, SpotifyAPIError
 
 
 def _norm_key(artist: str, name: str) -> tuple[str, str]:
@@ -107,6 +107,10 @@ async def compute_diff(spotify_client, lastfm_username: str) -> dict:
         spotify_liked = await spotify_client.get_all_saved_tracks()
     except CredentialError as e:
         return {"ok": False, "error": f"Spotify auth: {e}"}
+    except SpotifyAPIError as e:
+        # A failed page would leave the Liked list incomplete; bail rather than
+        # diff against partial data and mislabel tracks as "loved not liked".
+        return {"ok": False, "error": f"Spotify: {e}"}
 
     loved = await get_loved_tracks(lastfm_username)
     if loved == LASTFM_ERROR:

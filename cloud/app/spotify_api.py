@@ -30,6 +30,27 @@ class ReauthRequiredError(CredentialError):
     pass
 
 
+class SpotifyAPIError(Exception):
+    """Raised when a Spotify API request fails after retries.
+
+    Distinct from CredentialError: this covers non-auth failures (network
+    exhausted, 5xx, unexpected non-200). It exists so paginating helpers can
+    fail loudly instead of silently returning partial data mid-pagination —
+    partial results would corrupt downstream logic (an incomplete Liked list
+    poisons the Loved Sync diff; a truncated playlist scan makes Rediscovery
+    treat unfetched tracks as if they don't exist).
+    """
+
+    pass
+
+
+def _spotify_error(r: httpx.Response | None, context: str) -> SpotifyAPIError:
+    """Build a descriptive SpotifyAPIError from a failed response (or None)."""
+    if r is None:
+        return SpotifyAPIError(f"{context}: network error (retries exhausted)")
+    return SpotifyAPIError(f"{context}: HTTP {r.status_code}")
+
+
 class SpotifyClient:
     """Async Spotify API client with token management and rate-limit retry."""
 
@@ -281,7 +302,7 @@ class SpotifyClient:
                 params={"limit": 50, "offset": offset},
             )
             if r is None or r.status_code != 200:
-                break
+                raise _spotify_error(r, f"Fetching Liked Songs at offset {offset}")
             data = r.json() or {}
             for entry in data.get("items") or []:
                 track = entry.get("track") or {}
@@ -363,7 +384,7 @@ class SpotifyClient:
                 params={"limit": 50, "offset": offset},
             )
             if r is None or r.status_code != 200:
-                break
+                raise _spotify_error(r, f"Fetching playlists at offset {offset}")
             data = r.json()
             for p in data.get("items") or []:
                 if not p or not p.get("id"):
@@ -383,7 +404,12 @@ class SpotifyClient:
         return results
 
     async def get_playlist_tracks(self, playlist_id: str, limit: int = 100, offset: int = 0) -> dict:
-        """Return a page of playlist tracks. Returns {items: [...], total: int}."""
+        """Return a page of playlist tracks. Returns {items: [...], total: int}.
+
+        Raises SpotifyAPIError on a failed page so callers can't mistake a
+        fetch error for the end of the list (which would silently truncate a
+        Rediscovery scan).
+        """
         r = await self._get(
             f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks",
             params={
@@ -393,7 +419,7 @@ class SpotifyClient:
             },
         )
         if r is None or r.status_code != 200:
-            return {"items": [], "total": 0}
+            raise _spotify_error(r, f"Fetching playlist tracks at offset {offset}")
         data = r.json()
         items = []
         for entry in data.get("items") or []:
