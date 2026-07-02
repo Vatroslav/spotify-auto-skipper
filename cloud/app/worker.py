@@ -307,7 +307,11 @@ async def polling_loop():
                                     f"Detected repeating pattern ({threshold} skips) \u2014 restarting playlist...",
                                     "warning",
                                 )
-                                await client.restart_playlist(settings["dummy_playlist_id"])
+                                if not await client.restart_playlist(settings["dummy_playlist_id"]):
+                                    await _log(
+                                        "Playlist restart failed — check the dummy playlist ID in settings.",
+                                        "warning",
+                                    )
                                 recent_skip_days.clear()
 
                         await asyncio.sleep(1)

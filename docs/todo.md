@@ -31,8 +31,8 @@ Svaka stavka je samostalna — sadrži file, problem i smjer popravka.
 - [x] **Unhealthy container se ne restarta sam** — `cloud/app/worker.py`, `cloud/app/main.py` — DONE (v3.16.6)
   Rješenje: in-process supervizor (`worker_supervisor`, spawnan u lifespanu) koji restarta worker task **samo na crash** (`task.exception() is not None`), preko postojećeg `restart_worker_if_dead()`, uz eksponencijalni backoff. Uredan reauth/credential return ostaje netaknut (čeka korisnika na `/auth/login`). Svjesno BEZ container autoheala/self-exita: naivni autoheal bi restart-loopao na reauth-503; zaglavljeni-proces rep ostaje signal-only preko Docker HEALTHCHECK-a (odluka zapisana u CLAUDE.md, Health Monitoring).
 
-- [ ] **`restart_playlist` ne provjerava uspjeh PUT-ova** — `cloud/app/spotify_api.py` (`restart_playlist`)
-  Prvi PUT (skok na dummy playlistu) se ne provjerava; ako je `dummy_playlist_id` nevažeći (default je Spotifyjev editorial playlist, koje API od 2024. ograničava novim appovima), "restart" tiho degradira. Fix: provjeriti status svakog PUT-a, na grešku vratiti False i logirati.
+- [x] **`restart_playlist` ne provjerava uspjeh PUT-ova** — `cloud/app/spotify_api.py` (`restart_playlist`) — DONE (v3.16.7)
+  Svaki PUT (skok na dummy, shuffle on, skok natrag) sada provjerava status; na grešku logira warning i vraća False. Prvi PUT (skok na dummy playlistu) aborta rano ako padne — playback netaknut. Ako je skok na dummy uspio, skok natrag na originalni kontekst se **uvijek** pokuša (i kad shuffle padne) da korisnik ne ostane zaglavljen na dummy playlisti. Worker call-site (`worker.py`) sada površi neuspjeh u user-facing log ("Playlist restart failed — check the dummy playlist ID in settings.").
 
 ## Nizak prioritet / čišćenje
 
