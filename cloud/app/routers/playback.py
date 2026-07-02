@@ -21,6 +21,30 @@ _AUTO_ALIAS_NAME_SIM = 0.8  # track name similarity floor
 router = APIRouter(prefix="/api/playback", tags=["playback"], dependencies=[Depends(require_auth)])
 
 
+async def _get_liked_cached(track_id: str) -> bool | None:
+    """Liked status for track_id, cached across dashboard polls.
+
+    The cache (app_state.liked_status_cache) holds only the current track, so a
+    different track_id is a miss and triggers exactly one Spotify call. Returns
+    None if the Spotify client is unavailable or the lookup fails — matching the
+    prior get_playback behavior. On a Spotify-side like/unlike from another client
+    the cached value stays until the song changes; toggle_like refreshes it here.
+    """
+    cache = app_state.liked_status_cache
+    if track_id in cache:
+        return cache[track_id]
+    client = app_state.spotify_client
+    if not client:
+        return None
+    try:
+        is_liked = await client.is_track_liked(track_id)
+    except Exception:
+        return None
+    # Single-entry cache: replace so previous track ids don't accumulate.
+    app_state.liked_status_cache = {track_id: is_liked}
+    return is_liked
+
+
 @router.get("")
 async def get_playback(request: Request):
     """Return current track info and worker status."""
@@ -29,12 +53,7 @@ async def get_playback(request: Request):
 
     is_liked: bool | None = None
     if track and track.get("id"):
-        client = app_state.spotify_client
-        if client:
-            try:
-                is_liked = await client.is_track_liked(track["id"])
-            except Exception:
-                is_liked = None
+        is_liked = await _get_liked_cached(track["id"])
 
     return {
         "track": track,
@@ -238,6 +257,10 @@ async def toggle_like(request: Request):
             )
         new_state = True
         action_word = "Liked"
+
+    # Refresh the dashboard cache so the next poll reflects the toggle immediately
+    # (otherwise the button would flip back to the stale cached state).
+    app_state.liked_status_cache = {track_id: new_state}
 
     lastfm_synced: bool | None = None
     lastfm_error: str | None = None

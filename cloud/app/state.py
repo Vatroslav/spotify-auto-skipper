@@ -22,6 +22,11 @@ class AppState:
         self.spotify_client = None  # Shared SpotifyClient, set during lifespan
         self.worker_task: asyncio.Task | None = None  # Reference to polling_loop task
 
+        # Liked-status cache for the dashboard poll. Single-entry (holds only the
+        # most recently queried track_id) so it never accumulates stale ids. Avoids
+        # a Spotify /me/tracks/contains call on every 5s poll; a new track is a miss.
+        self.liked_status_cache: dict[str, bool] = {}
+
         # Rediscovery
         self.rediscovery_task: asyncio.Task | None = None
         self.rediscovery_status: str = "idle"  # idle/running/completed/failed
