@@ -8,8 +8,8 @@ Svaka stavka je samostalna — sadrži file, problem i smjer popravka.
 - [x] **Jinja2 pin isključuje sigurnosni patch** — `cloud/requirements.txt:5` — DONE (v3.15.2, PR #63)
   `jinja2>=3.1.0,<3.1.6` pinira na 3.1.5, a upravo 3.1.6 fixa CVE-2025-27516 (sandbox escape kroz `|attr` filter). Cap izgleda kao tipfeler. Fix: promijeniti u `jinja2>=3.1.6,<3.2`. Nakon izmjene rebuildati i provjeriti da se templati normalno renderiraju. Deployano i verificirano zdravo (jinja2 3.1.6 u buildu).
 
-- [ ] **`ALLOWED_SPOTIFY_USER` prazan = svatko se može ulogirati** — `cloud/app/routers/auth.py` (callback), `cloud/.env.example:22`
-  Ako env var nije postavljen, bilo tko tko nađe URL prođe Spotify OAuth, postane "authenticated" i njegovi tokeni prebrišu vlasnikove. Fix: na startupu (lifespan u `main.py`) logirati jasan warning kad je `ALLOWED_SPOTIFY_USER` prazan; razmotriti i fail-closed (odbiti login) uz eksplicitni opt-out. Usput provjeriti da je var postavljen u `.env` na VPS-u (deploy skill ima pristup).
+- [x] **`ALLOWED_SPOTIFY_USER` prazan = svatko se može ulogirati** — DONE (v3.16.0)
+  Prazan `ALLOWED_SPOTIFY_USER` sada je fail-closed: login se odbija osim ako je eksplicitno postavljeno `ALLOW_ANY_SPOTIFY_USER=true`. Startup (lifespan u `main.py`) logira jasan warning o trenutnom auth stanju. `.env.example` dokumentira oba vara. PREOSTALO: postaviti `ALLOWED_SPOTIFY_USER` na Vatrin Spotify user ID u `.env` na VPS-u PRIJE deploya (inače fail-closed zaključa vlasnika pri sljedećem re-loginu).
 
 - [ ] **Worker može umrijeti od NameError** — `cloud/app/worker.py:350`
   Završni `await app_state.interruptible_sleep(poll_interval)` je unutar `while` petlje ali izvan `try/except`. Ako na prvoj iteraciji `load_settings()` (linija 124) baci iznimku prije dodjele `poll_interval` (linija 125), generic handler je uhvati, ali linija 350 onda digne NameError koji ubije task. Fix: inicijalizirati `poll_interval` prije petlje (npr. iz settings učitanih na liniji 104).

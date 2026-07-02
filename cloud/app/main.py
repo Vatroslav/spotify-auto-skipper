@@ -3,6 +3,7 @@ FastAPI application entry point.
 """
 
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -13,10 +14,36 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from app import APP_VERSION
-from app.config import get_secret_key, get_spotify_client_id, get_spotify_client_secret, seed_defaults
+from app.config import (
+    get_allow_any_spotify_user,
+    get_allowed_spotify_user,
+    get_secret_key,
+    get_spotify_client_id,
+    get_spotify_client_secret,
+    seed_defaults,
+)
 from app.database import init_db
 from app.spotify_api import SpotifyClient
 from app.state import app_state
+
+_startup_log = logging.getLogger("startup")
+
+
+def _log_auth_posture() -> None:
+    """Warn loudly at startup about who is allowed to log in."""
+    if get_allowed_spotify_user():
+        _startup_log.info("Login restricted to Spotify user '%s'.", get_allowed_spotify_user())
+    elif get_allow_any_spotify_user():
+        _startup_log.warning(
+            "ALLOW_ANY_SPOTIFY_USER is enabled: ANY Spotify account can log in and take over "
+            "this instance. Set ALLOWED_SPOTIFY_USER to your Spotify user ID to lock it down."
+        )
+    else:
+        _startup_log.warning(
+            "ALLOWED_SPOTIFY_USER is not set — login is disabled (fail-closed). Set "
+            "ALLOWED_SPOTIFY_USER to your Spotify user ID, or set ALLOW_ANY_SPOTIFY_USER=true "
+            "to intentionally allow open login."
+        )
 
 
 @asynccontextmanager
@@ -24,6 +51,7 @@ async def lifespan(app: FastAPI):
     # Startup
     await init_db()
     await seed_defaults()
+    _log_auth_posture()
 
     # Create a single shared SpotifyClient for the entire process
     app_state.spotify_client = SpotifyClient(get_spotify_client_id(), get_spotify_client_secret())
