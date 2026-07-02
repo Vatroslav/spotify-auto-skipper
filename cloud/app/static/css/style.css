@@ -841,18 +841,24 @@ input:focus, select:focus {
 
 .chart-toggle:hover { color: var(--text-secondary); }
 
-@media (min-width: 820px) {
-    .container-wide.chart-open { max-width: 1040px; }
+/* Go side-by-side only when two full-width columns actually fit.
+   On desktop (>=768px) .container has 24px padding, so the closed Now
+   Playing column is 640 - 48 = 592px. Match that exactly so it never
+   changes width: 592px Now Playing + 16px gap + 592px chart + 48px
+   padding = 1248px container. Plus the 88px left margin for the sidebar,
+   the layout needs ~1336px, so gate side-by-side at 1360px. Below that
+   the chart stacks below (default column layout) at the same 592px width.
+   Keep these numbers in sync with .container max-width (640) and the
+   desktop padding (24) if either changes. */
+@media (min-width: 1360px) {
+    .container-wide.chart-open { max-width: 1248px; }
     .container-wide.chart-open .dashboard-grid {
         flex-direction: row;
         align-items: flex-start;
         gap: 16px;
     }
-    .container-wide.chart-open .dashboard-main { flex: 0 0 380px; }
-    .container-wide.chart-open .dashboard-side {
-        flex: 1 1 auto;
-        min-width: 0;
-    }
+    .container-wide.chart-open .dashboard-main { flex: 0 0 592px; }
+    .container-wide.chart-open .dashboard-side { flex: 0 0 592px; }
     .container-wide.chart-open .dashboard-side .card { margin-bottom: 0; }
 }
 
