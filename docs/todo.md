@@ -22,8 +22,8 @@ Svaka stavka je samostalna — sadrži file, problem i smjer popravka.
 
 ## Srednji prioritet
 
-- [ ] **`escapeHtml` ne escapa navodnike, a koristi se u HTML atributima** — `cloud/app/static/js/app.js:1362` (definicija), korišteno u `value="..."` (~linija 809, 971) i `href="..."` (~864)
-  Trik s `textContent`/`innerHTML` ne escapa `"`, pa naziv pjesme s navodnikom razbija atribut (attribute injection; CSP blokira inline handlere pa nije praktični XSS, ali lomi UI). Fix: escapeHtml zamijeniti replace-mapom koja pokriva i `"` i `'`.
+- [x] **`escapeHtml` ne escapa navodnike, a koristi se u HTML atributima** — `cloud/app/static/js/app.js:1362` — DONE (v3.16.4, PR #68)
+  Trik s `textContent`/`innerHTML` nije escapao `"`/`'`, pa je naziv s navodnikom razbijao atribut (`value="..."`, `href="..."`). Fix: `escapeHtml` zamijenjen regex replace-mapom (`& < > " '`), identično onoj u `loved_sync.js`, uz null-guard za staro ponašanje.
 
 - [ ] **`is_track_liked` na svakom dashboard pollu** — `cloud/app/routers/playback.py` (`get_playback`), frontend polla svakih 5 s (`app.js` `setInterval(updatePlayback, 5000)`)
   Svaki poll radi pravi Spotify API poziv za liked status — 720 req/h po otvorenom tabu, za istu pjesmu iznova; nepotrebna izloženost 429. Fix: keširati liked status po track id-u u `app_state` i invalidirati kad se pjesma promijeni ili na toggle-like.
