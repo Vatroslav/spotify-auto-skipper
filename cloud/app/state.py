@@ -21,6 +21,7 @@ class AppState:
         self.skip_exempt_track_id: str | None = None
         self.spotify_client = None  # Shared SpotifyClient, set during lifespan
         self.worker_task: asyncio.Task | None = None  # Reference to polling_loop task
+        self.supervisor_task: asyncio.Task | None = None  # Watches/restarts worker on crash
 
         # Liked-status cache for the dashboard poll. Single-entry (holds only the
         # most recently queried track_id) so it never accumulates stale ids. Avoids

@@ -88,3 +88,12 @@ cloud/
 ## Health Monitoring
 
 `GET /health` returns app version and worker status. Returns HTTP 503 when the worker is dead. Docker HEALTHCHECK pings this every 30 seconds.
+
+### Worker self-healing
+
+The background worker can die two ways, and they are handled differently on purpose:
+
+- **Crash** (unexpected exception escapes the loop, or fails in pre-loop setup): an in-process supervisor (`worker.py::worker_supervisor`, spawned in the lifespan) detects the dead task and restarts it via `restart_worker_if_dead()`, with an exponential backoff cap so a recurring crash doesn't spam logs. Recovery is in seconds, no container bounce.
+- **Clean stop** (re-auth / credential needed): the worker returns cleanly and the supervisor leaves it alone — restarting would just re-hit the dead token and loop. This state waits for the user to reconnect at `/auth/login`, which restarts the worker itself. The supervisor distinguishes the two via `task.exception()` (a crash has one; a clean return does not).
+
+**Conscious decision — no container-level autoheal.** `restart: unless-stopped` only reacts to the process exiting, not to an unhealthy status, so a fully wedged process (blocked event loop, dead uvicorn) is NOT auto-recovered — the supervisor runs on the same loop and can't fix that. We deliberately do not add a container autoheal (e.g. willfarrell/autoheal) or an app self-exit: the historical worker deaths have all been either crashes (now self-healed in-process) or re-auth (needs a human anyway), and a naive autoheal would restart-loop the container on the re-auth 503. That tail risk is left as **signal-only**: the Docker HEALTHCHECK still flips the container to unhealthy so it's visible in `docker ps` / the health JSON. Revisit only if a real wedged-process incident occurs.
