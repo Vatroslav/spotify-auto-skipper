@@ -25,8 +25,8 @@ Svaka stavka je samostalna — sadrži file, problem i smjer popravka.
 - [x] **`escapeHtml` ne escapa navodnike, a koristi se u HTML atributima** — `cloud/app/static/js/app.js:1362` — DONE (v3.16.4, PR #68)
   Trik s `textContent`/`innerHTML` nije escapao `"`/`'`, pa je naziv s navodnikom razbijao atribut (`value="..."`, `href="..."`). Fix: `escapeHtml` zamijenjen regex replace-mapom (`& < > " '`), identično onoj u `loved_sync.js`, uz null-guard za staro ponašanje.
 
-- [ ] **`is_track_liked` na svakom dashboard pollu** — `cloud/app/routers/playback.py` (`get_playback`), frontend polla svakih 5 s (`app.js` `setInterval(updatePlayback, 5000)`)
-  Svaki poll radi pravi Spotify API poziv za liked status — 720 req/h po otvorenom tabu, za istu pjesmu iznova; nepotrebna izloženost 429. Fix: keširati liked status po track id-u u `app_state` i invalidirati kad se pjesma promijeni ili na toggle-like.
+- [x] **`is_track_liked` na svakom dashboard pollu** — `cloud/app/routers/playback.py` (`get_playback`) — DONE (v3.16.5, PR #69)
+  Poll je radio pravi Spotify `/me/tracks/contains` poziv svakih 5 s (720 req/h po otvorenom tabu). Fix: liked status keširan po track_id-u u `app_state.liked_status_cache` (single-entry — drži samo trenutnu pjesmu, ne akumulira stale id-eve). Poll gađa Spotify samo na miss (nova pjesma); `toggle_like` upisuje novo stanje u cache pa se toggle odmah reflektira umjesto da se dugme vrati na staru vrijednost. Worker netaknut (već zove `is_track_liked` najviše jednom po pjesmi). Tradeoff: like/unlike s drugog Spotify klijenta ne vidi se na dashboardu dok se pjesma ne promijeni.
 
 - [ ] **Unhealthy container se ne restarta sam** — `cloud/Dockerfile` (HEALTHCHECK), `cloud/docker-compose.yml`
   `restart: unless-stopped` reagira samo na exit procesa, ne na unhealthy status — kad worker umre, container ostane unhealthy ali živ. Odlučiti: ili autoheal (npr. willfarrell/autoheal companion), ili da app sama exita kad je worker mrtav dulje od N minuta, ili svjesno ostaviti kao signal-only (onda zapisati tu odluku u CLAUDE.md).
