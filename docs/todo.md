@@ -17,8 +17,8 @@ Svaka stavka je samostalna — sadrži file, problem i smjer popravka.
 - [x] **Rediscovery ignorira track_id aliase** — `cloud/app/rediscovery.py:84` — DONE (v3.16.2, PR #66)
   Pozivao `get_last_play_date(artist, name)` bez `track_id`, iako ga ima (`track["id"]` iz playlist items). Aliasi keyani po track_id (moderni, iz Loved Sync / mapping-fails) se nisu primjenjivali, pa su pjesme s poznatim Spotify↔Last.fm mapping problemima ispadale "nikad slušane" i pogrešno ulazile u Rediscovery playlistu. Fix: `track["id"]` proslijeđen kao treći argument (kao u `worker.py:195`).
 
-- [ ] **Tihi parcijalni fetch kod Spotify paginacije** — `cloud/app/rediscovery.py:40-52`, `cloud/app/spotify_api.py` (`get_all_saved_tracks`, `get_user_playlists`)
-  Kad neka stranica paginacije vrati grešku, `get_playlist_tracks` vrati `{items: [], total: 0}` pa petlja pukne i job nastavi s dijelom pjesama kao da je sve dohvaćeno; `get_all_saved_tracks`/`get_user_playlists` na grešku samo `break`-aju (Loved Sync diff onda računa s nepotpunom Liked listom). Fix: razlikovati "kraj liste" od "greška" (npr. vratiti None / raise na ne-200) i job failati ili retryati umjesto tihog nastavka.
+- [x] **Tihi parcijalni fetch kod Spotify paginacije** — DONE (v3.16.3, PR #67)
+  Nova iznimka `SpotifyAPIError` baca se na ne-200 / mrežni fail nakon iscrpljenih retryja (tranzijentni network/429/401 već retrya `_request`), pa se greška u paginaciji više ne može tiho progutati. `get_playlist_tracks`/`get_all_saved_tracks`/`get_user_playlists` sada raise-aju umjesto da vraćaju parcijalne podatke. Calleri razlikuju "kraj liste" od "greške": Rediscovery job faila čisto (već ima try/except oko Phase 1), `compute_diff` (Loved Sync) vrati `{ok: False}` → 502, `list_playlists` vrati 502 umjesto parcijalnog dropdowna.
 
 ## Srednji prioritet
 
