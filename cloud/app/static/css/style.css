@@ -841,21 +841,20 @@ input:focus, select:focus {
 
 .chart-toggle:hover { color: var(--text-secondary); }
 
-@media (min-width: 820px) {
-    .container-wide.chart-open { max-width: 1024px; }
+/* Go side-by-side only when two full-width columns actually fit:
+   608px Now Playing + 16px gap + 608px chart + 32px padding = 1264px.
+   Below that, the chart stacks below (default column layout) at the same
+   width. Either way the Now Playing column keeps its closed 608px width
+   (640px container minus 16px padding each side) and never shrinks. */
+@media (min-width: 1280px) {
+    .container-wide.chart-open { max-width: 1264px; }
     .container-wide.chart-open .dashboard-grid {
         flex-direction: row;
         align-items: flex-start;
         gap: 16px;
     }
-    /* Keep the Now Playing column at its closed width (608px = 640px container
-       minus 16px padding each side) so opening the chart only adds to the right,
-       instead of shrinking the left column. */
     .container-wide.chart-open .dashboard-main { flex: 0 0 608px; }
-    .container-wide.chart-open .dashboard-side {
-        flex: 1 1 auto;
-        min-width: 0;
-    }
+    .container-wide.chart-open .dashboard-side { flex: 0 0 608px; }
     .container-wide.chart-open .dashboard-side .card { margin-bottom: 0; }
 }
 
