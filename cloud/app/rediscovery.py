@@ -77,11 +77,12 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str):
             artist = track["artist"]
             name = track["name"]
             uri = track["uri"]
+            track_id = track["id"]
 
             # Query Last.fm with retries
             result = None
             for attempt in range(LASTFM_MAX_RETRIES + 1):
-                result = await get_last_play_date(artist, name)
+                result = await get_last_play_date(artist, name, track_id)
                 if result is not LASTFM_ERROR:
                     break
                 if attempt < LASTFM_MAX_RETRIES:
