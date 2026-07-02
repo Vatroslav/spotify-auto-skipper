@@ -1360,9 +1360,10 @@ function initArtistChart() {
 // ── Utilities ───────────────────────────────────────────────────
 
 function escapeHtml(text) {
-    const div = document.createElement("div");
-    div.textContent = text;
-    return div.innerHTML;
+    if (text == null) return "";
+    return String(text).replace(/[&<>"']/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
 }
 
 
