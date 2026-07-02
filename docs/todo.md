@@ -11,8 +11,8 @@ Svaka stavka je samostalna — sadrži file, problem i smjer popravka.
 - [x] **`ALLOWED_SPOTIFY_USER` prazan = svatko se može ulogirati** — DONE (v3.16.0)
   Prazan `ALLOWED_SPOTIFY_USER` sada je fail-closed: login se odbija osim ako je eksplicitno postavljeno `ALLOW_ANY_SPOTIFY_USER=true`. Startup (lifespan u `main.py`) logira jasan warning o trenutnom auth stanju. `.env.example` dokumentira oba vara. PREOSTALO: postaviti `ALLOWED_SPOTIFY_USER` na Vatrin Spotify user ID u `.env` na VPS-u PRIJE deploya (inače fail-closed zaključa vlasnika pri sljedećem re-loginu).
 
-- [ ] **Worker može umrijeti od NameError** — `cloud/app/worker.py:350`
-  Završni `await app_state.interruptible_sleep(poll_interval)` je unutar `while` petlje ali izvan `try/except`. Ako na prvoj iteraciji `load_settings()` (linija 124) baci iznimku prije dodjele `poll_interval` (linija 125), generic handler je uhvati, ali linija 350 onda digne NameError koji ubije task. Fix: inicijalizirati `poll_interval` prije petlje (npr. iz settings učitanih na liniji 104).
+- [x] **Worker može umrijeti od NameError** — `cloud/app/worker.py` — DONE (v3.16.1)
+  Završni `await app_state.interruptible_sleep(poll_interval)` je unutar `while` petlje ali izvan `try/except`. Ako na prvoj iteraciji `load_settings()` baci iznimku prije dodjele `poll_interval`, generic handler je uhvati, ali sleep na kraju petlje onda digne NameError koji ubije task. Fix: `poll_interval` inicijaliziran prije petlje iz settingsa učitanih pri startupu.
 
 - [ ] **Rediscovery ignorira track_id aliase** — `cloud/app/rediscovery.py:84`
   Poziva `get_last_play_date(artist, name)` bez `track_id`, iako ga ima (`track["id"]` iz playlist items). Aliasi keyani po track_id (moderni, iz Loved Sync / mapping-fails) se ne primjenjuju, pa pjesme s poznatim Spotify↔Last.fm mapping problemima ispadnu "nikad slušane" i pogrešno uđu u Rediscovery playlistu. Fix: proslijediti `track["id"]` kao treći argument.

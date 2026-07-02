@@ -118,6 +118,13 @@ async def polling_loop():
     app_state.last_checked_track_id = await get_last_track_event_id()
     last_purge = datetime.now(timezone.utc)
 
+    # Seed poll_interval before the loop so the trailing sleep (and the generic
+    # exception handler's sleep) always has a value. Otherwise a load_settings()
+    # failure on the very first iteration would leave poll_interval unassigned,
+    # and the sleep on the last line of the loop would raise NameError — killing
+    # the worker instead of retrying.
+    poll_interval = settings["poll_interval_seconds"]
+
     while True:
         try:
             # Reload settings each cycle so changes take effect
