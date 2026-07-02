@@ -5,8 +5,8 @@ Svaka stavka je samostalna — sadrži file, problem i smjer popravka.
 
 ## Visoki prioritet
 
-- [ ] **Jinja2 pin isključuje sigurnosni patch** — `cloud/requirements.txt:5`
-  `jinja2>=3.1.0,<3.1.6` pinira na 3.1.5, a upravo 3.1.6 fixa CVE-2025-27516 (sandbox escape kroz `|attr` filter). Cap izgleda kao tipfeler. Fix: promijeniti u `jinja2>=3.1.6,<3.2`. Nakon izmjene rebuildati i provjeriti da se templati normalno renderiraju.
+- [x] **Jinja2 pin isključuje sigurnosni patch** — `cloud/requirements.txt:5` — DONE (v3.15.2, PR #63)
+  `jinja2>=3.1.0,<3.1.6` pinira na 3.1.5, a upravo 3.1.6 fixa CVE-2025-27516 (sandbox escape kroz `|attr` filter). Cap izgleda kao tipfeler. Fix: promijeniti u `jinja2>=3.1.6,<3.2`. Nakon izmjene rebuildati i provjeriti da se templati normalno renderiraju. Deployano i verificirano zdravo (jinja2 3.1.6 u buildu).
 
 - [ ] **`ALLOWED_SPOTIFY_USER` prazan = svatko se može ulogirati** — `cloud/app/routers/auth.py` (callback), `cloud/.env.example:22`
   Ako env var nije postavljen, bilo tko tko nađe URL prođe Spotify OAuth, postane "authenticated" i njegovi tokeni prebrišu vlasnikove. Fix: na startupu (lifespan u `main.py`) logirati jasan warning kad je `ALLOWED_SPOTIFY_USER` prazan; razmotriti i fail-closed (odbiti login) uz eksplicitni opt-out. Usput provjeriti da je var postavljen u `.env` na VPS-u (deploy skill ima pristup).
