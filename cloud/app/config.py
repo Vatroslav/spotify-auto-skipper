@@ -105,8 +105,15 @@ def get_base_url() -> str:
 
 
 def get_allowed_spotify_user() -> str:
-    """Spotify user ID whitelist. Empty string means no restriction."""
-    return os.environ.get("ALLOWED_SPOTIFY_USER", "")
+    """Spotify user ID whitelist. Empty string means no explicit whitelist
+    (login is then fail-closed unless get_allow_any_spotify_user() is set)."""
+    return os.environ.get("ALLOWED_SPOTIFY_USER", "").strip()
+
+
+def get_allow_any_spotify_user() -> bool:
+    """Explicit opt-out: allow ANY Spotify account to log in when
+    ALLOWED_SPOTIFY_USER is empty. Insecure — off by default."""
+    return os.environ.get("ALLOW_ANY_SPOTIFY_USER", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 # ── Settings (from SQLite) ───────────────────────────────────────

@@ -2,6 +2,7 @@
 Spotify OAuth Authorization Code Flow.
 """
 
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
@@ -10,10 +11,18 @@ import httpx
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
-from app.config import get_allowed_spotify_user, get_base_url, get_spotify_client_id, get_spotify_client_secret
+from app.config import (
+    get_allow_any_spotify_user,
+    get_allowed_spotify_user,
+    get_base_url,
+    get_spotify_client_id,
+    get_spotify_client_secret,
+)
 from app.database import clear_oauth_tokens, save_oauth_tokens, set_reauth_required
 from app.routers.deps import require_auth
 from app.state import app_state
+
+log = logging.getLogger("auth")
 
 router = APIRouter(tags=["auth"])
 
@@ -98,14 +107,17 @@ async def callback(request: Request, code: str = "", state: str = "", error: str
                 if spotify_user_id != allowed_user:
                     return RedirectResponse("/unauthorized")
             else:
-                import logging
-
-                logging.getLogger("auth").warning(
-                    "Spotify /v1/me returned %s: %s", me_resp.status_code, me_resp.text[:200]
-                )
+                log.warning("Spotify /v1/me returned %s: %s", me_resp.status_code, me_resp.text[:200])
                 return RedirectResponse("/unauthorized")
         except httpx.RequestError:
             return RedirectResponse("/unauthorized")
+    elif not get_allow_any_spotify_user():
+        # No whitelist and no explicit opt-out: refuse rather than let a
+        # stranger take over this instance by overwriting the owner's tokens.
+        log.warning(
+            "Login rejected: ALLOWED_SPOTIFY_USER is not set and ALLOW_ANY_SPOTIFY_USER is not enabled."
+        )
+        return RedirectResponse("/unauthorized")
 
     await save_oauth_tokens(access_token, refresh_token, expires_at.isoformat())
     # Fresh token — clear any "re-authorization required" state so the dashboard
