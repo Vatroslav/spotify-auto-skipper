@@ -14,8 +14,8 @@ Svaka stavka je samostalna — sadrži file, problem i smjer popravka.
 - [x] **Worker može umrijeti od NameError** — `cloud/app/worker.py` — DONE (v3.16.1)
   Završni `await app_state.interruptible_sleep(poll_interval)` je unutar `while` petlje ali izvan `try/except`. Ako na prvoj iteraciji `load_settings()` baci iznimku prije dodjele `poll_interval`, generic handler je uhvati, ali sleep na kraju petlje onda digne NameError koji ubije task. Fix: `poll_interval` inicijaliziran prije petlje iz settingsa učitanih pri startupu.
 
-- [ ] **Rediscovery ignorira track_id aliase** — `cloud/app/rediscovery.py:84`
-  Poziva `get_last_play_date(artist, name)` bez `track_id`, iako ga ima (`track["id"]` iz playlist items). Aliasi keyani po track_id (moderni, iz Loved Sync / mapping-fails) se ne primjenjuju, pa pjesme s poznatim Spotify↔Last.fm mapping problemima ispadnu "nikad slušane" i pogrešno uđu u Rediscovery playlistu. Fix: proslijediti `track["id"]` kao treći argument.
+- [x] **Rediscovery ignorira track_id aliase** — `cloud/app/rediscovery.py:84` — DONE (v3.16.2, PR #66)
+  Pozivao `get_last_play_date(artist, name)` bez `track_id`, iako ga ima (`track["id"]` iz playlist items). Aliasi keyani po track_id (moderni, iz Loved Sync / mapping-fails) se nisu primjenjivali, pa su pjesme s poznatim Spotify↔Last.fm mapping problemima ispadale "nikad slušane" i pogrešno ulazile u Rediscovery playlistu. Fix: `track["id"]` proslijeđen kao treći argument (kao u `worker.py:195`).
 
 - [ ] **Tihi parcijalni fetch kod Spotify paginacije** — `cloud/app/rediscovery.py:40-52`, `cloud/app/spotify_api.py` (`get_all_saved_tracks`, `get_user_playlists`)
   Kad neka stranica paginacije vrati grešku, `get_playlist_tracks` vrati `{items: [], total: 0}` pa petlja pukne i job nastavi s dijelom pjesama kao da je sve dohvaćeno; `get_all_saved_tracks`/`get_user_playlists` na grešku samo `break`-aju (Loved Sync diff onda računa s nepotpunom Liked listom). Fix: razlikovati "kraj liste" od "greška" (npr. vratiti None / raise na ne-200) i job failati ili retryati umjesto tihog nastavka.
