@@ -79,6 +79,16 @@ Tell the user:
 - Whether the health check passed
 - If anything went wrong, show the exact error
 
+## Env-only changes (no code change)
+
+To change only environment variables on the VPS: edit `$DEPLOY_APP/.env`, then recreate the container — a plain `docker compose restart` does NOT re-read `.env`:
+
+```bash
+ssh $DEPLOY_USER@$DEPLOY_HOST "cd $DEPLOY_APP && docker compose up -d --force-recreate"
+```
+
+Then run the same health check as a normal deploy.
+
 ## Troubleshooting
 
 If the SSH command fails with "not a git repository", the symlink or repo may be broken. Check:

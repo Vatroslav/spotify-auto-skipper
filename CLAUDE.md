@@ -6,6 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Questions are not instructions.** When the user asks how something works or asks a question, answer the question. Do NOT start editing code unless explicitly told to make a change.
 - **DELETE safety.** Always wrap DELETE operations in a transaction: BEGIN, DELETE, check affected row count matches expected, COMMIT only if correct, ROLLBACK otherwise.
+- **Pydantic model ordering.** Never insert a new BaseModel class between an existing model's fields and its `@field_validator` decorators — the validators rebind to the new class and crash startup with PydanticUserError (bit us in v3.15.0).
 
 ## Permissions
 
