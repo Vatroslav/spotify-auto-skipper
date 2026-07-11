@@ -45,5 +45,5 @@ Svaka stavka je samostalna — sadrži file, problem i smjer popravka.
 ## Napomene za izvođenje
 
 - Redoslijed rada: odozgo prema dolje; svaki fix zasebno testirati.
-- Feature branch + test snapshot verzija (`-1`, `-2`, ...) prije mergea na main — vidi CLAUDE.md (Versioning) i memory feedback.
-- Svaki commit na main bumpa patch verziju u `cloud/app/__init__.py`, bez iznimki.
+- Feature branch + deploy branch da testiraš prije mergea na main — vidi CLAUDE.md (Versioning) i memory feedback.
+- Bump je intent-based, u istom commitu: feat → minor, fix/perf → patch; docs/chore/tooling bez runtime učinka → bez bumpa. Vidi CLAUDE.md (Versioning).

@@ -31,4 +31,4 @@ Content width on desktop is `640 − 48 = 592`, not `640 − 32 = 608`, because 
 - Chart bars are elastic (`flex: 1`, `min-width: 0`, `max-width: 64px`) — they absorb width changes; don't give them fixed widths.
 - Mobile (< 768px) stays untouched by desktop-layout work: single column, 16px padding.
 - Changing `.container` max-width (640) or desktop padding (24) cascades into 592, 1248, and 1360 — recompute all of them and the CSS comment in the same change.
-- Verify per breakpoint before deploying: mobile (~375px), desktop stacked (768–1359px), side-by-side (≥1360px), each in both chart-open and chart-closed states. Docker isn't in the local PATH, so rendering verification happens on the VPS via snapshot deploys — the paper math is what keeps that to ONE snapshot instead of three.
+- Verify per breakpoint before deploying: mobile (~375px), desktop stacked (768–1359px), side-by-side (≥1360px), each in both chart-open and chart-closed states. Docker isn't in the local PATH, so rendering verification happens on the VPS via test deploys of the branch — the paper math is what keeps that to ONE test deploy instead of three.

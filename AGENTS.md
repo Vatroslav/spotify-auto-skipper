@@ -17,11 +17,13 @@ No tests or linting are configured.
 
 ## Versioning
 
-- Version lives in `cloud/app/__init__.py` as `APP_VERSION`
-- Test versions use numbered suffixes: `v3.2.0-1`, `v3.2.0-2` — never commit these to main
-- **Every build must increment the test version** — if the last build was `v3.2.0-4`, the next must be `v3.2.0-5`, even for tiny changes. Never reuse a number.
-- Use the exact version format the user specifies; don't invent suffixes — ask if unsure
-- When releasing: set final version (remove suffix), commit, push, create git tag + GitHub release together
+Intent-based model (migrated 2026-07-11 from the old `-N` snapshot model — no more test suffixes).
+
+- Version lives in `cloud/app/__init__.py` as `APP_VERSION`, format `vX.Y.Z` (no suffix).
+- Bump manually, in the same commit as the change: **feat** → minor, **fix / perf** → patch, **breaking** (`!:` / `BREAKING CHANGE`) → major.
+- Pure docs / chore / refactor / style / test / tooling with no runtime effect → **no bump**, even when touching source.
+- A conventional commit prefix is required whenever a commit touches `cloud/` — the hook `.claude/hooks/check-version-bump.sh` reads intent from it and blocks an undeclared type or a missing bump on feat/fix/perf/breaking. `.claude/hooks/check-version-decrease.sh` blocks lowering the version.
+- Tag + GitHub release only when the version reaches the user (prod deploy); until then it rises without tags.
 
 ## Architecture
 

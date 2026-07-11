@@ -96,6 +96,4 @@ If the SSH command fails with "not a git repository", the symlink or repo may be
 ssh $DEPLOY_USER@$DEPLOY_HOST "ls -la $DEPLOY_APP && ls -la $DEPLOY_REPO/.git"
 ```
 
-If the deploy hook blocks the build with "already deployed", the version suffix needs to be incremented in `cloud/app/__init__.py` before retrying.
-
 If `docker compose up` fails with a container-name conflict (`The container name "/skipper" is already in use`), the Compose project name resolved to something other than `skipper` (e.g. `cloud`, from the directory basename). Confirm `name: skipper` is present at the top of `cloud/docker-compose.yml`. As a one-off recovery, deploy with the explicit project: `docker compose -p skipper up -d --build`. Never let it create a `cloud_skipper_data` volume — that is an empty/stale DB, not the live one.

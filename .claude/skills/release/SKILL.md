@@ -1,17 +1,19 @@
 ---
 name: release
-description: Finalize and release a tested change - set the final version, land it on main, create git tag + GitHub release, update todo. Use when the user says "release", "release it", "merge it", "ship the release", "završi", or when a test snapshot has been verified healthy on production and the change is ready for main. NOT for deploying test snapshots during iteration - that is the /deploy skill.
+description: Finalize and release a tested change - land it on main, create git tag + GitHub release, update todo. Use when the user says "release", "release it", "merge it", "ship the release", "završi", or when a change has been verified healthy on production and is ready for main. NOT for deploying during iteration - that is the /deploy skill.
 ---
 
 # Release a finished change
 
-This is the choreography from "the fix is tested" to "the release is published". Every release in this repo follows it (see PRs #62-#72). Follow the order exactly — the two historical failures both came from skipping a step (PR #48 merge lost code; v3.9.0 needed a fixup commit to bump main after merge).
+This is the choreography from "the change is tested" to "the release is published". Every release in this repo follows it (see PRs #62-#72). Follow the order exactly — the two historical failures both came from skipping a step (PR #48 merge lost code; v3.9.0 needed a fixup commit to bump main after merge).
+
+Versioning is **intent-based** (no `-N` suffixes, migrated 2026-07-11): the version was already bumped in the feature commit that changed behavior. Releasing does NOT touch the version — it lands, tags, and deploys the number that is already on the branch.
 
 ## Preconditions
 
 - You are on a feature branch (never release directly from main).
-- The change was verified: test snapshot (`vX.Y.Z-N`) deployed to production and healthy, or explicitly approved by the user without a snapshot.
-- You know the final version. Semantic rules: MAJOR = breaking, MINOR = new feature, PATCH = bug fix/tweak. If unsure which, ask.
+- The change was verified: deployed to production and healthy (via `/deploy` on the branch), or explicitly approved by the user.
+- The version in `cloud/app/__init__.py` is already the final target number, bumped in the behavior-changing commit per the intent-based rules (feat → minor, fix/perf → patch, breaking → major). If a source change on the branch has no bump yet, fix that before releasing.
 
 ## Steps
 
@@ -30,36 +32,22 @@ git diff origin/main...HEAD --stat
 
 This is the PR #48 lesson: a merge resolution silently dropped the Like/Unlike pieces and they had to be restored in a follow-up commit (`8304569`).
 
-### 2. Set the final version
+### 2. Update docs/todo.md on the branch
 
-Edit `cloud/app/__init__.py`: remove the `-N` test suffix (e.g. `v3.16.8-3` → `v3.16.8`). Test suffixes must NEVER land on main.
+If the change resolves a `docs/todo.md` item, mark it `[x]` and append the version + PR number to the entry — in this same branch, before the merge (precedent: `a0ae497`, `1411476`). This is a docs-only commit → **no bump**; prefix it `docs:`.
 
-### 3. Update docs/todo.md on the branch
-
-If the change resolves a `docs/todo.md` item, mark it `[x]` and append the version + PR number to the entry — in this same branch, before the merge (precedent: `a0ae497`, `1411476`).
-
-### 4. Release commit
-
-Commit message format (see git log for examples):
-
-```
-Release vX.Y.Z — <short description of the change>
-```
-
-Push the branch.
-
-### 5. PR and merge
+### 3. PR and merge
 
 ```bash
 gh pr create --base main --title "..." --body "..."
 gh pr merge <N> --merge
 ```
 
-Use a merge commit (`--merge`), not squash — the repo history keeps individual snapshot commits.
+Use a merge commit (`--merge`), not squash — the repo history keeps individual commits.
 
-### 6. Tag + GitHub release (always together)
+### 4. Tag + GitHub release (always together)
 
-After the merge, tag the merge commit on main:
+After the merge, tag the merge commit on main. The tag is the version already live on the branch (no suffix to remove):
 
 ```bash
 git checkout main && git pull
@@ -70,17 +58,19 @@ gh release create vX.Y.Z --title "vX.Y.Z — <short description>" --notes "<what
 
 Never create the tag without the GitHub release or vice versa.
 
-### 7. Deploy the release
+### 5. Deploy the release
 
-Run the `/deploy` skill from main. The health check must report the final version (no suffix), `worker_running: true`, `worker_alive: true`.
+Run the `/deploy` skill from main. The health check must report the target version, `worker_running: true`, `worker_alive: true`.
 
-### 8. Record it
+### 6. Record it
 
 Update the project memory: last known version, one-paragraph summary of what shipped and any watch-outs learned during the work.
 
 ## Rules
 
-- Every commit on main bumps the patch version — including docs/tooling-only commits (user feedback, no exceptions). Docs-only bumps don't get a tag/release, just the version bump in the commit.
-- A pre-commit hook blocks commits that stage `cloud/` files without bumping `cloud/app/__init__.py` — that's a signal you forgot step 2, not something to work around.
+- **No test suffixes.** The version is bumped once, in the feature commit, per the intent-based rules — not at release time.
+- **docs / chore / refactor / style / test / tooling** commits with no runtime effect do **not** bump the version.
+- A source commit (touching `cloud/`) needs a conventional prefix and, for feat/fix/perf/breaking, a matching bump — the hook (`.claude/hooks/check-version-bump.sh`) enforces this. A block is a signal you forgot the prefix or the bump, not something to work around.
+- Do **not** make a source-touching "Release ..." commit: a bare `Release` subject is not a conventional type and the hook will block it. The version already lives in the feature commit, so the release step touches only `docs/todo.md` and the main merge.
 - Never `git push --force` to main (branch protection is on).
 - Do not delete the feature branch without asking.

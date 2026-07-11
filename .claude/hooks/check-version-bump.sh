@@ -1,87 +1,77 @@
 #!/bin/bash
-# PreToolUse hook: block git commit AND VPS deploy if version not bumped
+# PreToolUse hook: intent-based bump guard.
+# Veze se na DEKLARIRANU NAMJERU (tip commita), ne na putanju fajla.
+# Zamijenio stari path-based/-N snapshot model (migracija 2026-07-11).
 
-# Parse command from stdin JSON
-CMD=$(python -c "import sys,json; print(json.load(sys.stdin)['tool_input']['command'])" 2>/dev/null)
+CMD=$(python -c "import sys,json; print(json.load(sys.stdin)['tool_input'].get('command',''))" 2>/dev/null)
 
-# ── Check 1: Block VPS deploys without version bump ──────────────
-# Catch ANY ssh/tar command targeting the VPS that rebuilds docker
-if echo "$CMD" | grep -qE 'docker compose up.*--build|tar.*ssh.*docker'; then
-    # Check if cloud/ files have been modified (staged or unstaged) since last commit
-    CLOUD_CHANGES=$(git diff --name-only HEAD -- cloud/ 2>/dev/null; git diff --cached --name-only -- cloud/ 2>/dev/null)
-    # Also check untracked cloud files
-    CLOUD_CHANGES="$CLOUD_CHANGES
-$(git ls-files --others --exclude-standard -- cloud/ 2>/dev/null)"
-
-    # Remove cloud/app/__init__.py from the list to see if there are OTHER changes
-    OTHER_CHANGES=$(echo "$CLOUD_CHANGES" | grep -v '^$' | grep -v '^cloud/app/__init__.py$' | head -1)
-
-    if [ -n "$OTHER_CHANGES" ]; then
-        # There are cloud changes — verify __init__.py was also bumped
-        VERSION_CHANGED=$(git diff HEAD -- cloud/app/__init__.py 2>/dev/null; git diff --cached -- cloud/app/__init__.py 2>/dev/null)
-        if [ -z "$VERSION_CHANGED" ]; then
-            printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Deploy blocked! cloud/ files changed but cloud/app/__init__.py version not bumped. Increment the version first."}}'
-            exit 0
-        fi
-    fi
-
-    # ── Check 1b: If version has a test suffix, ensure it was incremented ──
-    LAST_DEPLOY_FILE=".claude/hooks/.last-deployed-version"
-    CURRENT_VERSION=$(sed -n 's/.*APP_VERSION.*"\(v\?\)\([^"]*\)".*/\2/p' cloud/app/__init__.py 2>/dev/null)
-
-    if echo "$CURRENT_VERSION" | grep -qE '\-[0-9]+$'; then
-        # Has test suffix — check against last deploy
-        if [ -f "$LAST_DEPLOY_FILE" ]; then
-            LAST_VERSION=$(cat "$LAST_DEPLOY_FILE")
-            if [ "$CURRENT_VERSION" = "$LAST_VERSION" ]; then
-                # Calculate next suffix
-                CUR_SUFFIX=$(echo "$CURRENT_VERSION" | sed -E 's/.*-([0-9]+)$/\1/')
-                NEXT_SUFFIX=$((CUR_SUFFIX + 1))
-                BASE=$(echo "$CURRENT_VERSION" | sed -E 's/-[0-9]+$//')
-                NEXT_VERSION="${BASE}-${NEXT_SUFFIX}"
-                printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Deploy blocked! Test version %s was already deployed. Increment the suffix (e.g. %s → %s) before deploying again."}}' \
-                    "$CURRENT_VERSION" "$CURRENT_VERSION" "$NEXT_VERSION"
-                exit 0
-            fi
-        fi
-        # Save current version as last deployed (will be written by post-deploy hook)
-    fi
-fi
-
-# ── Check 2: Block git commit without version bump ───────────────
+# Samo git commit komande
 echo "$CMD" | grep -qE 'git commit' || exit 0
 
-# Get staged files + any files mentioned in a git add in the same command
+# Staged fileovi (+ fileovi dodani inline preko git add u istoj komandi)
 STAGED=$(git diff --cached --name-only)
-# For chained commands like "git add file1 file2 && git commit", extract added paths
 ADD_PART=$(echo "$CMD" | sed -n 's/.*git add \([^&]*\).*/\1/p')
 if [ -n "$ADD_PART" ]; then
-    # Convert space-separated paths to newline-separated
     STAGED="$STAGED
 $(echo "$ADD_PART" | tr ' ' '\n')"
 fi
 
-# Only care if cloud/ or spotify_auto_skipper/ files are staged
-echo "$STAGED" | grep -qE '^cloud/|^spotify_auto_skipper/' || exit 0
+# Guard se aktivira samo ako su app source fileovi (cloud/) dirani
+echo "$STAGED" | grep -qE '^cloud/' || exit 0
 
-MISSING=""
+deny() {
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}' "$1"
+    exit 0
+}
 
-# Check cloud version
-if echo "$STAGED" | grep -q '^cloud/'; then
-    if ! echo "$STAGED" | grep -q '^cloud/app/__init__.py$'; then
-        MISSING="${MISSING} cloud/app/__init__.py"
-    fi
+# Commit poruka iz -m / --message (robusno preko shlex)
+MSG=$(printf '%s' "$CMD" | python -c "
+import sys, shlex
+try:
+    toks = shlex.split(sys.stdin.read())
+except Exception:
+    toks = []
+msg = ''
+for i, t in enumerate(toks):
+    if t in ('-m', '--message') and i + 1 < len(toks):
+        msg = toks[i + 1]; break
+    if t.startswith('-m') and len(t) > 2:
+        msg = t[2:]; break
+    if t.startswith('--message='):
+        msg = t[len('--message='):]; break
+print(msg)
+" 2>/dev/null)
+
+# Tip je u PRVOM retku (conventional header). MSG je cesto viseredan (tijelo +
+# Co-Authored-By), pa tip vadimo samo iz headera - inace sed hvata i rijeci iz
+# tijela i TYPE postane viseredan (ne matcha case -> lazni blok).
+HEADER=$(printf '%s' "$MSG" | head -1)
+TYPE=$(printf '%s' "$HEADER" | sed -n 's/^\([a-zA-Z]\+\).*/\1/p' | tr 'A-Z' 'a-z')
+
+# Breaking: "tip!:" / "tip(scope)!:" u headeru ili "BREAKING CHANGE" bilo gdje
+BREAKING=0
+printf '%s' "$HEADER" | grep -qE '^[a-zA-Z]+(\([^)]*\))?!:' && BREAKING=1
+printf '%s' "$MSG" | grep -q 'BREAKING CHANGE' && BREAKING=1
+
+# Je li version linija stvarno promijenjena u version fileu (ne samo staged)
+BUMPED=0
+git diff --cached -U0 -- cloud/app/__init__.py 2>/dev/null | grep -qE '^\+[[:space:]]*APP_VERSION' && BUMPED=1
+
+# Breaking uvijek trazi bump (major)
+if [ "$BREAKING" = "1" ] && [ "$BUMPED" != "1" ]; then
+    deny "Breaking promjena (!: / BREAKING CHANGE) a verzija nije podignuta. Bumpaj major u cloud/app/__init__.py."
 fi
 
-# Check desktop version
-if echo "$STAGED" | grep -q '^spotify_auto_skipper/'; then
-    if ! echo "$STAGED" | grep -q '^spotify_auto_skipper/__init__.py$'; then
-        MISSING="${MISSING} spotify_auto_skipper/__init__.py"
-    fi
-fi
+case "$TYPE" in
+    feat|fix|perf)
+        [ "$BUMPED" = "1" ] || deny "Tip '$TYPE' mijenja ponasanje a verzija nije podignuta. Bumpaj cloud/app/__init__.py (feat -> minor, fix/perf -> patch)."
+        ;;
+    docs|chore|style|refactor|test|ci|build|revert)
+        : # bez bumpa OK
+        ;;
+    *)
+        deny "Diras app source (cloud/) ali namjera nije deklarirana. Dodaj conventional prefiks u commit poruku (feat/fix/docs/chore/refactor...) da guard moze odluciti treba li bump."
+        ;;
+esac
 
-# All good
-[ -z "$MISSING" ] && exit 0
-
-# Block the commit
-printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Version not bumped! Update:%s"}}' "$MISSING"
+exit 0
