@@ -144,13 +144,6 @@ async def polling_loop():
             idle_threshold = settings["idle_threshold"]
             idle_poll_interval = settings["idle_poll_interval_seconds"]
 
-            # Manual pause
-            if app_state.skipping_paused:
-                await _log("Skipping is paused.")
-                app_state.current_track = None
-                await app_state.interruptible_sleep(poll_interval)
-                continue
-
             track = await client.get_current_track()
 
             # Nothing playing
@@ -177,6 +170,21 @@ async def polling_loop():
                 await _log("Playback detected — resuming normal polling.")
                 app_state.idle_mode = False
             consecutive_idle = 0
+
+            # Manual pause. Deliberately placed after the fetch so the dashboard
+            # still shows what's playing; only the Last.fm lookup and the skip
+            # decision are suspended. last_checked_track_id is left untouched, so
+            # on resume the current song is treated as unchecked and gets its
+            # normal skip decision.
+            if app_state.skipping_paused:
+                await _log("Skipping is paused.")
+                # A song that started while paused was never checked, so the
+                # previous song's verdict must not stay on the dashboard next
+                # to it. An already-checked song keeps its real verdict.
+                if track["id"] != app_state.last_checked_track_id:
+                    app_state.last_check_message = "Not checked — skipping paused"
+                await app_state.interruptible_sleep(poll_interval)
+                continue
 
             # Same song as last time
             if track["id"] == app_state.last_checked_track_id:
