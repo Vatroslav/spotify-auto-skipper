@@ -23,10 +23,15 @@ from app.config import (
     seed_defaults,
 )
 from app.database import init_db
+from app.observability import init_error_tracking, install_asyncio_exception_handler
 from app.spotify_api import SpotifyClient
 from app.state import app_state
 
 _startup_log = logging.getLogger("startup")
+
+# Must run before the FastAPI app is constructed so the SDK's Starlette
+# integration is in place for the first request. No-op unless GLITCHTIP_DSN is set.
+init_error_tracking(APP_VERSION)
 
 
 def _log_auth_posture() -> None:
@@ -49,6 +54,8 @@ def _log_auth_posture() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    # Needs a running loop, so it happens here rather than at init time above.
+    install_asyncio_exception_handler(asyncio.get_running_loop())
     await init_db()
     await seed_defaults()
     _log_auth_posture()
