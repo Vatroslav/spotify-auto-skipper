@@ -1,14 +1,20 @@
 """
-Error tracking (GlitchTip, over the Sentry protocol).
+Error tracking (Sentry).
 
-Opt-in: with GLITCHTIP_DSN unset the SDK is never initialised and every helper
+Opt-in: with SENTRY_DSN unset the SDK is never initialised and every helper
 here is a no-op, so local runs, forks and the existing test path behave exactly
 as they did before.
 
-Privacy — this process handles Spotify OAuth tokens, a Last.fm API key and a
-Spotify user ID, none of which may leave the box. Scrubbing is therefore
-deny-by-default rather than best-effort:
+Privacy — events leave this box and land on a third party's servers, so
+scrubbing is deny-by-default rather than best-effort. This process holds
+Spotify OAuth tokens, a Last.fm API key and a Spotify user ID, and the DB holds
+the user's full listening history:
 
+  * local variables are NOT captured (include_local_variables=False). This is
+    the big one: the SDK default is True, which would serialise every frame's
+    locals — including the `track` dict (name/artist/album) and whatever a
+    settings dict happens to hold. before_send cannot fix this, as it does not
+    reach stack-trace frame vars.
   * request bodies and cookies are dropped outright
   * query strings are stripped from both request URLs and HTTP breadcrumbs
     (the Spotify OAuth callback carries ?code=<secret>, and every Last.fm call
@@ -16,10 +22,8 @@ deny-by-default rather than best-effort:
   * any key that looks like a credential or a personal detail is redacted
   * the `user` context is removed entirely
 
-Two things are captured on purpose and are safe: the exception type/message and
-the stack trace. Track and artist names can appear in a worker error message;
-that is the user's own listening data on the user's own server, not third-party
-personal data.
+What is deliberately kept, because it is what makes an event useful at all: the
+exception type and message, and the stack trace as file/function/line only.
 """
 
 import logging
@@ -27,7 +31,7 @@ import os
 
 logger = logging.getLogger("observability")
 
-_DSN_ENV = "GLITCHTIP_DSN"
+_DSN_ENV = "SENTRY_DSN"
 _REDACTED = "[redacted]"
 
 # Matched as a lowercase substring against every key we would serialise.
@@ -139,15 +143,17 @@ def init_error_tracking(release: str) -> bool:
     sentry_sdk.init(
         dsn=dsn,
         release=release,
-        environment=os.getenv("GLITCHTIP_ENVIRONMENT", "").strip() or "production",
-        # Privacy — see the module docstring. send_default_pii=False is the SDK
-        # default; set explicitly so a future default flip can't leak data.
+        environment=os.getenv("SENTRY_ENVIRONMENT", "").strip() or "production",
+        # Privacy — see the module docstring. Both of these default the other
+        # way or are merely the current default, so they are set explicitly:
+        # events go to a third party and must not carry app data.
+        include_local_variables=False,
         send_default_pii=False,
         max_request_body_size="never",
         before_send=_before_send,
         before_breadcrumb=_before_breadcrumb,
-        # Errors only. No tracing/profiling — GlitchTip shares this small VPS
-        # with the app it is watching.
+        # Errors only — no tracing/profiling. Keeps the free tier (5k
+        # errors/month) comfortable and adds no request overhead.
         traces_sample_rate=0.0,
     )
     _enabled = True

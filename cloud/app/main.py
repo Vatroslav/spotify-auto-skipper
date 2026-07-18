@@ -30,7 +30,7 @@ from app.state import app_state
 _startup_log = logging.getLogger("startup")
 
 # Must run before the FastAPI app is constructed so the SDK's Starlette
-# integration is in place for the first request. No-op unless GLITCHTIP_DSN is set.
+# integration is in place for the first request. No-op unless SENTRY_DSN is set.
 init_error_tracking(APP_VERSION)
 
 
