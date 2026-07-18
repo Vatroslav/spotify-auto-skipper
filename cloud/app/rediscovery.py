@@ -8,6 +8,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from app.lastfm_api import LASTFM_ERROR, get_last_play_date
+from app.observability import report_exception
 
 logger = logging.getLogger(__name__)
 
@@ -179,3 +180,4 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str):
         app_state.rediscovery_status = "failed"
         app_state.rediscovery_progress = {"phase": "error", "message": f"Error: {e}"}
         logger.exception("[Rediscovery] Job failed: %s", e)
+        report_exception(e, component="rediscovery")

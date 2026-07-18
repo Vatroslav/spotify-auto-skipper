@@ -18,6 +18,7 @@ from app.database import (
     set_reauth_required,
 )
 from app.lastfm_api import LASTFM_ERROR, get_last_play_date
+from app.observability import report_exception
 from app.spotify_api import CredentialError, ReauthRequiredError
 from app.state import app_state
 
@@ -365,6 +366,7 @@ async def polling_loop():
             break
         except Exception as e:
             await _log(f"Unexpected error: {e}", "error")
+            report_exception(e, component="worker")
 
         await app_state.interruptible_sleep(poll_interval)
 
@@ -426,4 +428,5 @@ async def worker_supervisor():
             f"(attempt {consecutive_crashes}).",
             "error",
         )
+        report_exception(exc, component="worker-supervisor")
         app_state.restart_worker_if_dead()
