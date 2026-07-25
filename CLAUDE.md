@@ -27,18 +27,11 @@ No tests or linting are configured. For deployment, use the `/deploy` skill whic
 
 ## Versioning
 
-Intent-based model (migrated 2026-07-11 from the old `-N` snapshot model — no more test suffixes).
-
-- Version lives in `cloud/app/__init__.py` as `APP_VERSION`, format `vX.Y.Z` (no suffix).
-- Bump is **manual, in the same commit as the change**:
-  - **feat** → minor (`v3.16.9` → `v3.17.0`)
-  - **fix / perf** → patch (`v3.16.9` → `v3.16.10`)
-  - **breaking** (`!:` / `BREAKING CHANGE`) → major (`v3.16.9` → `v4.0.0`)
-- Pure **docs / chore / refactor / style / test / tooling with no runtime effect → no bump**, even when they touch source. The version only moves when user-visible or deployed behavior changes.
-- **A conventional commit prefix is required whenever a commit touches `cloud/`** — the hook reads intent from it to decide whether a bump is needed. An undeclared type on a source-touching commit is blocked (not silently skipped).
-- **Tag only when the version actually reaches the user** (prod deploy). Until then the version rises without tags. On release: create the git tag on the number that's live + a GitHub release, together.
-- Claude assesses the bump level from the change; if unsure, ask.
-- Hooks: `.claude/hooks/check-version-bump.sh` blocks (1) touching `cloud/` without a declared type, (2) feat/fix/perf/breaking without a bump. `.claude/hooks/check-version-decrease.sh` blocks any edit that lowers `APP_VERSION`.
+Intent-based model (migrated 2026-07-11 from the old `-N` snapshot model) - full rules: `~/.claude/knowledge/versioning-intent.md` (in Croatian).
+- Version file: `cloud/app/__init__.py` (`APP_VERSION`, format `vX.Y.Z`, no suffix).
+- The guard activates on `cloud/`.
+- Hooks: `.claude/hooks/check-version-bump.sh` + `.claude/hooks/check-version-decrease.sh` (blocks any edit that lowers `APP_VERSION`).
+- Tag only on prod deploy.
 
 ## Architecture
 
