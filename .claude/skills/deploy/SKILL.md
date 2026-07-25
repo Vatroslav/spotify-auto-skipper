@@ -9,7 +9,7 @@ This skill deploys the Spotify Auto-Skipper to the VPS. Follow these steps exact
 
 ## Environment Variables
 
-Before deploying, read these from the user's global CLAUDE.md or memory. The skill uses these placeholders:
+Before deploying, read the actual values from the project memory file `reference_vps_access.md` (this repo's auto-memory folder). The skill uses these placeholders:
 - `$DEPLOY_USER` — SSH user
 - `$DEPLOY_HOST` — VPS hostname
 - `$DEPLOY_REPO` — git repo path on VPS

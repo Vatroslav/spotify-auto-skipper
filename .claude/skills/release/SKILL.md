@@ -7,13 +7,13 @@ description: Finalize and release a tested change - land it on main, create git 
 
 This is the choreography from "the change is tested" to "the release is published". Every release in this repo follows it (see PRs #62-#72). Follow the order exactly — the two historical failures both came from skipping a step (PR #48 merge lost code; v3.9.0 needed a fixup commit to bump main after merge).
 
-Versioning is **intent-based** (no `-N` suffixes, migrated 2026-07-11): the version was already bumped in the feature commit that changed behavior. Releasing does NOT touch the version — it lands, tags, and deploys the number that is already on the branch.
+Versioning model — full rules: `~/.claude/knowledge/versioning-intent.md`. The repo-specific delta: the version was already bumped in the feature commit that changed behavior. Releasing does NOT touch the version — it lands, tags, and deploys the number that is already on the branch.
 
 ## Preconditions
 
 - You are on a feature branch (never release directly from main).
 - The change was verified: deployed to production and healthy (via `/deploy` on the branch), or explicitly approved by the user.
-- The version in `cloud/app/__init__.py` is already the final target number, bumped in the behavior-changing commit per the intent-based rules (feat → minor, fix/perf → patch, breaking → major). If a source change on the branch has no bump yet, fix that before releasing.
+- The version in `cloud/app/__init__.py` is already the final target number, bumped in the behavior-changing commit. If a source change on the branch has no bump yet, fix that before releasing.
 
 ## Steps
 
@@ -47,7 +47,7 @@ Use a merge commit (`--merge`), not squash — the repo history keeps individual
 
 ### 4. Tag + GitHub release (always together)
 
-After the merge, tag the merge commit on main. The tag is the version already live on the branch (no suffix to remove):
+After the merge, tag the merge commit on main. The tag is the version already live on the branch:
 
 ```bash
 git checkout main && git pull
@@ -68,9 +68,7 @@ Update the project memory: last known version, one-paragraph summary of what shi
 
 ## Rules
 
-- **No test suffixes.** The version is bumped once, in the feature commit, per the intent-based rules — not at release time.
-- **docs / chore / refactor / style / test / tooling** commits with no runtime effect do **not** bump the version.
-- A source commit (touching `cloud/`) needs a conventional prefix and, for feat/fix/perf/breaking, a matching bump — the hook (`.claude/hooks/check-version-bump.sh`) enforces this. A block is a signal you forgot the prefix or the bump, not something to work around.
+- Versioning rules (which commit types bump, hook enforcement): `~/.claude/knowledge/versioning-intent.md`.
 - Do **not** make a source-touching "Release ..." commit: a bare `Release` subject is not a conventional type and the hook will block it. The version already lives in the feature commit, so the release step touches only `docs/todo.md` and the main merge.
 - Never `git push --force` to main (branch protection is on).
 - Do not delete the feature branch without asking.
