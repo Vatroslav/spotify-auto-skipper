@@ -3,7 +3,7 @@
 {% block content %}
 <div class="container">
     <h1 class="page-title">Playlist Genres</h1>
-    <p class="text-secondary mb-16">See which genres dominate a playlist. Each track is attributed to its primary artist, and every genre Spotify lists for that artist is counted.</p>
+    <p class="text-secondary mb-16">See which genres dominate a playlist. Each track is attributed to its primary artist, and that artist's genres are counted.</p>
 
     <div id="error-banner" class="card hidden" style="border-color: var(--color-error);">
         <div id="error-text"></div>
@@ -16,11 +16,26 @@
                 <option value="">Loading playlists...</option>
             </select>
         </div>
+
+        <div class="form-group">
+            <label>Genre source</label>
+            <div class="filter-chips">
+                <button type="button" class="chip active" data-source="spotify">Spotify</button>
+                <button type="button" class="chip" data-source="lastfm">Last.fm</button>
+            </div>
+            <div id="source-help" class="help-text"></div>
+        </div>
+
         <button id="analyze-btn" class="btn btn-accent btn-full" disabled>Analyze</button>
     </div>
 
     <div id="loading" class="card hidden">
-        <div class="text-secondary text-center">Reading playlist and fetching artist genres...</div>
+        <div id="progress-message" class="text-secondary">Starting...</div>
+        <div class="progress-bar-container mt-8">
+            <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
+        </div>
+        <div id="progress-detail" class="help-text mt-8"></div>
+        <button id="cancel-btn" class="btn btn-full mt-8">Cancel</button>
     </div>
 
     <div id="results" class="hidden">

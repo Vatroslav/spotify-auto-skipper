@@ -330,6 +330,77 @@ async def get_loved_tracks(username: str = "") -> list[dict] | str:
     return results
 
 
+# ── Artist tags (read) ───────────────────────────────────────────
+
+
+async def get_artist_top_tags(artist: str, http: httpx.AsyncClient | None = None) -> list[dict] | str:
+    """Return an artist's top tags as ``[{"name", "count"}]``, ordered by count.
+
+    Returns ``LASTFM_ERROR`` only on a transport/HTTP failure. An artist Last.fm
+    has never heard of comes back as an empty list — a real answer, and the
+    caller must not retry it as if it were a blip.
+
+    ``count`` is Last.fm's relative weight (the top tag is normalised to 100),
+    not a play count. Callers pass an existing client when looping over many
+    artists so the connection pool is reused.
+    """
+    if not artist or not artist.strip():
+        return []
+    api_key = get_lastfm_api_key()
+    if not api_key:
+        return LASTFM_ERROR
+
+    params = {
+        "method": "artist.gettoptags",
+        "artist": artist.strip(),
+        "api_key": api_key,
+        "autocorrect": 1,
+        "format": "json",
+    }
+
+    async def _fetch(client: httpx.AsyncClient):
+        return await client.get(LASTFM_API_URL, params=params)
+
+    try:
+        if http is not None:
+            r = await _fetch(http)
+        else:
+            async with httpx.AsyncClient(timeout=20) as client:
+                r = await _fetch(client)
+    except httpx.RequestError as e:
+        logger.warning("[Last.fm] Network error fetching tags for '%s': %s", artist, e)
+        return LASTFM_ERROR
+
+    if r.status_code != 200:
+        logger.warning("[Last.fm] getTopTags status %d for '%s'", r.status_code, artist)
+        return LASTFM_ERROR
+
+    try:
+        data = r.json() or {}
+    except ValueError:
+        return LASTFM_ERROR
+
+    # error 6 = "artist not found"; anything else is a real failure.
+    if data.get("error"):
+        return [] if data.get("error") == 6 else LASTFM_ERROR
+
+    tags = (data.get("toptags") or {}).get("tag") or []
+    if isinstance(tags, dict):
+        tags = [tags]
+
+    out = []
+    for t in tags:
+        name = (t.get("name") or "").strip()
+        if not name:
+            continue
+        try:
+            count = int(t.get("count") or 0)
+        except (ValueError, TypeError):
+            count = 0
+        out.append({"name": name, "count": count})
+    return out
+
+
 # ── Authenticated session (write) ────────────────────────────────
 
 

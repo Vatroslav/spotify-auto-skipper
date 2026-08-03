@@ -28,6 +28,12 @@ class AppState:
         # a Spotify /me/tracks/contains call on every 5s poll; a new track is a miss.
         self.liked_status_cache: dict[str, bool] = {}
 
+        # Playlist Genres
+        self.genres_task: asyncio.Task | None = None
+        self.genres_status: str = "idle"  # idle/running/completed/failed
+        self.genres_progress: dict = {}  # {current, total, message}
+        self.genres_result: dict | None = None
+
         # Rediscovery
         self.rediscovery_task: asyncio.Task | None = None
         self.rediscovery_status: str = "idle"  # idle/running/completed/failed

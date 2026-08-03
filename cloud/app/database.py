@@ -3,6 +3,7 @@ SQLite database setup and CRUD helpers.
 All data persists at DATA_DIR/skipper.db (default: /app/data/skipper.db).
 """
 
+import json
 import os
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -110,6 +111,17 @@ CREATE TABLE IF NOT EXISTS lastfm_auth (
 CREATE TABLE IF NOT EXISTS loved_sync_ignored (
     track_id    TEXT PRIMARY KEY,
     ignored_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Last.fm top tags per artist, keyed by Spotify artist id (that is what the
+-- playlist scan yields). Cache, not a source of truth: Last.fm has no batch
+-- endpoint, so a 600-artist playlist costs 600 requests on a cold run and
+-- roughly zero on a warm one. Rows expire by age, see ARTIST_TAGS_TTL_DAYS.
+CREATE TABLE IF NOT EXISTS artist_tags (
+    artist_id   TEXT PRIMARY KEY,
+    artist_name TEXT NOT NULL DEFAULT '',
+    tags        TEXT NOT NULL DEFAULT '[]',
+    fetched_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_track_events_timestamp ON track_events(timestamp);
@@ -1202,6 +1214,67 @@ async def remove_loved_sync_ignore(track_id: str):
     db = await get_db()
     try:
         await db.execute("DELETE FROM loved_sync_ignored WHERE track_id = ?", (track_id,))
+        await db.commit()
+    finally:
+        await db.close()
+
+
+ARTIST_TAGS_TTL_DAYS = 30
+
+
+async def get_cached_artist_tags(artist_ids: list[str]) -> dict[str, list[str]]:
+    """Return cached Last.fm tags for the given artists, skipping stale rows.
+
+    Missing and expired entries are simply absent from the result, so the
+    caller treats both the same way: fetch them.
+    """
+    if not artist_ids:
+        return {}
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=ARTIST_TAGS_TTL_DAYS)).isoformat()
+    out: dict[str, list[str]] = {}
+    db = await get_db()
+    try:
+        # Chunked so a large playlist can't blow SQLite's variable limit (999).
+        for i in range(0, len(artist_ids), 500):
+            chunk = artist_ids[i : i + 500]
+            placeholders = ",".join("?" for _ in chunk)
+            cursor = await db.execute(
+                f"SELECT artist_id, tags FROM artist_tags "  # noqa: S608 - placeholders only
+                f"WHERE artist_id IN ({placeholders}) AND fetched_at >= ?",
+                (*chunk, cutoff),
+            )
+            for row in await cursor.fetchall():
+                try:
+                    parsed = json.loads(row["tags"])
+                except (ValueError, TypeError):
+                    continue
+                if isinstance(parsed, list):
+                    out[row["artist_id"]] = [str(t) for t in parsed]
+    finally:
+        await db.close()
+    return out
+
+
+async def save_artist_tags(entries: list[tuple[str, str, list[str]]]):
+    """Upsert (artist_id, artist_name, tags) rows, refreshing fetched_at.
+
+    An empty tag list is a legitimate cached answer — the artist exists but
+    carries no usable genre tags — so it is stored rather than skipped, which
+    keeps the next run from re-querying the same dead ends.
+    """
+    if not entries:
+        return
+    db = await get_db()
+    try:
+        await db.executemany(
+            """INSERT INTO artist_tags (artist_id, artist_name, tags, fetched_at)
+               VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+               ON CONFLICT(artist_id)
+               DO UPDATE SET artist_name = excluded.artist_name,
+                             tags        = excluded.tags,
+                             fetched_at  = CURRENT_TIMESTAMP""",
+            [(aid, name, json.dumps(tags)) for aid, name, tags in entries],
+        )
         await db.commit()
     finally:
         await db.close()
