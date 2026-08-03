@@ -473,6 +473,85 @@ class SpotifyClient:
             )
         return {"items": items, "total": data.get("total", 0)}
 
+    async def get_playlist_artist_counts(self, playlist_id: str) -> dict:
+        """Return the primary artist of every track in a playlist, with track counts.
+
+        Returns ``{"artists": {artist_id: {"name", "track_count"}}, "total_tracks",
+        "tracks_without_artist"}``.
+
+        Only the *primary* (first-credited) artist counts, so each track
+        contributes exactly once and featured guests don't inflate the mix.
+
+        Pagination is offset-driven rather than following ``next``: the ``fields``
+        mask below strips ``next`` from the response, so relying on it would end
+        the loop after the first page and silently truncate the scan.
+        """
+        artists: dict[str, dict] = {}
+        total_tracks = 0
+        tracks_without_artist = 0
+        offset = 0
+        playlist_total = 0
+
+        while True:
+            r = await self._get(
+                f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks",
+                params={
+                    "limit": 100,
+                    "offset": offset,
+                    "fields": "total,items(track(id,artists(id,name)))",
+                },
+            )
+            if r is None or r.status_code != 200:
+                raise _spotify_error(r, f"Fetching playlist artists at offset {offset}")
+            data = r.json() or {}
+            playlist_total = data.get("total", 0)
+            items = data.get("items") or []
+            if not items:
+                break
+
+            for entry in items:
+                track = (entry or {}).get("track") or {}
+                total_tracks += 1
+                credited = track.get("artists") or []
+                primary = credited[0] if credited else {}
+                artist_id = (primary or {}).get("id")
+                if not artist_id:
+                    # Local files and podcast episodes carry no artist ID.
+                    tracks_without_artist += 1
+                    continue
+                slot = artists.setdefault(artist_id, {"name": primary.get("name", ""), "track_count": 0})
+                slot["track_count"] += 1
+
+            offset += len(items)
+            if offset >= playlist_total:
+                break
+
+        return {
+            "artists": artists,
+            "total_tracks": total_tracks,
+            "tracks_without_artist": tracks_without_artist,
+        }
+
+    async def get_artists_genres(self, artist_ids: list[str]) -> dict[str, list[str]]:
+        """Return ``{artist_id: [genres]}`` for the given artists (batches of 50).
+
+        An artist Spotify hasn't classified comes back with an empty list — that
+        is a normal, and increasingly common, answer rather than an error.
+        """
+        out: dict[str, list[str]] = {}
+        for i in range(0, len(artist_ids), 50):
+            batch = artist_ids[i : i + 50]
+            r = await self._get("https://api.spotify.com/v1/artists", params={"ids": ",".join(batch)})
+            if r is None or r.status_code != 200:
+                raise _spotify_error(r, f"Fetching artist genres at index {i}")
+            data = r.json() or {}
+            for a in data.get("artists") or []:
+                # Unknown IDs come back as null entries in the array.
+                if not a or not a.get("id"):
+                    continue
+                out[a["id"]] = a.get("genres") or []
+        return out
+
     async def create_playlist(self, name: str, description: str = "", public: bool = False) -> dict | None:
         """Create a new playlist. Returns {id, url} or None."""
         # Need user ID first
