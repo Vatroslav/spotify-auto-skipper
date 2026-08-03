@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Playlist Genres - Spotify Auto-Skipper{% endblock %}
+{% block content %}
+<div class="container">
+    <h1 class="page-title">Playlist Genres</h1>
+    <p class="text-secondary mb-16">See which genres dominate a playlist. Each track is attributed to its primary artist, and every genre Spotify lists for that artist is counted.</p>
+
+    <div id="error-banner" class="card hidden" style="border-color: var(--color-error);">
+        <div id="error-text"></div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Playlist</div>
+        <div class="form-group">
+            <select id="playlist-select">
+                <option value="">Loading playlists...</option>
+            </select>
+        </div>
+        <button id="analyze-btn" class="btn btn-accent btn-full" disabled>Analyze</button>
+    </div>
+
+    <div id="loading" class="card hidden">
+        <div class="text-secondary text-center">Reading playlist and fetching artist genres...</div>
+    </div>
+
+    <div id="results" class="hidden">
+        <div class="card">
+            <div class="card-title">Summary</div>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div id="stat-tracks" class="metric-value">-</div>
+                    <div class="metric-label">Tracks</div>
+                </div>
+                <div class="metric-card">
+                    <div id="stat-artists" class="metric-value">-</div>
+                    <div class="metric-label">Artists</div>
+                </div>
+                <div class="metric-card">
+                    <div id="stat-genres" class="metric-value">-</div>
+                    <div class="metric-label">Genres</div>
+                </div>
+            </div>
+            <div id="coverage-note" class="help-text mt-8"></div>
+        </div>
+
+        <div class="card">
+            <div class="genre-toolbar">
+                <div class="card-title">Genre mix</div>
+                <div class="genre-sort">
+                    <button type="button" class="chip active" data-sort="tracks">By tracks</button>
+                    <button type="button" class="chip" data-sort="artists">By artists</button>
+                </div>
+            </div>
+            <div id="genre-list" class="genre-list"></div>
+            <div id="genre-empty" class="text-secondary text-center hidden">No genre data for any artist on this playlist.</div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/genres.js?v={{ version }}"></script>
+{% endblock %}
