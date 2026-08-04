@@ -15,6 +15,9 @@ odgovoriti na go/no-go pitanja u stvarnom autu, ne biti gotov proizvod.
   na `STATE_NONE` nakon 4 s.
 - Autentikacija je device token iz PWA (Settings → Android Auto device), spremljen u
   `EncryptedSharedPreferences`.
+- Na telefonu se zove **Car Skipper**, a ne Auto-Skipper, da se ne brka s PWA-om instaliranim na
+  istom telefonu. Ikona je brand oznaka (zelene skip strelice) s autom između njih; generira je
+  `tools/make_launcher_icon.py` iz boja postojećeg `cloud/app/static/icons/maskable-512.png`.
 
 Tri pravila koja drže cijeli pristup (detalji u planu):
 

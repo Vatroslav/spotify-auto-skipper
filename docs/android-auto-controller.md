@@ -78,7 +78,8 @@ Minimalni app koji odgovara na go/no-go pitanja. Sadržaj:
 - Manifest: service s intent filterom `android.media.browse.MediaBrowserService`,
   meta-data `com.google.android.gms.car.application` → `automotive_app_desc.xml`
   s `<uses name="media"/>`. Prijedlog applicationId: `uk.autoskipper.controls`,
-  label "Auto-Skipper" (promjenjivo, uskladiti s Vatrom).
+  label "Car Skipper" (dogovoreno s Vatrom 2026-08-04 - "Auto-Skipper" bi se brkao s PWA-om
+  instaliranim na istom telefonu; ikona je brand oznaka s autom između strelica).
 - `onGetRoot`: dopustiti samo Android Auto (`com.google.android.projection.gearhead`)
   i vlastiti package - browse akcije imaju server-side efekte, ne smiju biti
   okidive od bilo koje aplikacije na telefonu.
