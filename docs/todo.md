@@ -46,6 +46,11 @@ Svaka stavka je samostalna — sadrži file, problem i smjer popravka.
 - [ ] **Null-check za Spotify client** — `cloud/app/routers/settings.py` (`resolve_playlist`) i `cloud/app/routers/artists.py` (`search_artists`) ne provjeravaju `app_state.spotify_client is None` → 500 umjesto urednog 503 prije prvog OAutha. Dodati check kao u rediscovery routeru.
 - [ ] **(opcionalno) SQLite konekcija po upitu** — `cloud/app/database.py` (`get_db`): svaki upit otvara novu konekciju + pragme. Radi i nije hitno za single-user app; ako se dira, prijeći na jednu perzistentnu konekciju ili mali pool.
 
+## Sljedeći projekti
+
+- [ ] **Android Auto kontroler** — ručne komande (Check Now, Pause, Don't Skip, Liked, Remove) s ekrana auta.
+  Plan i upute za implementaciju: [android-auto-controller.md](android-auto-controller.md). Redoslijed: backend token auth → spike APK → go/no-go u stvarnom autu → puni app.
+
 ## Napomene za izvođenje
 
 - Redoslijed rada: odozgo prema dolje; svaki fix zasebno testirati.
