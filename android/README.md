@@ -29,8 +29,8 @@ Compat stack je namjeran: `MediaBrowserServiceCompat` + `MediaSessionCompat` (an
 
 ## Build
 
-Traži Android SDK (platform 35, build-tools 35) i JDK 17+. Na Vatrinom PC-u JDK dolazi s Android
-Studiom:
+Traži Android SDK (platform 36) i JDK 17+. Na Vatrinom PC-u JDK dolazi s Android Studiom i nije na
+PATH-u, pa se zadaje eksplicitno:
 
 ```bash
 cd android && JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" ./gradlew assembleDebug

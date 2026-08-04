@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace = "uk.autoskipper.controls"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "uk.autoskipper.controls"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
     }
