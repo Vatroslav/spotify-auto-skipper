@@ -773,6 +773,11 @@ function initInsights() {
         const container = document.getElementById("mapping-fails-list");
         if (!container) return;
 
+        // The endpoint re-checks every candidate against Last.fm, which takes a
+        // while the first time after a restart — say so instead of showing an
+        // empty box that reads as "no issues".
+        container.innerHTML = '<p class="text-muted text-center">Checking candidates against Last.fm...</p>';
+
         try {
             const data = await API.get("/api/insights/mapping-fails");
             const candidates = data.candidates || [];
