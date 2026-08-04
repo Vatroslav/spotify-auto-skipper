@@ -34,6 +34,10 @@ Svaka stavka je samostalna — sadrži file, problem i smjer popravka.
 - [x] **`restart_playlist` ne provjerava uspjeh PUT-ova** — `cloud/app/spotify_api.py` (`restart_playlist`) — DONE (v3.16.7, PR #71)
   Svaki PUT (skok na dummy, shuffle on, skok natrag) sada provjerava status; na grešku logira warning i vraća False. Prvi PUT (skok na dummy playlistu) aborta rano ako padne — playback netaknut. Ako je skok na dummy uspio, skok natrag na originalni kontekst se **uvijek** pokuša (i kad shuffle padne) da korisnik ne ostane zaglavljen na dummy playlisti. Worker call-site (`worker.py`) sada površi neuspjeh u user-facing log ("Playlist restart failed — check the dummy playlist ID in settings.").
 
+- [ ] **Alias potpuno gazi originalni naziv umjesto da uzme noviji rezultat** — `cloud/app/lastfm_api.py:120` (`get_last_play_date`)
+  Kad postoji alias, radi se `return await _lookup_scrobbles(artist, alias)` i originalni Spotify naziv se više uopće ne provjerava. Zato jedan loš alias tiho pokvari podatke: ako alias ne postoji na Last.fm-u, pjesma ispadne "nikad slušana" (jače od izostanka aliasa), a ako alias postoji ali je pod njim zadnja scrobbla starija, app radi na zastarjelom datumu i ne skipa pjesmu koju bi trebao. Oba slučaja potvrđena na produ 2026-08-04: 1 slomljen alias (zalijepljen "Love this track " prefiks s Last.fm stranice) + 3 koja su pokazivala na scrobblu iz 2022. dok je originalni naziv imao 2026. Podaci su počišćeni ručno (`track_aliases` 60 → 40), ali logika i dalje dopušta isti scenarij.
+  Fix: pozvati oba naziva i uzeti noviji (`max`), uz čuvanje semantike `LASTFM_ERROR` — greška na jednom pozivu ne smije se pretvoriti u "nema scrobble". Cijena: jedan dodatni Last.fm poziv po pjesmi koja ima alias. Napomena: lookup je case-insensitive, pa alias koji se od Spotify naziva razlikuje samo u velikim slovima nema efekta — razmisliti i o tome da UI odbije spremiti takav alias umjesto da stvori mrtav redak.
+
 ## Nizak prioritet / čišćenje
 
 - [ ] **`.env.example` kaže "min 16 chars" za SECRET_KEY, kod traži 32** — `cloud/.env.example:11` vs `cloud/app/config.py` (`get_secret_key`). Uskladiti komentar na 32.
