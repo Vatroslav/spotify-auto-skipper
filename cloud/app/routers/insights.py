@@ -13,7 +13,6 @@ from app.database import (
     delete_track_alias,
     dismiss_mapping_fail,
     get_cached_overall_metrics,
-    get_mapping_fail_candidates,
     get_track_event_dates,
     get_track_events,
     get_unconfirmed_track_aliases,
@@ -25,6 +24,7 @@ from app.insights import (
     generate_insights,
     generate_insights_all,
 )
+from app.mapping_fails import get_mapping_fail_candidates
 from app.routers.deps import require_auth
 
 router = APIRouter(prefix="/api/insights", tags=["insights"], dependencies=[Depends(require_auth)])
@@ -62,7 +62,10 @@ async def artist_daily(request: Request, tz: str = ""):
 
 @router.get("/mapping-fails")
 async def get_mapping_fails(request: Request):
-    """Return tracks suspected of Last.fm mapping issues."""
+    """Return tracks suspected of Last.fm mapping issues.
+
+    Costs one (cached) Last.fm call per candidate — see app.mapping_fails.
+    """
     settings = await load_settings()
     candidates = await get_mapping_fail_candidates(settings["skip_window_days"])
     return {
