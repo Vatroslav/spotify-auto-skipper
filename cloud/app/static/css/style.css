@@ -494,6 +494,53 @@ input:focus, select:focus {
     margin-left: auto;
 }
 
+/* ── Device tokens (Android Auto) ─────────────────── */
+
+.device-token-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-secondary);
+}
+
+.device-token-row:last-child { border-bottom: none; }
+
+.device-token-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.device-token-name {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+.device-token-qr {
+    max-width: 220px;
+    margin: 8px auto 0;
+}
+
+.device-token-qr svg {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+}
+
+.device-token-value {
+    margin-top: 8px;
+    padding: 8px;
+    border-radius: 6px;
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    font-family: monospace;
+    font-size: 0.75rem;
+    word-break: break-all;
+    user-select: all;
+}
+
 /* ── Mapping issues rows ──────────────────────────── */
 
 .mapping-fail-row {
