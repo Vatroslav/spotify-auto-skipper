@@ -822,12 +822,23 @@ function initInsights() {
                 actions.querySelector(".mapping-fail-dismiss").addEventListener("click", () => doDismiss(actions, ctx));
             };
 
+            // Drop the handled row instead of reloading the list. A reload would
+            // re-run the Last.fm check for every remaining candidate, and the
+            // server already knows this one is gone — the next page load shows it.
+            const removeRow = (actions) => {
+                const row = actions.closest(".mapping-fail-row");
+                if (row) row.remove();
+                if (!container.querySelector(".mapping-fail-row")) {
+                    container.innerHTML = `<p class="text-muted text-center">No mapping issues left in the last ${windowDays} days.</p>`;
+                }
+            };
+
             const doDismiss = async (actions, ctx) => {
                 actions.querySelectorAll("button").forEach(b => b.disabled = true);
                 try {
                     await API.post("/api/insights/mapping-fails/dismiss", { track_id: ctx.trackId });
                     showToast(`Dismissed "${ctx.trackName}"`);
-                    loadMappingFails();
+                    removeRow(actions);
                 } catch (e) {
                     actions.querySelectorAll("button").forEach(b => b.disabled = false);
                     showToast(`Dismiss failed: ${e.message}`, 3000, "error");
@@ -865,7 +876,7 @@ function initInsights() {
                             track_id: ctx.trackId,
                         });
                         showToast(`Alias saved: "${ctx.trackName}" → "${trimmed}"`);
-                        loadMappingFails();
+                        removeRow(actions);
                     } catch (e) {
                         input.disabled = false;
                         saveBtn.disabled = false;
