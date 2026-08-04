@@ -125,6 +125,93 @@ async def get_last_play_date(artist: str, track: str, track_id: str = "") -> dat
     return await _lookup_scrobbles(artist, track)
 
 
+# ── Scrobble history for one track (read) ────────────────────────
+
+# 200 is Last.fm's per-page maximum. A track that needs more than three pages
+# has been scrobbled 600+ times, which no caller of this function cares about.
+_SCROBBLE_PAGE_SIZE = 200
+_SCROBBLE_MAX_PAGES = 3
+
+
+async def get_track_scrobble_times(
+    artist: str, track: str, since_uts: int, http: httpx.AsyncClient | None = None
+) -> list[int] | str:
+    """Return the UTS timestamps of every scrobble of a track, newest first.
+
+    Pages back until the oldest scrobble seen predates ``since_uts``, so the
+    caller gets full coverage of the window it asked about, bounded by
+    ``_SCROBBLE_MAX_PAGES``. ``user.getTrackScrobbles`` is undocumented, so the
+    loop stops on a short page rather than trusting a ``totalPages`` attribute.
+
+    Returns ``LASTFM_ERROR`` on any failure — including missing credentials.
+    Never an empty list in that case, which a caller would read as "this track
+    was never scrobbled".
+    """
+    user = get_lastfm_username()
+    api_key = get_lastfm_api_key()
+    if not user or not api_key or not artist or not track:
+        return LASTFM_ERROR
+
+    async def _collect(client: httpx.AsyncClient) -> list[int] | str:
+        times: list[int] = []
+        for page in range(1, _SCROBBLE_MAX_PAGES + 1):
+            r = await client.get(
+                LASTFM_API_URL,
+                params={
+                    "method": "user.gettrackscrobbles",
+                    "user": user,
+                    "artist": artist,
+                    "track": track,
+                    "api_key": api_key,
+                    "format": "json",
+                    "limit": _SCROBBLE_PAGE_SIZE,
+                    "page": page,
+                },
+            )
+            if r.status_code != 200:
+                logger.warning(
+                    "[Last.fm] getTrackScrobbles status %d for '%s - %s'", r.status_code, artist, track
+                )
+                return LASTFM_ERROR
+            try:
+                data = r.json() or {}
+            except ValueError:
+                return LASTFM_ERROR
+            if data.get("error"):
+                # Includes "track not found" (6). Treated as a failure, not as
+                # "no scrobbles", so the caller stays on the safe side.
+                logger.warning(
+                    "[Last.fm] getTrackScrobbles error %s for '%s - %s'", data.get("error"), artist, track
+                )
+                return LASTFM_ERROR
+
+            scrobbles = (data.get("trackscrobbles") or {}).get("track") or []
+            if isinstance(scrobbles, dict):
+                scrobbles = [scrobbles]
+            for s in scrobbles:
+                date_obj = s.get("date") or {}
+                uts_raw = date_obj.get("uts") if isinstance(date_obj, dict) else None
+                try:
+                    times.append(int(uts_raw))
+                except (TypeError, ValueError):
+                    continue
+
+            if len(scrobbles) < _SCROBBLE_PAGE_SIZE:
+                break  # last page
+            if times and min(times) < since_uts:
+                break  # paged past the window the caller asked about
+        return times
+
+    try:
+        if http is not None:
+            return await _collect(http)
+        async with httpx.AsyncClient(timeout=20) as client:
+            return await _collect(client)
+    except httpx.RequestError as e:
+        logger.warning("[Last.fm] Network error fetching scrobbles for '%s - %s': %s", artist, track, e)
+        return LASTFM_ERROR
+
+
 # ── Now playing (read) ───────────────────────────────────────────
 
 

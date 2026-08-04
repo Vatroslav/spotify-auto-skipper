@@ -1081,54 +1081,40 @@ async def is_reauth_required() -> bool:
 # ── Mapping fail candidates ──────────────────────────────────────
 
 
-async def get_mapping_fail_candidates(skip_window_days: int) -> list[dict]:
-    """Return tracks likely suffering from Last.fm mapping issues.
+async def get_mapping_fail_events(skip_window_days: int) -> list[dict]:
+    """Return the raw events that feed the Last.fm mapping-issue list.
 
-    A candidate is a Spotify track (identified by track_id) that appears
-    2+ times within the skip window where every occurrence has outcome
-    'played' or 'no_scrobble' (never 'skipped', 'liked', 'never_skip',
-    'skip_paused'). Grouping by track_id lets different album versions
-    of the same-named track be handled independently.
+    An event qualifies when its outcome is 'played' or 'no_scrobble' (the two
+    the worker logs after failing to find a fresh scrobble) and the track has no
+    positive outcome ('skipped', 'liked', 'never_skip', 'skip_paused') in the
+    same window — a track that was skipped is demonstrably mapped.
 
     Dismissed entries are filtered: a dismissal hides the track until new
     qualifying events are logged after dismissed_at.
+
+    Rows come back oldest-first, one per event and not grouped, because
+    ``app.mapping_fails`` first drops the events that Last.fm's scrobble history
+    shows were only a race with the scrobble landing; the per-track counts and
+    the 2+ threshold are computed there, on what survives.
     """
     db = await get_db()
     try:
         cursor = await db.execute(
             """
-            WITH recent AS (
-                SELECT track_id, track_name, artist_name, album_name, outcome, timestamp
-                FROM track_events
-                WHERE timestamp >= datetime('now', ?)
-            ),
-            grouped AS (
-                SELECT
-                    r.track_id,
-                    r.track_name,
-                    r.artist_name,
-                    MAX(r.album_name) AS album_name,
-                    COUNT(*) AS total_count,
-                    SUM(r.outcome = 'no_scrobble') AS no_scrobble_count,
-                    SUM(r.outcome = 'played') AS played_count,
-                    MAX(r.timestamp) AS last_seen
-                FROM recent r
-                LEFT JOIN mapping_fail_dismissals d ON d.track_id = r.track_id
-                WHERE r.outcome IN ('played', 'no_scrobble')
-                  AND (d.dismissed_at IS NULL OR r.timestamp > d.dismissed_at)
-                GROUP BY r.track_id
-            )
-            SELECT track_id, track_name, artist_name, album_name,
-                   total_count, no_scrobble_count, played_count, last_seen
-            FROM grouped
-            WHERE total_count >= 2
+            SELECT r.track_id, r.track_name, r.artist_name, r.album_name,
+                   r.outcome, r.timestamp
+            FROM track_events r
+            LEFT JOIN mapping_fail_dismissals d ON d.track_id = r.track_id
+            WHERE r.timestamp >= datetime('now', ?)
+              AND r.outcome IN ('played', 'no_scrobble')
+              AND (d.dismissed_at IS NULL OR r.timestamp > d.dismissed_at)
               AND NOT EXISTS (
                   SELECT 1 FROM track_events te
-                  WHERE te.track_id = grouped.track_id
+                  WHERE te.track_id = r.track_id
                     AND te.timestamp >= datetime('now', ?)
                     AND te.outcome IN ('skipped', 'liked', 'never_skip', 'skip_paused')
               )
-            ORDER BY total_count DESC, last_seen DESC
+            ORDER BY r.timestamp
             """,
             (f"-{skip_window_days} days", f"-{skip_window_days} days"),
         )
