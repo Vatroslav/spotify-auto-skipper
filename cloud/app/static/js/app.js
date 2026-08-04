@@ -17,6 +17,32 @@ function showToast(message, duration = 2000, type = "success") {
     toast._timeout = setTimeout(() => toast.classList.remove("show"), duration);
 }
 
+// ── Clipboard ───────────────────────────────────────────────────
+
+function copyToClipboard(text, message = "Copied to clipboard") {
+    const ok = () => showToast(message);
+    const fallback = () => {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+            document.execCommand("copy");
+            ok();
+        } catch (e) {
+            showToast("Copy failed", 3000, "error");
+        }
+        document.body.removeChild(ta);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(ok).catch(fallback);
+    } else {
+        fallback();
+    }
+}
+
 // ── Dashboard (index.html) ──────────────────────────────────────
 
 function initDashboard() {
@@ -861,8 +887,8 @@ function initInsights() {
                 const lastSeen = fmtLastSeen(lastSeenDate);
                 const link = lastfmDayLink(lastSeenDate);
                 const lastSeenHtml = link
-                    ? `<a class="mapping-fail-info mapping-fail-lastseen" href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer" title="Open Last.fm scrobbles for this day">${escapeHtml(lastSeen)}</a>`
-                    : `<span class="text-muted mapping-fail-info">${escapeHtml(lastSeen)}</span>`;
+                    ? `<a class="mapping-fail-info mapping-fail-lastseen" href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer" title="Open Last.fm scrobbles for this day (copies artist name)">${escapeHtml(lastSeen)}</a>`
+                    : `<span class="text-muted mapping-fail-info mapping-fail-lastseen" title="Copy artist name">${escapeHtml(lastSeen)}</span>`;
                 const albumSuffix = c.album_name ? ` <span class="mapping-fail-album text-muted">(${escapeHtml(c.album_name)})</span>` : "";
                 return `
                     <div class="mapping-fail-row" data-idx="${i}">
@@ -885,6 +911,13 @@ function initInsights() {
                 };
                 const actions = row.querySelector(".mapping-fail-actions");
                 renderDefaultActions(actions, ctx);
+
+                const lastSeenEl = row.querySelector(".mapping-fail-lastseen");
+                if (lastSeenEl) {
+                    lastSeenEl.addEventListener("click", () => {
+                        copyToClipboard(c.artist_name, `Copied "${c.artist_name}"`);
+                    });
+                }
             });
         } catch (e) {
             container.innerHTML = `<p class="text-muted text-center">Failed to load: ${escapeHtml(e.message)}</p>`;

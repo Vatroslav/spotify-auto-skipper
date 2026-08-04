@@ -537,6 +537,7 @@ input:focus, select:focus {
 .mapping-fail-lastseen {
     color: var(--text-secondary);
     text-decoration: none;
+    cursor: pointer;
 }
 
 .mapping-fail-lastseen:hover {
