@@ -55,6 +55,7 @@ Svaka stavka je samostalna — sadrži file, problem i smjer popravka.
 
 - [ ] **Android Auto kontroler** — ručne komande (Check Now, Pause, Don't Skip, Liked, Remove) s ekrana auta.
   Plan i upute za implementaciju: [android-auto-controller.md](android-auto-controller.md). Redoslijed: backend token auth → spike APK → go/no-go u stvarnom autu → puni app.
+  - [x] Faza 1 (backend device token auth) — branch `feat/device-token-auth`, PR #77, v3.21.0. Čeka deploy na VPS i test s telefona prije Faze 2.
 
 ## Napomene za izvođenje
 
