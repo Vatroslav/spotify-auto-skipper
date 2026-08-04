@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Auto-Skipper</string>
+
+    <string name="setup_intro">Server URL and device token from the Auto-Skipper web app (Settings → Android Auto device).</string>
+    <string name="label_server_url">Server URL</string>
+    <string name="label_token">Device token</string>
+    <string name="action_save">Save</string>
+    <string name="action_test">Test connection</string>
+    <string name="status_saved">Saved.</string>
+    <string name="status_testing">Testing…</string>
+    <string name="status_missing_token">Enter a device token first.</string>
+
+    <string name="cmd_check_now">Check Now</string>
+    <string name="cmd_pause_skipping">Pause Skipping</string>
+    <string name="cmd_resume_skipping">Resume Skipping (paused)</string>
+
+    <string name="msg_check_sent">Check now sent</string>
+    <string name="msg_skipping_paused">Skipping paused</string>
+    <string name="msg_skipping_resumed">Skipping resumed</string>
+    <string name="msg_not_configured">Not set up — open Auto-Skipper on your phone</string>
+    <string name="msg_unreachable">Server unreachable</string>
+</resources>
