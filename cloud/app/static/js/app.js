@@ -403,6 +403,111 @@ function initSettings() {
     bindLogout();
 }
 
+// ── Android Auto device tokens (settings.html) ──────────────────
+
+function initDeviceTokens() {
+    const generateBtn = document.getElementById("generate-token-btn");
+    const labelInput = document.getElementById("device-token-label");
+    const listEl = document.getElementById("device-token-list");
+    const reveal = document.getElementById("device-token-reveal");
+    const qrEl = document.getElementById("device-token-qr");
+    const valueEl = document.getElementById("device-token-value");
+    const copyBtn = document.getElementById("copy-token-btn");
+    if (!generateBtn || !listEl) return;
+
+    function fmtStamp(ts) {
+        if (!ts) return null;
+        const d = new Date(ts.replace(" ", "T") + "Z");
+        if (isNaN(d)) return null;
+        const pad = (n) => String(n).padStart(2, "0");
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    async function loadTokens() {
+        try {
+            const data = await API.get("/api/device-tokens");
+            const tokens = data.tokens || [];
+            if (tokens.length === 0) {
+                listEl.innerHTML = '<p class="help-text">No device tokens yet.</p>';
+                return;
+            }
+            listEl.innerHTML = tokens.map(t => `
+                <div class="device-token-row" data-id="${t.id}">
+                    <div class="device-token-info">
+                        <div class="device-token-name">${escapeHtml(t.label || "Unnamed device")}</div>
+                        <div class="help-text">Created ${escapeHtml(fmtStamp(t.created_at) || "unknown")} &middot; ${t.last_used_at ? "last used " + escapeHtml(fmtStamp(t.last_used_at)) : "never used"}</div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-danger device-token-revoke">Revoke</button>
+                </div>
+            `).join("");
+
+            listEl.querySelectorAll(".device-token-revoke").forEach(btn => {
+                btn.addEventListener("click", async () => {
+                    const row = btn.closest(".device-token-row");
+                    const name = row.querySelector(".device-token-name").textContent;
+                    if (!confirm(`Revoke "${name}"? The Android Auto app on that phone will stop working.`)) return;
+                    btn.disabled = true;
+                    try {
+                        await API.del(`/api/device-tokens/${row.dataset.id}`);
+                        showToast("Device token revoked");
+                        loadTokens();
+                    } catch (e) {
+                        btn.disabled = false;
+                        showToast(e.message || "Revoke failed", 3000, "error");
+                    }
+                });
+            });
+        } catch (e) {
+            listEl.innerHTML = `<p class="help-text text-error">Failed to load device tokens: ${escapeHtml(e.message)}</p>`;
+        }
+    }
+
+    function renderQr(payload) {
+        if (!qrEl) return;
+        qrEl.innerHTML = "";
+        if (typeof qrcode !== "function") return;
+        try {
+            // Type 0 = auto-size for the payload, error correction level M.
+            const qr = qrcode(0, "M");
+            qr.addData(payload);
+            qr.make();
+            // Inline SVG, not createDataURL(): the CSP's img-src has no data:.
+            // Sized in px by the library so it renders even before CSS applies.
+            qrEl.innerHTML = qr.createSvgTag({ cellSize: 5, margin: 4 });
+        } catch {
+            qrEl.innerHTML = '<p class="help-text text-error">QR could not be rendered — copy the token instead.</p>';
+        }
+    }
+
+    generateBtn.addEventListener("click", async () => {
+        generateBtn.disabled = true;
+        generateBtn.textContent = "...";
+        try {
+            const data = await API.post("/api/device-tokens", { label: labelInput ? labelInput.value.trim() : "" });
+            // The plaintext token exists only in this response — the server
+            // stores a hash, so this is the one chance to capture it.
+            const payload = JSON.stringify({ url: data.base_url, token: data.token });
+            renderQr(payload);
+            if (valueEl) valueEl.textContent = data.token;
+            if (reveal) reveal.classList.remove("hidden");
+            if (labelInput) labelInput.value = "";
+            loadTokens();
+        } catch (e) {
+            showToast(e.message || "Failed to generate token", 3000, "error");
+        }
+        generateBtn.disabled = false;
+        generateBtn.textContent = "Generate";
+    });
+
+    if (copyBtn) {
+        copyBtn.addEventListener("click", () => {
+            if (valueEl && valueEl.textContent) copyToClipboard(valueEl.textContent, "Token copied");
+        });
+    }
+
+    loadTokens();
+}
+
 function bindLogout() {
     const logoutBtn = document.getElementById("logout-btn");
     if (logoutBtn && !logoutBtn._bound) {
@@ -1422,6 +1527,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initDashboard();
     initArtistChart();
     initSettings();
+    initDeviceTokens();
     initArtists();
     initInsights();
     initLogs();

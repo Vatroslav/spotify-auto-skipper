@@ -134,6 +134,28 @@
         </div>
 
         <div class="card">
+            <div class="card-title">Android Auto device</div>
+
+            <div class="form-group">
+                <label for="device-token-label">Device label</label>
+                <div class="input-with-btn">
+                    <input type="text" id="device-token-label" placeholder="e.g. Pixel 8" maxlength="60">
+                    <button type="button" id="generate-token-btn" class="btn">Generate</button>
+                </div>
+                <div class="help-text">A device token lets the Android Auto controller send playback commands. Playback only &mdash; settings, logs and Spotify sign-in stay browser-only.</div>
+            </div>
+
+            <div id="device-token-reveal" class="hidden">
+                <div class="help-text text-warning">Shown once. Scan it in the app or copy it now.</div>
+                <div id="device-token-qr" class="device-token-qr"></div>
+                <div id="device-token-value" class="device-token-value"></div>
+                <button type="button" id="copy-token-btn" class="btn btn-full mt-8">Copy token</button>
+            </div>
+
+            <div id="device-token-list" class="mt-16"></div>
+        </div>
+
+        <div class="card">
             <div class="card-title">Account</div>
             <button id="logout-btn" class="btn btn-danger btn-full">
                 Disconnect Spotify
@@ -141,4 +163,6 @@
         </div>
     </div>
 </div>
+
+<script src="/static/js/vendor/qrcode.js?v={{ version }}"></script>
 {% endblock %}

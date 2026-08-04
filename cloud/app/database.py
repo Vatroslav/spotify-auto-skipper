@@ -124,6 +124,18 @@ CREATE TABLE IF NOT EXISTS artist_tags (
     fetched_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Long-lived bearer tokens for non-browser clients (the Android Auto
+-- controller). Only the SHA-256 hash is stored: a database read must not
+-- yield a usable token. Scope is deliberately narrow — these authenticate
+-- the playback router only, never settings or auth.
+CREATE TABLE IF NOT EXISTS device_tokens (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash   TEXT NOT NULL UNIQUE,
+    label        TEXT NOT NULL DEFAULT '',
+    created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_used_at TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_track_events_timestamp ON track_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
 """
@@ -1278,5 +1290,89 @@ async def dismiss_mapping_fail(track_id: str):
             (track_id,),
         )
         await db.commit()
+    finally:
+        await db.close()
+
+
+# ── Device tokens (Android Auto controller) ─────────────────────
+
+
+async def add_device_token(token_hash: str, label: str = "") -> dict:
+    """Store a new device token by hash. Returns the created row (no hash)."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "INSERT INTO device_tokens (token_hash, label) VALUES (?, ?)",
+            (token_hash, label),
+        )
+        token_id = cursor.lastrowid
+        await db.commit()
+        row = await (
+            await db.execute(
+                "SELECT id, label, created_at, last_used_at FROM device_tokens WHERE id = ?",
+                (token_id,),
+            )
+        ).fetchone()
+        return dict(row)
+    finally:
+        await db.close()
+
+
+async def get_device_tokens() -> list[dict]:
+    """List device tokens for the management UI, newest first. Hashes stay out."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT id, label, created_at, last_used_at FROM device_tokens ORDER BY id DESC"
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+
+async def get_device_token_hashes() -> list[tuple[int, str]]:
+    """Return (id, token_hash) for every device token.
+
+    The whole set is loaded so the caller can compare in constant time
+    (hmac.compare_digest) instead of letting SQLite match on the hash — a
+    handful of rows at most, one per phone.
+    """
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT id, token_hash FROM device_tokens")
+        return [(row["id"], row["token_hash"]) for row in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+
+async def touch_device_token(token_id: int):
+    """Record that a device token was just used successfully."""
+    db = await get_db()
+    try:
+        await db.execute(
+            "UPDATE device_tokens SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (token_id,),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def delete_device_token(token_id: int) -> bool:
+    """Revoke a device token. Returns True if a row was deleted.
+
+    Deletes by primary key, so at most one row may go; anything else means
+    the statement is not what it looks like and the transaction is rolled back.
+    """
+    db = await get_db()
+    try:
+        cursor = await db.execute("DELETE FROM device_tokens WHERE id = ?", (token_id,))
+        if cursor.rowcount > 1:
+            await db.rollback()
+            raise RuntimeError(
+                f"delete_device_token({token_id}) matched {cursor.rowcount} rows — rolled back"
+            )
+        await db.commit()
+        return cursor.rowcount == 1
     finally:
         await db.close()

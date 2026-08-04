@@ -11,14 +11,20 @@ from app.config import load_settings
 from app.database import add_log, add_track_alias, get_lastfm_session, get_track_alias, is_reauth_required
 from app.lastfm_api import get_nowplaying, track_love, track_unlove
 from app.loved_sync import _normalize, _similarity
-from app.routers.deps import require_auth
+from app.routers.deps import require_auth_or_device_token
 from app.state import app_state
 
 # Thresholds for auto-alias creation in toggle_like (see resolve_lastfm_name).
 _AUTO_ALIAS_ARTIST_SIM = 1.0  # artist must match exactly (after normalize)
 _AUTO_ALIAS_NAME_SIM = 0.8  # track name similarity floor
 
-router = APIRouter(prefix="/api/playback", tags=["playback"], dependencies=[Depends(require_auth)])
+# Device tokens are accepted here only: these are the manual commands the
+# Android Auto controller sends. Every other router stays session-only.
+router = APIRouter(
+    prefix="/api/playback",
+    tags=["playback"],
+    dependencies=[Depends(require_auth_or_device_token)],
+)
 
 
 async def _get_liked_cached(track_id: str) -> bool | None:

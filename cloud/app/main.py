@@ -143,11 +143,23 @@ async def service_worker():
     )
 
 # Include routers
-from app.routers import artists, auth, genres, insights, logs, loved_sync, playback, rediscovery, settings
+from app.routers import (
+    artists,
+    auth,
+    device_tokens,
+    genres,
+    insights,
+    logs,
+    loved_sync,
+    playback,
+    rediscovery,
+    settings,
+)
 
 app.include_router(auth.router)
 app.include_router(playback.router)
 app.include_router(settings.router)
+app.include_router(device_tokens.router)
 app.include_router(artists.router)
 app.include_router(insights.router)
 app.include_router(logs.router)
