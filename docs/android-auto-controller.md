@@ -24,10 +24,15 @@ klik na stavku okida HTTP poziv na postojeće API endpointe.
 3. **Poruke korisniku:** `PlaybackStateCompat.STATE_ERROR` + `setErrorMessage()` - AA to
    prikazuje; službeni vodič "Handle errors" za AA media appove.
    (developer.android.com/training/cars/media/errors)
-4. **Neprovjereno (zato spike faza):** točno vizualno ponašanje AA kad klik na playable
-   stavku ne pokrene playback. Dokazi s foruma: klik se registrira, ništa se vidljivo ne
-   dogodi, ostaje se u browse listi. Prihvatljivo u oba slučaja jer feedback gradimo kroz
-   STATE_ERROR - ali spike to mora potvrditi u stvarnom autu.
+4. **Provjereno spikeom u stvarnom autu (2026-08-08):** kad klik na playable stavku ne
+   pokrene playback, AA prikaže VLASTITU generičku poruku "Could not load your selection" -
+   iako je komanda na serveru uredno izvršena. Uzrok: app je STATE_ERROR postavljao tek
+   nakon HTTP round-tripa, a AA nakon klika čeka tranziciju stanja odmah. Posljedica za
+   dizajn: STATE_ERROR se postavlja SINKRONO na klik (prije HTTP-a), poruka se ažurira po
+   odgovoru; primarna potvrda ide kroz promjenu labela/subtitlea stavki
+   (notifyChildrenChanged), koju AA garantirano renderira.
+5. **Provjereno spikeom:** AA kešira popis appova - novoinstalirani sideload media app se
+   ne pojavi u launcheru dok se Android Auto ne force-stopa (ili telefon ne restarta).
 
 ## Kardinalna pravila (kršenje ruši cijeli pristup)
 
@@ -107,6 +112,11 @@ Minimalni app koji odgovara na go/no-go pitanja. Sadržaj:
 
 Padne li bilo koji kriterij: STOP, javiti Vatri nalaz. Ne krpati hackovima.
 
+**Rezultat spikea (2026-08-08):** kriteriji 1 (vidljivost, uz force-stop AA) i 2
+(izvršenje komande, potvrđeno u server logu) PROŠLI. Kriterij 3 pao na timingu feedbacka
+(vidi Utvrđene činjenice #4) - fix definiran i ugrađuje se u puni app. Kriterije 4 (volan)
+i 5 (refresh labela) Vatra svjesno testira na punom appu umjesto ponovnog spike kruga.
+
 ### Faza 3 - backend proširenja (feat → minor bump)
 
 - `GET /api/playback`: dodati `trash_configured: bool`
@@ -144,9 +154,12 @@ Browse tree (redoslijed = redoslijed u listi):
 - **Volan-fallback:** session callbackovi `onSkipToNext/onSkipToPrevious/onPause/onPlay`
   → proxy endpointi iz Faze 3. Deklarirati odgovarajuće ACTION flagove u PlaybackState.
   Ovo je osiguranje za slučaj da routing ikad zaluta na SAS - ne primarni mehanizam.
-- **Greške sa servera** mapirati doslovno u STATE_ERROR poruke: "Nothing is playing",
-  "Currently playing track is not from a playlist", "Spotify client not ready",
-  mrežni fail → "Server unreachable".
+- **Feedback (revidirano po spike nalazu):** STATE_ERROR se postavlja sinkrono na klik
+  ("Working..."), pa se poruka ažurira po HTTP odgovoru; nakon ~4 s natrag na STATE_NONE.
+  Primarna potvrda uspjeha je promjena labela/subtitlea stavke kroz notifyChildrenChanged
+  (npr. "Check Now" → subtitle "Sent ✓"). **Greške sa servera** mapirati doslovno u
+  STATE_ERROR poruke: "Nothing is playing", "Currently playing track is not from a
+  playlist", "Spotify client not ready", mrežni fail → "Server unreachable".
 - Telefonska aktivnost: + QR scan tokena (zxing-embedded) uz postojeći paste.
 
 ### Faza 5 (v2, opcionalno, NE raditi bez eksplicitnog zahtjeva)
