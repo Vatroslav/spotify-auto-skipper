@@ -12,13 +12,42 @@
     <string name="status_testing">Testing…</string>
     <string name="status_missing_token">Enter a device token first.</string>
 
+    <!-- Browse list: item titles -->
+    <string name="status_now_playing">Now: %1$s - %2$s</string>
+    <string name="status_now_playing_track_only">Now: %1$s</string>
+    <string name="status_nothing_playing">Nothing playing</string>
+    <string name="status_skipping_active">Skipping active</string>
+    <string name="status_skipping_paused">Skipping paused</string>
     <string name="cmd_check_now">Check Now</string>
     <string name="cmd_pause_skipping">Pause Skipping</string>
     <string name="cmd_resume_skipping">Resume Skipping (paused)</string>
+    <string name="cmd_dont_skip">Don\'t Skip This Song</string>
+    <string name="cmd_wont_skip">Won\'t skip: %1$s</string>
+    <string name="cmd_like_add">Add to Liked Songs</string>
+    <string name="cmd_like_remove">Remove from Liked Songs</string>
+    <string name="cmd_remove">Remove from Playlist</string>
+    <string name="cmd_remove_armed">Tap again to remove: %1$s</string>
 
+    <!-- Browse list: subtitles. The primary success signal on a car screen — Android Auto
+         renders a relabelled list reliably, a playback-state message only briefly. -->
+    <string name="feedback_sent">Sent ✓</string>
+    <string name="feedback_done">Done ✓</string>
+    <string name="feedback_removed">Removed ✓</string>
+    <string name="feedback_failed">Failed</string>
+
+    <!-- Transient STATE_ERROR messages -->
+    <string name="msg_working">Working…</string>
+    <string name="msg_busy">Still working…</string>
     <string name="msg_check_sent">Check now sent</string>
     <string name="msg_skipping_paused">Skipping paused</string>
     <string name="msg_skipping_resumed">Skipping resumed</string>
+    <string name="msg_wont_skip">Won\'t skip: %1$s</string>
+    <string name="msg_liked">Added to Liked Songs</string>
+    <string name="msg_unliked">Removed from Liked Songs</string>
+    <string name="msg_remove_armed">Tap again to remove: %1$s</string>
+    <string name="msg_removed">Removed: %1$s</string>
+    <string name="msg_track_changed">Track changed - not removed</string>
+    <string name="msg_nothing_playing">Nothing is playing</string>
     <string name="msg_not_configured">Not set up — open Car Skipper on your phone</string>
     <string name="msg_unreachable">Server unreachable</string>
 </resources>
