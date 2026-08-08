@@ -260,6 +260,16 @@ class SpotifyClient:
             return False
         return True
 
+    async def previous_track(self) -> bool:
+        r = await self._post("https://api.spotify.com/v1/me/player/previous")
+        if r is None or r.status_code not in (200, 202, 204):
+            logger.warning(
+                "[Spotify] previous: playback not moved (%s)",
+                "network error" if r is None else f"HTTP {r.status_code}",
+            )
+            return False
+        return True
+
     async def is_spotify_paused(self) -> bool:
         r = await self._get("https://api.spotify.com/v1/me/player")
         if r is None or r.status_code != 200:
@@ -267,8 +277,25 @@ class SpotifyClient:
         data = r.json() or {}
         return not data.get("is_playing", True)
 
-    async def pause_spotify_playback(self):
-        await self._put("https://api.spotify.com/v1/me/player/pause")
+    async def pause_spotify_playback(self) -> bool:
+        r = await self._put("https://api.spotify.com/v1/me/player/pause")
+        if r is None or r.status_code not in (200, 202, 204):
+            logger.warning(
+                "[Spotify] pause: playback not paused (%s)",
+                "network error" if r is None else f"HTTP {r.status_code}",
+            )
+            return False
+        return True
+
+    async def resume_spotify_playback(self) -> bool:
+        r = await self._put("https://api.spotify.com/v1/me/player/play")
+        if r is None or r.status_code not in (200, 202, 204):
+            logger.warning(
+                "[Spotify] resume: playback not resumed (%s)",
+                "network error" if r is None else f"HTTP {r.status_code}",
+            )
+            return False
+        return True
 
     async def restart_playlist(self, dummy_playlist_id: str) -> bool:
         """Restart the current playlist (shuffle on) to break repeating patterns.

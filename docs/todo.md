@@ -54,7 +54,11 @@ Svaka stavka je samostalna — sadrži file, problem i smjer popravka.
 
 - [ ] **Android Auto kontroler** — ručne komande (Check Now, Pause, Don't Skip, Liked, Remove) s ekrana auta.
   Plan i upute za implementaciju: [android-auto-controller.md](android-auto-controller.md). Redoslijed: backend token auth → spike APK → go/no-go u stvarnom autu → puni app.
-  - [x] Faza 1 (backend device token auth) — v3.21.0, PR #77. Deployano na prod, token verificiran curlom, released. Sljedeće: Faza 2 (spike APK).
+  - [x] Faza 1 (backend device token auth) — v3.21.0, PR #77. Deployano na prod, token verificiran curlom, released.
+  - [x] Faza 2 (spike APK) — testirana u autu 2026-08-08, PR #79. Kriteriji 1 i 2 prošli; kriterij 3 pao na timingu feedbacka (fix u Fazi 4), kriterije 4 i 5 Vatra svjesno prebacio na test punog appa.
+  - [x] Faza 3 (backend proširenja) — v3.22.0, PR #79. `trash_configured`, `expected_track_id` → 409, transport proxyji `/next` `/previous` `/pause` `/resume`.
+  - [x] Faza 4 (puni app) — app 0.2.0, PR #79. Svih šest stavki, dvofazni Remove, poll 30 s, volan-fallback, sinkroni STATE_ERROR. Upute: [android/README.md](../android/README.md).
+  - [ ] Test punog appa u autu — instalirati `CarSkipper-0.2.0.apk` (force-stop Android Auta nakon instalacije) i provjeriti pet točaka iz [android/README.md](../android/README.md): ikone, izvršenje komande, čitljivost poruke, ostaje li volan Spotifyjev, osvježavanje labela.
 
 ## Napomene za izvođenje
 

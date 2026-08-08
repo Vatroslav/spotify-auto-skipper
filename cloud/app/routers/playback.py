@@ -3,20 +3,34 @@ Playback API routes — current track, check now, pause/resume.
 """
 
 import asyncio
+from collections.abc import Awaitable, Callable
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from app.config import load_settings
 from app.database import add_log, add_track_alias, get_lastfm_session, get_track_alias, is_reauth_required
 from app.lastfm_api import get_nowplaying, track_love, track_unlove
 from app.loved_sync import _normalize, _similarity
 from app.routers.deps import require_auth_or_device_token
+from app.spotify_api import SpotifyClient
 from app.state import app_state
 
 # Thresholds for auto-alias creation in toggle_like (see resolve_lastfm_name).
 _AUTO_ALIAS_ARTIST_SIM = 1.0  # artist must match exactly (after normalize)
 _AUTO_ALIAS_NAME_SIM = 0.8  # track name similarity floor
+
+
+class RemoveFromPlaylistRequest(BaseModel):
+    """Body of POST /remove-from-playlist.
+
+    expected_track_id is what the caller believes is playing. The car controller
+    sends it because its two-tap confirmation can straddle a track change; the PWA
+    omits it (the button sits next to a live now-playing display).
+    """
+
+    expected_track_id: str | None = None
 
 # Device tokens are accepted here only: these are the manual commands the
 # Android Auto controller sends. Every other router stays session-only.
@@ -74,6 +88,9 @@ async def get_playback(request: Request):
         "idle_mode": app_state.idle_mode,
         "skip_exempt_track_id": app_state.skip_exempt_track_id,
         "is_liked": is_liked,
+        # The car controller hides its Remove item unless a trash playlist exists,
+        # so a mis-tap can never delete a track without a backup copy.
+        "trash_configured": bool((settings.get("trash_playlist_id") or "").strip()),
     }
 
 
@@ -107,11 +124,52 @@ async def toggle_pause(request: Request):
     return {"skipping_paused": app_state.skipping_paused}
 
 
+async def _transport_command(label: str, run: Callable[[SpotifyClient], Awaitable[bool]]):
+    """Run a Spotify transport command and phrase the outcome for a car screen.
+
+    These four proxies exist only as the Android Auto controller's steering-wheel
+    fallback: media buttons should reach Spotify directly, but if routing ever
+    lands on the controller instead, it forwards them here rather than dropping them.
+    """
+    client = app_state.spotify_client
+    if not client:
+        return JSONResponse({"ok": False, "error": "Spotify client not ready"}, status_code=503)
+    if not await run(client):
+        await add_log(f"Playback {label} failed: Spotify rejected the command", "warning")
+        return JSONResponse({"ok": False, "error": f"Spotify rejected {label}"}, status_code=502)
+    return {"ok": True}
+
+
+@router.post("/next")
+async def player_next(request: Request):
+    """Skip to the next track."""
+    return await _transport_command("next", lambda client: client.skip_current_track())
+
+
+@router.post("/previous")
+async def player_previous(request: Request):
+    """Go back to the previous track."""
+    return await _transport_command("previous", lambda client: client.previous_track())
+
+
+@router.post("/pause")
+async def player_pause(request: Request):
+    """Pause Spotify playback (not the skipping worker — that is /toggle-pause)."""
+    return await _transport_command("pause", lambda client: client.pause_spotify_playback())
+
+
+@router.post("/resume")
+async def player_resume(request: Request):
+    """Resume Spotify playback."""
+    return await _transport_command("resume", lambda client: client.resume_spotify_playback())
+
+
 @router.post("/remove-from-playlist")
-async def remove_from_playlist(request: Request):
+async def remove_from_playlist(request: Request, body: RemoveFromPlaylistRequest | None = None):
     """Remove the currently playing track from its playlist (back up to trash playlist if configured), then skip.
 
-    Reproduces the AHK Ctrl+Media_Next workflow.
+    Reproduces the AHK Ctrl+Media_Next workflow. When the caller sends
+    expected_track_id and the song has moved on since, nothing is touched (409).
     """
     client = app_state.spotify_client
     if not client:
@@ -120,6 +178,15 @@ async def remove_from_playlist(request: Request):
     track = await client.get_current_track()
     if not track or not track.get("id"):
         return JSONResponse({"ok": False, "error": "Nothing is playing"}, status_code=400)
+
+    expected_track_id = body.expected_track_id if body else None
+    if expected_track_id and expected_track_id != track["id"]:
+        await add_log(
+            f'Manual remove aborted: expected {expected_track_id}, "{track["name"]}" by '
+            f"{track['artist']} is playing now",
+            "info",
+        )
+        return JSONResponse({"ok": False, "error": "Track changed"}, status_code=409)
 
     context_uri = track.get("context_uri") or ""
     if not context_uri.startswith("spotify:playlist:"):

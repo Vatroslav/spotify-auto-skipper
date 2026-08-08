@@ -83,7 +83,8 @@ Minimalni app koji odgovara na go/no-go pitanja. Sadržaj:
 - Manifest: service s intent filterom `android.media.browse.MediaBrowserService`,
   meta-data `com.google.android.gms.car.application` → `automotive_app_desc.xml`
   s `<uses name="media"/>`. Prijedlog applicationId: `uk.autoskipper.controls`,
-  label "Auto-Skipper" (promjenjivo, uskladiti s Vatrom).
+  label "Car Skipper" (dogovoreno s Vatrom 2026-08-04 - "Auto-Skipper" bi se brkao s PWA-om
+  instaliranim na istom telefonu; ikona je brand oznaka s autom između strelica).
 - `onGetRoot`: dopustiti samo Android Auto (`com.google.android.projection.gearhead`)
   i vlastiti package - browse akcije imaju server-side efekte, ne smiju biti
   okidive od bilo koje aplikacije na telefonu.
@@ -128,6 +129,12 @@ i 5 (refresh labela) Vatra svjesno testira na punom appu umjesto ponovnog spike 
   `POST /api/playback/resume` (Spotify `POST /me/player/previous`, `PUT /me/player/pause`,
   `PUT /me/player/play`). Nove Spotify pozive pisati po `.claude/skills/spotify-api/SKILL.md`.
 
+**Napravljeno (2026-08-08, v3.22.0):** sve troje. `expected_track_id` je opcionalan pa PWA
+poziv bez bodyja i dalje prolazi - provjereno lokalno: prazan body uz
+`Content-Type: application/json` → 200, nesklad → 409 bez ijednog Spotify writea.
+`pause_spotify_playback` sad vraća bool (prije je slao PUT bez provjere statusa).
+Nije još deployano na VPS.
+
 ### Faza 4 - puni app
 
 Browse tree (redoslijed = redoslijed u listi):
@@ -160,6 +167,20 @@ Browse tree (redoslijed = redoslijed u listi):
   STATE_ERROR poruke: "Nothing is playing", "Currently playing track is not from a
   playlist", "Spotify client not ready", mrežni fail → "Server unreachable".
 - Telefonska aktivnost: + QR scan tokena (zxing-embedded) uz postojeći paste.
+
+**Napravljeno (2026-08-08, app 0.2.0):** cijela tablica, dvofazni Remove, poll na 30 s
+vezan uz `onSubscribe`/`onUnsubscribe`, volan-fallback i sinkroni STATE_ERROR. Tri odstupanja
+od teksta gore, sva svjesna:
+
+1. **QR scan preskočen** na Vatrin zahtjev - paste tokena već radi, zxing se ne uvodi.
+2. **Status header ima vlastiti mediaId** (`cmd:status`), ne `cmd:check_now`. Akcija je ista
+   (klik pokreće check-now), ali dvije stavke s istim mediaId-em u istoj listi su nepotreban
+   rizik u tuđem list adapteru. Ponašanje prema planu je nepromijenjeno.
+3. **Status header ima i subtitle** "Skipping active"/"Skipping paused"; potvrda nakon klika
+   na njega ide na red Check Now (jedini red bez vlastitog subtitlea bio bi header).
+
+Neprovjereno do testa u autu: kriteriji 3 (čitljivost poruke), 4 (volan i dalje vodi Spotify)
+i 5 (refresh labela u vožnji), plus renderira li AA `android.resource://` ikone i subtitleove.
 
 ### Faza 5 (v2, opcionalno, NE raditi bez eksplicitnog zahtjeva)
 
