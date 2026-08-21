@@ -250,6 +250,11 @@ class SpotifyClient:
                 "context_uri": context_uri,
                 "progress_ms": progress_ms,
                 "duration_ms": duration_ms,
+                # Read from the same response, no extra call. The lyrics display
+                # extrapolates position from progress_ms and would keep scrolling
+                # through a pause without this. Absent field means playing —
+                # the endpoint only answers about a track that is loaded.
+                "is_playing": bool(data.get("is_playing", True)),
                 "album_art": album_art,
             }
         return None

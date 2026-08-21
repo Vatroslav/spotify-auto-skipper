@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="AppTheme" parent="@android:style/Theme.Material.Light.DarkActionBar" />
+    <!-- NoActionBar on purpose: with the system action bar, the top of the scroll
+         content rendered underneath it and the intro paragraph was never visible
+         (found on Vatra's phone, 2026-08-21 — a Samsung skin draws a taller bar
+         than the layout accounts for). The header is now part of the layout, so
+         nothing outside our control can cover it. -->
+    <style name="AppTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <!-- Dropping the action bar left the status bar light with light icons on
+             it — the clock was barely legible. Painting it the header colour puts
+             the white system icons back on a dark ground. -->
+        <item name="android:statusBarColor">@color/header_background</item>
+    </style>
 </resources>

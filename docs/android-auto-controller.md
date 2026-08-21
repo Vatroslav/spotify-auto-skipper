@@ -187,6 +187,32 @@ i 5 (refresh labela u vožnji), plus renderira li AA `android.resource://` ikone
 TTS glasovna potvrda s transient-duck audio focusom. Prije uvođenja provjeriti da TTS
 reprodukcija ne pomiče media button routing.
 
+### Faza 6 - prikaz teksta pjesme (napravljeno: backend v3.23.0, app 0.3.0)
+
+Tražena na eksplicitni zahtjev, izvedena bez prethodnog spikea (svjesna odluka - rizik je
+poznat i izoliran na jednu točku).
+
+**Izvor teksta:** LRCLIB (`lrclib.net`) - besplatan, bez ključa, daje vremenski usklađen LRC.
+Spotify **nema** javni lyrics endpoint; interni `color-lyrics` traži `sp_dc` cookie iz web
+playera, nedokumentiran je i krši ToS, pa nije razmatran. Musixmatch free tier daje 30% teksta.
+
+LRCLIB ne poznaje Spotify id-eve - pjesma se traži po (izvođač, naslov, album, trajanje). To je
+slaba točka: promašaj vrati tuđe timingove, što na ekranu izgleda gore od izostanka teksta. Zato
+`/api/get` prvo, pa `/api/search` bez albuma kao fallback, a rezultati searcha se filtriraju po
+trajanju (±3 s) - prvi rezultat je često verzija s kompilacije i drugim timingovima.
+
+**Bez ijednog dodatnog Spotify poziva.** Pozicija se ne dohvaća, nego ekstrapolira iz zadnjeg
+workerovog snapshota (`progress_ms` + starost snapshota). Napredovanje je linearno pa je to
+jednako dobro kao svjež dohvat sve dok nitko ne premota. `is_playing` je dodan u
+`get_current_track` iz **istog** odgovora - bez toga bi tekst nastavio teći kroz pauzu.
+
+**Keširanje:** `lyrics_cache` po `track_id`. Pogodak trajno (tekst objavljene pjesme se ne
+mijenja), promašaj 7 dana (LRCLIB pune korisnici, pa "nema" vrijedi za danas).
+
+**Poznati rizik, neriješiv bez testa u autu:** AA zna propustiti `notifyChildrenChanged` dok
+korisnik ne izađe i vrati se u podmapu. Ublaženo prozorom od pet redaka umjesto dva - propušteno
+osvježavanje tada ostavlja kontekst umjesto praznine. Ako padne, ručno listanje ostaje.
+
 ## Repo i versioning
 
 - Android kod: **poddirektorij `android/`** u ovom repou (API kontrakt i app se mijenjaju

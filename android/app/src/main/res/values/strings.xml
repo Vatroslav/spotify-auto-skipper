@@ -3,6 +3,8 @@
     <!-- Deliberately not "Auto-Skipper": the PWA is installed under that name on the same phone. -->
     <string name="app_name">Car Skipper</string>
 
+    <!-- %1$s is the app version, e.g. "Car Skipper 0.3.0" -->
+    <string name="setup_version">Car Skipper %1$s</string>
     <string name="setup_intro">Server URL and device token from the Auto-Skipper web app (Settings → Android Auto device).</string>
     <string name="label_server_url">Server URL</string>
     <string name="label_token">Device token</string>
@@ -27,6 +29,20 @@
     <string name="cmd_like_remove">Remove from Liked Songs</string>
     <string name="cmd_remove">Remove from Playlist</string>
     <string name="cmd_remove_armed">Tap again to remove: %1$s</string>
+
+    <!-- Lyrics branch -->
+    <string name="lyrics_browse_title">Lyrics</string>
+    <string name="lyrics_browse_subtitle">Words for the current song</string>
+    <string name="lyrics_loading">Loading lyrics…</string>
+    <string name="lyrics_nothing_playing">Nothing playing</string>
+    <string name="lyrics_instrumental">Instrumental — no words</string>
+    <string name="lyrics_not_found">No lyrics found for this song</string>
+    <!-- Subtitle of the top line: the one row a driver reliably reads, so it
+         carries the mode and how to change it. -->
+    <string name="lyrics_mode_auto">Following the song</string>
+    <string name="lyrics_mode_manual">Holding — tap this line to follow again</string>
+    <string name="lyrics_mode_untimed">No timings — tap a line to page</string>
+    <string name="lyrics_mode_paused">Paused</string>
 
     <!-- Browse list: subtitles. The primary success signal on a car screen — Android Auto
          renders a relabelled list reliably, a playback-state message only briefly. -->

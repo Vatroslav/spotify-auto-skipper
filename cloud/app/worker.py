@@ -159,12 +159,14 @@ async def polling_loop():
                 else:
                     await _log("Nothing is playing right now.")
                 app_state.current_track = None
+                app_state.current_track_captured_at = None
                 sleep_interval = idle_poll_interval if app_state.idle_mode else poll_interval
                 await app_state.interruptible_sleep(sleep_interval)
                 continue
 
             # Update cached current track for the dashboard
             app_state.current_track = track
+            app_state.current_track_captured_at = datetime.now(timezone.utc)
 
             # Playback detected — exit idle mode
             if app_state.idle_mode:

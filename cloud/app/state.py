@@ -13,6 +13,11 @@ class AppState:
         self.last_checked_track_id: str | None = None
         self.last_checked_timestamp: datetime | None = None
         self.current_track: dict | None = None
+        # When current_track was actually read from Spotify. The lyrics display
+        # advances progress_ms by the age of this snapshot, so it must be the
+        # moment of the fetch — last_checked_timestamp is set before the call
+        # and would fold the request's own latency into the offset.
+        self.current_track_captured_at: datetime | None = None
         self.worker_running: bool = False
         self.check_now_event: asyncio.Event = asyncio.Event()
         self.recent_skip_days: list[int] = []

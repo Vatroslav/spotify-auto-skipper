@@ -151,6 +151,7 @@ from app.routers import (
     insights,
     logs,
     loved_sync,
+    lyrics,
     playback,
     rediscovery,
     settings,
@@ -166,6 +167,7 @@ app.include_router(logs.router)
 app.include_router(rediscovery.router)
 app.include_router(loved_sync.router)
 app.include_router(genres.router)
+app.include_router(lyrics.router)
 
 
 # ── Health check ─────────────────────────────────────────────────

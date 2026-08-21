@@ -11,14 +11,19 @@ android {
         applicationId = "uk.autoskipper.controls"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.2.0"
+        versionCode = 8
+        versionName = "0.3.4"
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
         }
+    }
+
+    // For BuildConfig.VERSION_NAME on the setup screen. Off by default since AGP 8.
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {
@@ -36,4 +41,9 @@ dependencies {
     implementation("androidx.security:security-crypto:1.0.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+
+    // Only LyricsTiming is covered: it decides which line is on screen and when
+    // the next one is due, and it is the one piece that cannot be checked by
+    // running the app — a wrong boundary looks like a lag, not like a failure.
+    testImplementation("junit:junit:4.13.2")
 }
