@@ -112,9 +112,12 @@ se ne commitaju.
    Settingsa (Android Auto device), **Save**, pa **Test connection** — mora javiti "Connected: …".
 4. Spojiti telefon na auto; app je u AA launcheru.
 
-Verzija piše u naslovnoj traci setup ekrana ("Car Skipper 0.3.2"). Sideload preko postojeće
-instalacije ne javi je li stvarno prošao, pa je to prva stvar za pogledati nakon instalacije.
-U traci, a ne u tijelu ekrana, jer se tijelo skrola - prvo je mjesto bilo baš iznad ruba kadra.
+Verzija piše u zaglavlju setup ekrana ("Car Skipper 0.3.3"). Sideload preko postojeće instalacije
+ne javi je li stvarno prošao, pa je to prva stvar za pogledati nakon instalacije.
+
+Zaglavlje je **vlastiti view**, a app ima `NoActionBar` temu. Sa sistemskim action barom vrh
+sadržaja se renderirao ispod trake - uvodni odlomak na setup ekranu Vatra nikad nije vidio
+(nađeno 2026-08-21 na njegovom telefonu; Samsungov skin crta višu traku nego što layout računa).
 
 AA kešira popis appova: nakon instalacije nove verzije app se ne pojavi dok se Android Auto ne
 force-stopa (ili telefon ne restarta). Utvrđeno na spikeu.
@@ -147,7 +150,7 @@ ručnim listanjem — nalaz o tome što radi bez auto-scrolla određuje ima li s
 ## Verzioniranje
 
 `versionName`/`versionCode` u `app/build.gradle.kts`, neovisno o `APP_VERSION` backenda (version
-guard hookovi su scoped na `cloud/`). Trenutno **0.3.2**; traži backend v3.23.0 ili noviji
+guard hookovi su scoped na `cloud/`). Trenutno **0.3.3**; traži backend v3.23.0 ili noviji
 (`GET /api/lyrics`, uz raniji `trash_configured`, `expected_track_id` i transport proxyje).
 
 ## Testovi

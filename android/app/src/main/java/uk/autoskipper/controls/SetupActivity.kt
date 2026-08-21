@@ -31,9 +31,10 @@ class SetupActivity : Activity() {
         tokenInput = findViewById(R.id.input_token)
         status = findViewById(R.id.text_status)
 
-        // In the title bar rather than in the layout: the body scrolls, and the one
-        // moment this matters is right after a sideload, before anything is touched.
-        title = getString(R.string.setup_version, BuildConfig.VERSION_NAME)
+        // Our own header, not the system title bar: with the action bar the top of
+        // the scroll content rendered underneath it (see themes.xml).
+        findViewById<TextView>(R.id.text_version).text =
+            getString(R.string.setup_version, BuildConfig.VERSION_NAME)
 
         urlInput.setText(settings.baseUrl.ifEmpty { SettingsStore.DEFAULT_URL })
         tokenInput.setText(settings.token)

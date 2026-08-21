@@ -1,73 +1,93 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
 
-    <!-- focusableInTouchMode: without it the token field grabs focus on open and
-         the ScrollView jumps down to it, opening the screen already scrolled. -->
-    <LinearLayout
+    <!-- Header sits outside the ScrollView: it carries the version, which is the
+         one thing that must be readable the moment the app opens after a sideload. -->
+    <TextView
+        android:id="@+id/text_version"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:focusableInTouchMode="true"
-        android:orientation="vertical"
-        android:padding="24dp">
+        android:background="@color/header_background"
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="20dp"
+        android:textColor="@color/header_text"
+        android:textSize="22sp"
+        android:textStyle="bold" />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingBottom="24dp"
-            android:text="@string/setup_intro" />
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/label_server_url" />
-
-        <EditText
-            android:id="@+id/input_url"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:autofillHints="url"
-            android:inputType="textUri" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingTop="16dp"
-            android:text="@string/label_token" />
-
-        <EditText
-            android:id="@+id/input_token"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:autofillHints="password"
-            android:inputType="textNoSuggestions|textVisiblePassword" />
-
+        <!-- focusableInTouchMode: without it the token field grabs focus on open and
+             the ScrollView jumps down to it, opening the screen already scrolled. -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:paddingTop="24dp">
+            android:focusableInTouchMode="true"
+            android:orientation="vertical"
+            android:padding="24dp">
 
-            <Button
-                android:id="@+id/button_save"
-                android:layout_width="wrap_content"
+            <TextView
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/action_save" />
+                android:paddingBottom="24dp"
+                android:text="@string/setup_intro" />
 
-            <Button
-                android:id="@+id/button_test"
-                android:layout_width="wrap_content"
+            <TextView
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="@string/action_test" />
+                android:text="@string/label_server_url" />
+
+            <EditText
+                android:id="@+id/input_url"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:autofillHints="url"
+                android:inputType="textUri" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="16dp"
+                android:text="@string/label_token" />
+
+            <EditText
+                android:id="@+id/input_token"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:autofillHints="password"
+                android:inputType="textNoSuggestions|textVisiblePassword" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingTop="24dp">
+
+                <Button
+                    android:id="@+id/button_save"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/action_save" />
+
+                <Button
+                    android:id="@+id/button_test"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="@string/action_test" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/text_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="24dp"
+                android:textStyle="bold" />
         </LinearLayout>
-
-        <TextView
-            android:id="@+id/text_status"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingTop="24dp"
-            android:textStyle="bold" />
-    </LinearLayout>
-</ScrollView>
+    </ScrollView>
+</LinearLayout>
