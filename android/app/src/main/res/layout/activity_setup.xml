@@ -9,6 +9,18 @@
         android:orientation="vertical"
         android:padding="24dp">
 
+        <!-- First thing on screen: after a sideload the only question is whether
+             the new build actually replaced the old one. -->
+        <TextView
+            android:id="@+id/text_version"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="16dp"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            tools:text="Car Skipper 0.3.0"
+            xmlns:tools="http://schemas.android.com/tools" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

@@ -31,6 +31,9 @@ class SetupActivity : Activity() {
         tokenInput = findViewById(R.id.input_token)
         status = findViewById(R.id.text_status)
 
+        findViewById<TextView>(R.id.text_version).text =
+            getString(R.string.setup_version, BuildConfig.VERSION_NAME)
+
         urlInput.setText(settings.baseUrl.ifEmpty { SettingsStore.DEFAULT_URL })
         tokenInput.setText(settings.token)
 

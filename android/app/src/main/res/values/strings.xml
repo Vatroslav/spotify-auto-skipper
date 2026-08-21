@@ -3,6 +3,8 @@
     <!-- Deliberately not "Auto-Skipper": the PWA is installed under that name on the same phone. -->
     <string name="app_name">Car Skipper</string>
 
+    <!-- %1$s is the app version, e.g. "Car Skipper 0.3.0" -->
+    <string name="setup_version">Car Skipper %1$s</string>
     <string name="setup_intro">Server URL and device token from the Auto-Skipper web app (Settings → Android Auto device).</string>
     <string name="label_server_url">Server URL</string>
     <string name="label_token">Device token</string>

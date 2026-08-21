@@ -11,14 +11,19 @@ android {
         applicationId = "uk.autoskipper.controls"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.3.0"
+        versionCode = 5
+        versionName = "0.3.1"
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
         }
+    }
+
+    // For BuildConfig.VERSION_NAME on the setup screen. Off by default since AGP 8.
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {

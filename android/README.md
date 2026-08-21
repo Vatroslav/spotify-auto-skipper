@@ -112,6 +112,9 @@ se ne commitaju.
    Settingsa (Android Auto device), **Save**, pa **Test connection** — mora javiti "Connected: …".
 4. Spojiti telefon na auto; app je u AA launcheru.
 
+Verzija piše na vrhu setup ekrana ("Car Skipper 0.3.1"). Sideload preko postojeće instalacije ne
+javi je li stvarno prošao, pa je to prva stvar za pogledati nakon instalacije.
+
 AA kešira popis appova: nakon instalacije nove verzije app se ne pojavi dok se Android Auto ne
 force-stopa (ili telefon ne restarta). Utvrđeno na spikeu.
 
@@ -143,7 +146,7 @@ ručnim listanjem — nalaz o tome što radi bez auto-scrolla određuje ima li s
 ## Verzioniranje
 
 `versionName`/`versionCode` u `app/build.gradle.kts`, neovisno o `APP_VERSION` backenda (version
-guard hookovi su scoped na `cloud/`). Trenutno **0.3.0**; traži backend v3.23.0 ili noviji
+guard hookovi su scoped na `cloud/`). Trenutno **0.3.1**; traži backend v3.23.0 ili noviji
 (`GET /api/lyrics`, uz raniji `trash_configured`, `expected_track_id` i transport proxyje).
 
 ## Testovi
