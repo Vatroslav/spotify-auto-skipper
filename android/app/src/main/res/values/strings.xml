@@ -28,6 +28,20 @@
     <string name="cmd_remove">Remove from Playlist</string>
     <string name="cmd_remove_armed">Tap again to remove: %1$s</string>
 
+    <!-- Lyrics branch -->
+    <string name="lyrics_browse_title">Lyrics</string>
+    <string name="lyrics_browse_subtitle">Words for the current song</string>
+    <string name="lyrics_loading">Loading lyrics…</string>
+    <string name="lyrics_nothing_playing">Nothing playing</string>
+    <string name="lyrics_instrumental">Instrumental — no words</string>
+    <string name="lyrics_not_found">No lyrics found for this song</string>
+    <!-- Subtitle of the top line: the one row a driver reliably reads, so it
+         carries the mode and how to change it. -->
+    <string name="lyrics_mode_auto">Following the song</string>
+    <string name="lyrics_mode_manual">Holding — tap this line to follow again</string>
+    <string name="lyrics_mode_untimed">No timings — tap a line to page</string>
+    <string name="lyrics_mode_paused">Paused</string>
+
     <!-- Browse list: subtitles. The primary success signal on a car screen — Android Auto
          renders a relabelled list reliably, a playback-state message only briefly. -->
     <string name="feedback_sent">Sent ✓</string>

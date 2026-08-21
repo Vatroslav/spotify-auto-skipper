@@ -14,6 +14,7 @@ skip i dalje radi server-side; ovo je samo za ono što se inače klikalo u PWA.
 | Don't Skip This Song | `POST /api/playback/skip-one-pause`; label postaje "Won't skip: {pjesma}" dok izuzeće vrijedi |
 | Add / Remove Liked Songs | `POST /api/playback/toggle-like`, label po `is_liked` |
 | Remove from Playlist | dvofazno, vidi dolje. Stavke nema ako `trash_configured` nije true. |
+| Lyrics | podmapa s tekstom pjesme, vidi dolje. Namjerno zadnja - komande iznad su već mišićna memorija. |
 
 **Remove je dvofazan:** prvi klik ništa ne šalje - zapamti pjesmu i promijeni label u "Tap again to
 remove: {pjesma}". Potvrda šalje `expected_track_id`, pa server odbije s 409 ako je pjesma u
@@ -33,6 +34,35 @@ komanda na serveru uredno izvršena. Zato:
 - Trajna potvrda je promjena liste (`notifyChildrenChanged`): red dobije podnaslov "Sent ✓",
   "Done ✓", "Removed ✓" ili "Failed".
 - Greške sa servera idu doslovno na ekran - API ih već formulira za ljude.
+
+## Lyrics
+
+Podmapa "Lyrics" prikazuje **pet redaka odjednom**, s trenutnim na vrhu. Podnaslov gornjeg retka
+nosi način rada ("Following the song", "Holding…", "Paused", "No timings…") jer je to jedini redak
+koji vozač pouzdano pročita.
+
+Zašto pet, a ne dva: AA zna propustiti osvježavanje browse liste dok korisnik ne izađe i vrati se u
+podmapu. S prozorom od pet redaka propušteno osvježavanje ostavi čovjeka na retku koji malo kasni;
+s dva retka ostavi ga na zaslonu bez konteksta. Prozor se pri kraju pjesme povlači unatrag da ostane
+pun umjesto da se skupi na jedan redak.
+
+**Dva sata, namjerno razdvojena:**
+
+- *Server* (`GET /api/lyrics`, poll 20 s dok je podmapa otvorena) - koja pjesma svira, gdje je,
+  koje su riječi. Hvata promjenu pjesme, pauzu i premotavanje.
+- *Telefon* (besplatan) - između pollova pozicija se ekstrapolira lokalno, a lista se relabelira
+  **točno na početak sljedećeg retka**. Nijedan poll ne bi pogodio granicu retka, a poll svakih par
+  sekundi kroz cijelu vožnju je ono što ovaj dizajn izbjegava.
+
+Tekst se dohvaća jednom po pjesmi: klijent šalje `known_track_id`, server izostavi retke kad se
+poklapa i vrati samo poziciju.
+
+**Ručno listanje:** klik na redak čini ga vrhom prozora i gasi automatiku ("Holding…"); klik na
+redak koji je već na vrhu vraća praćenje pjesme. Namjerno nema zasebnog "Next" gumba - bio bi meta
+koju vozač mora tražiti na dnu liste.
+
+Stanja bez teksta prikazuju jedan redak: "Instrumental — no words" (LRCLIB zna pjesmu i kaže da
+nema teksta), "No lyrics found for this song", "Nothing playing".
 
 ## Tri pravila koja drže cijeli pristup
 
@@ -96,8 +126,32 @@ force-stopa (ili telefon ne restarta). Utvrđeno na spikeu.
 
 Padne li bilo koji: stop, javiti nalaz. Ne krpati hackovima.
 
+### Što provjeriti u Lyrics grani
+
+1. **Osvježava li se lista sama** dok pjesma ide — ovo je jedina prava nepoznanica cijelog featurea.
+   AA zna propustiti `notifyChildrenChanged` dok korisnik ne izađe i vrati se u podmapu. Ako se ne
+   osvježava sama, ostatak je svejedno upotrebljiv ručnim listanjem, ali auto-scroll pada.
+2. Poklapa li se tekst s onim što se čuje (kasni li, žuri li, je li uopće ta pjesma).
+3. Klik na redak zaustavi praćenje, klik na gornji redak ga vrati.
+4. Pauza na Spotifyju zaustavi pomicanje, nastavak ga nastavi s pravog mjesta.
+5. Promjena pjesme povuče novi tekst bez izlaska iz podmape.
+6. Pjesma bez teksta i instrumental daju čitljivu poruku, ne prazan ekran.
+
+Trajanje testa: dovoljno je nekoliko pjesama. Ako prva točka padne, ostale se svejedno provjere
+ručnim listanjem — nalaz o tome što radi bez auto-scrolla određuje ima li smisla dorađivati.
+
 ## Verzioniranje
 
 `versionName`/`versionCode` u `app/build.gradle.kts`, neovisno o `APP_VERSION` backenda (version
-guard hookovi su scoped na `cloud/`). Trenutno **0.2.0**; puni app traži backend v3.22.0 ili noviji
-(`trash_configured`, `expected_track_id`, transport proxyji).
+guard hookovi su scoped na `cloud/`). Trenutno **0.3.0**; traži backend v3.23.0 ili noviji
+(`GET /api/lyrics`, uz raniji `trash_configured`, `expected_track_id` i transport proxyje).
+
+## Testovi
+
+`LyricsTiming` (koji redak je na ekranu i kad ide sljedeći) pokriven je unit testovima — jedini dio
+kojeg se ne može provjeriti pokretanjem appa, jer se kriva granica vidi kao kašnjenje, ne kao kvar.
+Ostatak repoa nema testove i ovo ih ne uvodi šire.
+
+```bash
+cd android && JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" ./gradlew testDebugUnitTest
+```

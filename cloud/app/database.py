@@ -136,6 +136,19 @@ CREATE TABLE IF NOT EXISTS device_tokens (
     last_used_at TIMESTAMP
 );
 
+-- Lyrics per Spotify track id, as fetched from LRCLIB. Cache, not a source of
+-- truth. A hit is kept indefinitely (lyrics for a released song don't change);
+-- a miss is kept only briefly, because LRCLIB is community-filled and today's
+-- missing song may be there next week — see LYRICS_MISS_TTL_DAYS.
+CREATE TABLE IF NOT EXISTS lyrics_cache (
+    track_id     TEXT PRIMARY KEY,
+    synced       TEXT NOT NULL DEFAULT '',
+    plain        TEXT NOT NULL DEFAULT '',
+    instrumental INTEGER NOT NULL DEFAULT 0,
+    found        INTEGER NOT NULL DEFAULT 0,
+    fetched_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_track_events_timestamp ON track_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
 """
@@ -1276,6 +1289,89 @@ async def save_artist_tags(entries: list[tuple[str, str, list[str]]]):
         await db.commit()
     finally:
         await db.close()
+
+
+# ── Lyrics cache (car display) ───────────────────────────────────
+
+# A hit never expires — the lyrics of a released song are fixed. A miss does:
+# LRCLIB is filled by its users, so "not there" is a statement about today.
+LYRICS_MISS_TTL_DAYS = 7
+
+
+async def get_cached_lyrics(track_id: str) -> dict | None:
+    """Return the cached lyrics row for a track, or None to fetch it again.
+
+    None covers three cases the caller handles identically: never fetched,
+    fetched and missing but long enough ago to be worth retrying, and a row
+    that failed to load. A cached miss inside its TTL returns the row with
+    found = 0, which is an answer — not a reason to hit LRCLIB again.
+    """
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT synced, plain, instrumental, found, fetched_at "
+            "FROM lyrics_cache WHERE track_id = ?",
+            (track_id,),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        if not row["found"]:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=LYRICS_MISS_TTL_DAYS)
+            fetched_at = _parse_timestamp(row["fetched_at"])
+            if fetched_at is None or fetched_at < cutoff:
+                return None
+        return {
+            "synced": row["synced"] or "",
+            "plain": row["plain"] or "",
+            "instrumental": bool(row["instrumental"]),
+            "found": bool(row["found"]),
+        }
+    finally:
+        await db.close()
+
+
+async def save_lyrics(
+    track_id: str,
+    *,
+    synced: str = "",
+    plain: str = "",
+    instrumental: bool = False,
+    found: bool = True,
+):
+    """Store a lookup result. Misses are stored too, so a song with no lyrics
+    costs one LRCLIB request per week rather than one per car trip."""
+    db = await get_db()
+    try:
+        await db.execute(
+            """INSERT INTO lyrics_cache (track_id, synced, plain, instrumental, found, fetched_at)
+               VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+               ON CONFLICT(track_id)
+               DO UPDATE SET synced       = excluded.synced,
+                             plain        = excluded.plain,
+                             instrumental = excluded.instrumental,
+                             found        = excluded.found,
+                             fetched_at   = CURRENT_TIMESTAMP""",
+            (track_id, synced, plain, int(instrumental), int(found)),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+def _parse_timestamp(value) -> datetime | None:
+    """Read a stored CURRENT_TIMESTAMP back as an aware UTC datetime.
+
+    SQLite writes 'YYYY-MM-DD HH:MM:SS' with no zone; it is UTC by definition
+    of CURRENT_TIMESTAMP, so it is labelled as such rather than compared naive.
+    """
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace(" ", "T"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
 async def dismiss_mapping_fail(track_id: str):

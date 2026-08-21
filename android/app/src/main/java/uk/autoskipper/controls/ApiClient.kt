@@ -1,6 +1,7 @@
 package uk.autoskipper.controls
 
 import java.io.IOException
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -36,6 +37,33 @@ data class PlaybackSnapshot(
 /** The track a command endpoint reports it acted on. */
 data class TrackRef(val name: String?, val artist: String?)
 
+/**
+ * Snapshot of GET /api/lyrics.
+ *
+ * `lines` is empty when [linesIncluded] is false — the caller asked about a
+ * track it already holds the lyrics for and the server left them out. Treating
+ * that as "no lyrics" would blank the screen on every poll, so the two cases
+ * must stay distinguishable.
+ */
+data class LyricsSnapshot(
+    val state: String,
+    val trackId: String?,
+    val trackName: String?,
+    val artist: String?,
+    val lines: List<LyricLine>,
+    val linesIncluded: Boolean,
+    val positionMs: Long,
+    val isPlaying: Boolean,
+) {
+    companion object {
+        const val STATE_SYNCED = "synced"
+        const val STATE_PLAIN_ONLY = "plain_only"
+        const val STATE_INSTRUMENTAL = "instrumental"
+        const val STATE_NOT_FOUND = "not_found"
+        const val STATE_NOTHING_PLAYING = "nothing_playing"
+    }
+}
+
 /** Result of toggle-like: the new Liked state plus the track it applies to. */
 data class LikeResult(val isLiked: Boolean, val track: TrackRef)
 
@@ -70,6 +98,47 @@ class ApiClient(private val baseUrl: String, private val token: String) {
                 trashConfigured = json.optBoolean("trash_configured", false),
             )
         }
+
+    /**
+     * Lyrics and playback position for the current track.
+     *
+     * knownTrackId is what the caller already has cached; the server omits the
+     * line list when it matches, so a position refresh costs a few hundred
+     * bytes instead of a full lyric sheet.
+     */
+    fun getLyrics(knownTrackId: String?): ApiResult<LyricsSnapshot> {
+        val suffix = if (knownTrackId.isNullOrEmpty()) {
+            ""
+        } else {
+            "?known_track_id=" + URLEncoder.encode(knownTrackId, "UTF-8")
+        }
+        return execute(Request.Builder().url(url("/api/lyrics$suffix")).get()) { body ->
+            val json = JSONObject(body)
+            val track = json.optJSONObject("track")
+            val linesArray = json.optJSONArray("lines")
+            val lines = buildList {
+                for (i in 0 until (linesArray?.length() ?: 0)) {
+                    val entry = linesArray?.optJSONObject(i) ?: continue
+                    add(
+                        LyricLine(
+                            timeMs = if (entry.isNull("t")) null else entry.optLong("t"),
+                            text = entry.optString("text"),
+                        ),
+                    )
+                }
+            }
+            LyricsSnapshot(
+                state = json.optString("state", LyricsSnapshot.STATE_NOT_FOUND),
+                trackId = track?.stringOrNull("id"),
+                trackName = track?.stringOrNull("name"),
+                artist = track?.stringOrNull("artist"),
+                lines = lines,
+                linesIncluded = json.optBoolean("lines_included", true),
+                positionMs = json.optLong("position_ms", 0L),
+                isPlaying = json.optBoolean("is_playing", false),
+            )
+        }
+    }
 
     fun checkNow(): ApiResult<Unit> = post("/api/playback/check-now") { }
 

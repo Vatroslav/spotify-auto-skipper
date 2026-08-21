@@ -58,7 +58,8 @@ Svaka stavka je samostalna — sadrži file, problem i smjer popravka.
   - [x] Faza 2 (spike APK) — testirana u autu 2026-08-08, PR #79. Kriteriji 1 i 2 prošli; kriterij 3 pao na timingu feedbacka (fix u Fazi 4), kriterije 4 i 5 Vatra svjesno prebacio na test punog appa.
   - [x] Faza 3 (backend proširenja) — v3.22.0, PR #79. `trash_configured`, `expected_track_id` → 409, transport proxyji `/next` `/previous` `/pause` `/resume`.
   - [x] Faza 4 (puni app) — app 0.2.0, PR #79. Svih šest stavki, dvofazni Remove, poll 30 s, volan-fallback, sinkroni STATE_ERROR. Upute: [android/README.md](../android/README.md).
-  - [ ] Test punog appa u autu — instalirati `CarSkipper-0.2.0.apk` (force-stop Android Auta nakon instalacije) i provjeriti pet točaka iz [android/README.md](../android/README.md): ikone, izvršenje komande, čitljivost poruke, ostaje li volan Spotifyjev, osvježavanje labela.
+  - [x] Faza 6 (prikaz teksta pjesme) — backend v3.23.0 + app 0.3.0. LRCLIB kao izvor, `GET /api/lyrics`, grana "Lyrics" u browse listi, prozor od pet redaka koji se pomiče sam. Detalji: [android/README.md](../android/README.md).
+  - [ ] Test punog appa u autu — instalirati `CarSkipper-0.3.0.apk` (force-stop Android Auta nakon instalacije) i provjeriti pet točaka iz [android/README.md](../android/README.md): ikone, izvršenje komande, čitljivost poruke, ostaje li volan Spotifyjev, osvježavanje labela. Uz to i točke za Lyrics granu iz istog dokumenta — prije svega osvježava li se lista sama dok pjesma ide.
 
 ## Napomene za izvođenje
 

@@ -43,6 +43,7 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
 
     private lateinit var session: MediaSessionCompat
     private lateinit var settings: SettingsStore
+    private lateinit var lyrics: LyricsSection
 
     /** Last known server state; browse labels render from this, never from a live call. */
     private var state = PlaybackSnapshot.UNKNOWN
@@ -66,6 +67,9 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
     override fun onCreate() {
         super.onCreate()
         settings = SettingsStore(this)
+        lyrics = LyricsSection(this, scope, settings) {
+            notifyChildrenChanged(LyricsSection.LYRICS_ROOT)
+        }
 
         session = MediaSessionCompat(this, TAG).apply {
             setCallback(SessionCallback())
@@ -102,6 +106,12 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
         parentId: String,
         result: Result<MutableList<MediaBrowserCompat.MediaItem>>,
     ) {
+        if (parentId == LyricsSection.LYRICS_ROOT) {
+            // Rendered from whatever the section already holds — the car screen
+            // never waits on the network here, the section refreshes itself.
+            result.sendResult(lyrics.items())
+            return
+        }
         if (parentId != ROOT_ID) {
             result.sendResult(mutableListOf())
             return
@@ -123,12 +133,20 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
 
     /** Polling runs only while something is actually browsing us — an Auto disconnect ends it. */
     override fun onSubscribe(id: String, options: Bundle?) {
+        if (id == LyricsSection.LYRICS_ROOT) {
+            lyrics.onOpened()
+            return
+        }
         if (id != ROOT_ID) return
         subscribers++
         startPolling()
     }
 
     override fun onUnsubscribe(id: String) {
+        if (id == LyricsSection.LYRICS_ROOT) {
+            lyrics.onClosed()
+            return
+        }
         if (id != ROOT_ID) return
         subscribers = (subscribers - 1).coerceAtLeast(0)
         if (subscribers == 0) {
@@ -214,6 +232,10 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
             )
         }
 
+        // Last on purpose: the command rows above are muscle memory by now, and
+        // this one is opened deliberately rather than hit in passing.
+        items += lyrics.rootItem()
+
         return items
     }
 
@@ -269,6 +291,11 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
     }
 
     private fun onItemTapped(mediaId: String) {
+        // Lyrics rows are display, not commands: they page the text locally and
+        // must not go through the command path (no "Working…", no server call).
+        if (mediaId == LyricsSection.LYRICS_MESSAGE) return
+        if (lyrics.onItemTapped(mediaId)) return
+
         // Remove's first tap is local: it arms, shows the confirmation label, sends nothing.
         if (mediaId == CMD_REMOVE && armedTrackId == null) {
             arm()

@@ -155,6 +155,26 @@ def icon_trash(color):
     return img
 
 
+def icon_lyrics(color):
+    """Note beside text lines — words that belong to what is playing.
+
+    The note alone would read as "music" (which every row here already is) and
+    the lines alone as a list; together they say lyrics. The flag stops short of
+    the text block: at list-icon scale an overlap merges the two into one blob.
+    """
+    img, d = new_canvas()
+
+    # Eighth note, left third.
+    d.ellipse([44, 314, 156, 404], fill=color)
+    d.rounded_rectangle([128, 106, 158, 368], radius=14, fill=color)
+    d.polygon([(158, 106), (158, 196), (214, 154), (214, 80)], fill=color)
+
+    # Three ragged text lines, right two thirds.
+    for top, right in ((128, 470), (240, 422), (352, 470)):
+        d.rounded_rectangle([262, top, right, top + 44], radius=22, fill=color)
+    return img
+
+
 ICONS = {
     "ic_status": (icon_status, GREEN),
     "ic_check_now": (icon_check_now, GREEN),
@@ -165,6 +185,7 @@ ICONS = {
     "ic_like_remove": (icon_like_remove, GREEN),
     "ic_remove": (icon_trash, GREEN),
     "ic_remove_armed": (icon_trash, RED),
+    "ic_lyrics": (icon_lyrics, GREEN),
 }
 
 
