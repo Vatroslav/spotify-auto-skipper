@@ -112,7 +112,7 @@ se ne commitaju.
    Settingsa (Android Auto device), **Save**, pa **Test connection** — mora javiti "Connected: …".
 4. Spojiti telefon na auto; app je u AA launcheru.
 
-Verzija piše u zaglavlju setup ekrana ("Car Skipper 0.3.3"). Sideload preko postojeće instalacije
+Verzija piše u zaglavlju setup ekrana ("Car Skipper 0.3.4"). Sideload preko postojeće instalacije
 ne javi je li stvarno prošao, pa je to prva stvar za pogledati nakon instalacije.
 
 Zaglavlje je **vlastiti view**, a app ima `NoActionBar` temu. Sa sistemskim action barom vrh
@@ -150,7 +150,7 @@ ručnim listanjem — nalaz o tome što radi bez auto-scrolla određuje ima li s
 ## Verzioniranje
 
 `versionName`/`versionCode` u `app/build.gradle.kts`, neovisno o `APP_VERSION` backenda (version
-guard hookovi su scoped na `cloud/`). Trenutno **0.3.3**; traži backend v3.23.0 ili noviji
+guard hookovi su scoped na `cloud/`). Trenutno **0.3.4**; traži backend v3.23.0 ili noviji
 (`GET /api/lyrics`, uz raniji `trash_configured`, `expected_track_id` i transport proxyje).
 
 ## Testovi
