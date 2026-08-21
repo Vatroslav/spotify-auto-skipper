@@ -11,6 +11,7 @@ safe zone) plus a legacy square icon. Run from the repo root:
 """
 
 import os
+
 from PIL import Image, ImageDraw
 
 BG = (41, 46, 50, 255)  # brand dark, #292E32
