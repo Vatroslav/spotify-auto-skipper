@@ -23,7 +23,11 @@ docker compose up -d --build
 docker compose logs -f
 ```
 
-No tests or linting are configured. For deployment, use the `/deploy` skill which reads connection details from the user's private config.
+**CI runs on every PR** (`.github/workflows/ci.yml`): `ruff check .` over the whole repo — including `android/tools/` — plus a Docker build of `cloud/`. Run `ruff check .` before committing; ruff is unpinned in CI, so a new release can fail a file nobody touched.
+
+The Python side has no test suite. The one exception is `android/app/src/test/` (Kotlin, `LyricsTiming`), run with `./gradlew testDebugUnitTest` — see `android/README.md`.
+
+For deployment, use the `/deploy` skill which reads connection details from the user's private config.
 
 ## Versioning
 
