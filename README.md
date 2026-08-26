@@ -1,6 +1,6 @@
 # Spotify + Last.fm Auto-Skipper
 
-I have a [playlist with over 5,000 songs](https://open.spotify.com/playlist/2DTe0ztu8OB5c1B80pjdfc?si=7b1c5cb732394d14), but Spotify's shuffle keeps playing the same ones over and over. This app fixes that — it checks your Last.fm scrobble history and automatically skips any song you've already heard recently, so you actually get to hear the rest of your library.
+I have a [playlist with over 6,000 songs](https://open.spotify.com/playlist/2DTe0ztu8OB5c1B80pjdfc?si=7b1c5cb732394d14), but Spotify's shuffle keeps playing the same ones over and over. This app fixes that — it checks your Last.fm scrobble history and automatically skips any song you've already heard recently, so you actually get to hear the rest of your library.
 
 Available as a **self-hosted cloud app** (v3.10.1) or a legacy **Windows desktop app** (v2.5.0).
 
