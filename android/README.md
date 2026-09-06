@@ -4,7 +4,18 @@ Faza 4 iz [docs/android-auto-controller.md](../docs/android-auto-controller.md):
 Android Autu prikazuje ručne Auto-Skipper komande i šalje ih na postojeći playback API. Automatski
 skip i dalje radi server-side; ovo je samo za ono što se inače klikalo u PWA.
 
-## Browse lista
+## Dva taba
+
+Korijen sadrži **samo dva browsable čvora**: **Controls** pa **Lyrics**. AA gradi traku tabova
+isključivo od browsable djece korijena, redoslijedom kojim stignu, i otvara se na prvom. Do 0.4.0
+su komande stajale gole na korijenu - nisu bile tab, pa se app otvarao na Lyricsu (Vatrin nalaz,
+2026-09-06). Playable stavke na korijenu AA po dokumentaciji zna i posve ispustiti.
+
+Limit je 4 taba (`BROWSER_ROOT_HINTS_KEY_ROOT_CHILDREN_LIMIT`, default kad hint ne dođe), pa dva
+prolaze bez čitanja hinta.
+(developer.android.com/training/cars/media/create-media-browser/content-hierarchy)
+
+## Controls tab
 
 | Stavka | Što radi |
 |--------|----------|
@@ -14,7 +25,6 @@ skip i dalje radi server-side; ovo je samo za ono što se inače klikalo u PWA.
 | Don't Skip This Song | `POST /api/playback/skip-one-pause`; label postaje "Won't skip: {pjesma}" dok izuzeće vrijedi |
 | Add / Remove Liked Songs | `POST /api/playback/toggle-like`, label po `is_liked` |
 | Remove from Playlist | `POST /api/playback/remove-from-playlist` na jedan klik, vidi dolje. Stavke nema ako `trash_configured` nije true. |
-| Lyrics | podmapa s tekstom pjesme, vidi dolje. Namjerno zadnja - komande iznad su već mišićna memorija. |
 
 **Remove je jednofazan** (od 0.4.0; prije je bio dvofazan): klik odmah šalje komandu. Šalje se
 `expected_track_id` iz zadnjeg snapshota, pa server odbije s 409 ako je pjesma u međuvremenu otišla
@@ -57,20 +67,20 @@ tamo browse ekran ostaje otvoren. Podržanost javlja AA kroz
 `BROWSER_ROOT_HINTS_KEY_CUSTOM_BROWSER_ACTION_LIMIT` u root hintovima (0 = nema), pa treba fallback.
 Nije napravljeno.
 
-## Lyrics
+## Lyrics tab
 
-Podmapa "Lyrics" prikazuje **pet redaka odjednom**, s trenutnim na vrhu. Podnaslov gornjeg retka
+Drugi tab prikazuje **pet redaka odjednom**, s trenutnim na vrhu. Podnaslov gornjeg retka
 nosi način rada ("Following the song", "Holding…", "Paused", "No timings…") jer je to jedini redak
 koji vozač pouzdano pročita.
 
 Zašto pet, a ne dva: AA zna propustiti osvježavanje browse liste dok korisnik ne izađe i vrati se u
-podmapu. S prozorom od pet redaka propušteno osvježavanje ostavi čovjeka na retku koji malo kasni;
+tab. S prozorom od pet redaka propušteno osvježavanje ostavi čovjeka na retku koji malo kasni;
 s dva retka ostavi ga na zaslonu bez konteksta. Prozor se pri kraju pjesme povlači unatrag da ostane
 pun umjesto da se skupi na jedan redak.
 
 **Dva sata, namjerno razdvojena:**
 
-- *Server* (`GET /api/lyrics`, poll 20 s dok je podmapa otvorena) - koja pjesma svira, gdje je,
+- *Server* (`GET /api/lyrics`, poll 20 s dok je tab otvoren) - koja pjesma svira, gdje je,
   koje su riječi. Hvata promjenu pjesme, pauzu i premotavanje.
 - *Telefon* (besplatan) - između pollova pozicija se ekstrapolira lokalno, a lista se relabelira
   **točno na početak sljedećeg retka**. Nijedan poll ne bi pogodio granicu retka, a poll svakih par
@@ -104,9 +114,10 @@ Compat stack je namjeran: `MediaBrowserServiceCompat` + `MediaSessionCompat` (an
 ## Ikone
 
 `tools/make_launcher_icon.py` crta launcher ikonu (brand strelice + auto), `tools/make_browse_icons.py`
-ikone stavki u listi. Sve su jednobojne (brand zelena) jer AA listu
-renderira na svijetloj ili tamnoj podlozi ovisno o day/night modu auta - dvobojni glif izgubi
-polovicu sebe u jednom od njih. Boje su iz postojećeg `cloud/app/static/icons/maskable-512.png`.
+ikone stavki u listi. Sve su jednobojne (brand zelena) jer AA listu renderira na svijetloj ili
+tamnoj podlozi ovisno o day/night modu auta - dvobojni glif izgubi polovicu sebe u jednom od njih.
+Boje su iz postojećeg `cloud/app/static/icons/maskable-512.png`. Controls tab posuđuje `ic_status`
+(brand marku), Lyrics tab `ic_lyrics` - AA za tabove traži jednobojne ikone, što ove već jesu.
 
 Regeneriranje (traži Pillow):
 
@@ -134,7 +145,7 @@ se ne commitaju.
    Settingsa (Android Auto device), **Save**, pa **Test connection** — mora javiti "Connected: …".
 4. Spojiti telefon na auto; app je u AA launcheru.
 
-Verzija piše u zaglavlju setup ekrana ("Car Skipper 0.4.0"). Sideload preko postojeće instalacije
+Verzija piše u zaglavlju setup ekrana ("Car Skipper 0.5.0"). Sideload preko postojeće instalacije
 ne javi je li stvarno prošao, pa je to prva stvar za pogledati nakon instalacije.
 
 Zaglavlje je **vlastiti view**, a app ima `NoActionBar` temu. Sa sistemskim action barom vrh
@@ -146,24 +157,25 @@ force-stopa (ili telefon ne restarta). Utvrđeno na spikeu.
 
 ### Što provjeriti u autu
 
-1. Sve stavke se renderiraju, s ikonama.
-2. Klik izvršava komandu (potvrda u PWA logu) i AA se ne raspadne bez playbacka.
-3. Poruka na klik je vidljiva i čitljiva, bez generičkog "Could not load your selection".
-4. Volan (next/prev) i dalje upravlja Spotifyjem, media kartica ostaje Spotifyjeva, zvuk se
+1. App se otvara na **Controls** tabu, Lyrics je drugi.
+2. Sve stavke se renderiraju, s ikonama.
+3. Klik izvršava komandu (potvrda u PWA logu) i AA se ne raspadne bez playbacka.
+4. Poruka na klik je vidljiva i čitljiva, bez generičkog "Could not load your selection".
+5. Volan (next/prev) i dalje upravlja Spotifyjem, media kartica ostaje Spotifyjeva, zvuk se
    nijednom ne prekida.
-5. Labeli se osvježe nakon komande (Pause↔Resume, "Won't skip", Liked).
+6. Labeli se osvježe nakon komande (Pause↔Resume, "Won't skip", Liked).
 
 Padne li bilo koji: stop, javiti nalaz. Ne krpati hackovima.
 
 ### Što provjeriti u Lyrics grani
 
 1. **Osvježava li se lista sama** dok pjesma ide — ovo je jedina prava nepoznanica cijelog featurea.
-   AA zna propustiti `notifyChildrenChanged` dok korisnik ne izađe i vrati se u podmapu. Ako se ne
+   AA zna propustiti `notifyChildrenChanged` dok korisnik ne izađe i vrati se u tab. Ako se ne
    osvježava sama, ostatak je svejedno upotrebljiv ručnim listanjem, ali auto-scroll pada.
 2. Poklapa li se tekst s onim što se čuje (kasni li, žuri li, je li uopće ta pjesma).
 3. Klik na redak zaustavi praćenje, klik na gornji redak ga vrati.
 4. Pauza na Spotifyju zaustavi pomicanje, nastavak ga nastavi s pravog mjesta.
-5. Promjena pjesme povuče novi tekst bez izlaska iz podmape.
+5. Promjena pjesme povuče novi tekst bez izlaska iz taba.
 6. Pjesma bez teksta i instrumental daju čitljivu poruku, ne prazan ekran.
 
 Trajanje testa: dovoljno je nekoliko pjesama. Ako prva točka padne, ostale se svejedno provjere
@@ -172,7 +184,7 @@ ručnim listanjem — nalaz o tome što radi bez auto-scrolla određuje ima li s
 ## Verzioniranje
 
 `versionName`/`versionCode` u `app/build.gradle.kts`, neovisno o `APP_VERSION` backenda (version
-guard hookovi su scoped na `cloud/`). Trenutno **0.4.0**; traži backend v3.23.0 ili noviji
+guard hookovi su scoped na `cloud/`). Trenutno **0.5.0**; traži backend v3.23.0 ili noviji
 (`GET /api/lyrics`, uz raniji `trash_configured`, `expected_track_id` i transport proxyje).
 
 ## Testovi

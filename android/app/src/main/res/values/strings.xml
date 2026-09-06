@@ -29,6 +29,10 @@
     <string name="cmd_like_remove">Remove from Liked Songs</string>
     <string name="cmd_remove">Remove from Playlist</string>
 
+    <!-- Tabs, in the order they appear across the top of the car screen -->
+    <string name="controls_browse_title">Controls</string>
+    <string name="controls_browse_subtitle">Skipper commands</string>
+
     <!-- Lyrics branch -->
     <string name="lyrics_browse_title">Lyrics</string>
     <string name="lyrics_browse_subtitle">Words for the current song</string>

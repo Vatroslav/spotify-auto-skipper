@@ -23,6 +23,11 @@ import kotlinx.coroutines.withContext
 /**
  * Browse tree of manual Auto-Skipper commands for Android Auto.
  *
+ * The root holds nothing but two browsable nodes — Controls, then Lyrics — because
+ * Android Auto builds its tab strip from the root's browsable children in the order
+ * they arrive and opens on the first one. Commands live under Controls rather than
+ * loose at the root, where they would not be a tab at all.
+ *
  * Three rules hold the whole approach together (see docs/android-auto-controller.md):
  *  - the session never reports STATE_PLAYING or STATE_BUFFERING, so the system never
  *    routes steering-wheel media buttons here and Spotify keeps the media card;
@@ -100,13 +105,20 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
         parentId: String,
         result: Result<MutableList<MediaBrowserCompat.MediaItem>>,
     ) {
+        if (parentId == ROOT_ID) {
+            // The two tabs, in the order they appear across the top of the car screen.
+            // Static, so this never waits on the network — the tab strip is up before
+            // the first snapshot lands.
+            result.sendResult(mutableListOf(controlsRootItem(), lyrics.rootItem()))
+            return
+        }
         if (parentId == LyricsSection.LYRICS_ROOT) {
             // Rendered from whatever the section already holds — the car screen
             // never waits on the network here, the section refreshes itself.
             result.sendResult(lyrics.items())
             return
         }
-        if (parentId != ROOT_ID) {
+        if (parentId != CONTROLS_ROOT) {
             result.sendResult(mutableListOf())
             return
         }
@@ -131,7 +143,7 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
             lyrics.onOpened()
             return
         }
-        if (id != ROOT_ID) return
+        if (id != CONTROLS_ROOT) return
         subscribers++
         startPolling()
     }
@@ -141,7 +153,7 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
             lyrics.onClosed()
             return
         }
-        if (id != ROOT_ID) return
+        if (id != CONTROLS_ROOT) return
         subscribers = (subscribers - 1).coerceAtLeast(0)
         if (subscribers == 0) {
             pollJob?.cancel()
@@ -221,12 +233,24 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
             )
         }
 
-        // Last on purpose: the command rows above are muscle memory by now, and
-        // this one is opened deliberately rather than hit in passing.
-        items += lyrics.rootItem()
-
         return items
     }
+
+    /**
+     * The first tab. Browsable, because Android Auto builds the tab strip from the
+     * root's browsable children only — root playable items get dropped or buried —
+     * and it comes first because the tab strip follows this list's order and the car
+     * opens on tab one.
+     */
+    private fun controlsRootItem(): MediaBrowserCompat.MediaItem = MediaBrowserCompat.MediaItem(
+        MediaDescriptionCompat.Builder()
+            .setMediaId(CONTROLS_ROOT)
+            .setTitle(getString(R.string.controls_browse_title))
+            .setSubtitle(getString(R.string.controls_browse_subtitle))
+            .setIconUri(resourceUri(R.drawable.ic_status))
+            .build(),
+        MediaBrowserCompat.MediaItem.FLAG_BROWSABLE,
+    )
 
     private fun nowPlayingLabel(s: PlaybackSnapshot): String = when {
         s.trackName == null -> getString(R.string.status_nothing_playing)
@@ -316,7 +340,7 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
                 val row = if (mediaId == CMD_STATUS) CMD_CHECK_NOW else mediaId
                 feedback = Feedback(row, outcome.subtitle)
                 refreshState()
-                notifyChildrenChanged(ROOT_ID)
+                notifyChildrenChanged(CONTROLS_ROOT)
                 showMessage(outcome.message)
             } finally {
                 commandRunning.set(false)
@@ -406,7 +430,7 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
     private suspend fun refreshAndNotify() {
         val before = renderKey()
         refreshState()
-        if (renderKey() != before) notifyChildrenChanged(ROOT_ID)
+        if (renderKey() != before) notifyChildrenChanged(CONTROLS_ROOT)
     }
 
     /**
@@ -475,6 +499,11 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
     companion object {
         private const val TAG = "AutoSkipperControls"
         private const val ROOT_ID = "root"
+
+        // The two tabs. Only browsable root children become tabs, and the car opens
+        // on the first one, so Controls has to be a node of its own — with the
+        // commands loose at the root they were not a tab and Lyrics was what opened.
+        private const val CONTROLS_ROOT = "controls:root"
 
         // The status row runs Check Now like the row below it, but carries its own id:
         // two items sharing one media id is a needless risk in someone else's list adapter.

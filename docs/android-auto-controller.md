@@ -242,6 +242,23 @@ Podržanost AA javlja kroz `BROWSER_ROOT_HINTS_KEY_CUSTOM_BROWSER_ACTION_LIMIT` 
 (0 = nema), pa treba fallback na današnje ponašanje.
 (developer.android.com/training/cars/media/create-media-browser/custom-browse-actions)
 
+### Korijen su tabovi, ne lista (app 0.5.0)
+
+Vatrin nalaz 2026-09-06: app se u autu otvara na **Lyricsu**, a komande su drugi panel. Uzrok je u
+tome kako AA gradi traku tabova - dokumentirano, samo nam je promaklo pri pisanju Faze 6:
+
+- tabovi nastaju **isključivo od browsable djece korijena**; playable stavke na korijenu nisu tab,
+  a dokumentacija upozorava da ih AA zna i ispustiti ili zakopati;
+- **redoslijed tabova prati redoslijed iz `onLoadChildren`**, a auto se otvara na prvom;
+- limit je `BROWSER_ROOT_HINTS_KEY_ROOT_CHILDREN_LIMIT` (4 kad hint ne dođe).
+
+Do 0.4.0 je korijen bio šest playable komandi + jedan browsable Lyrics, pa je Lyrics bio jedini
+pravi tab. **U 0.5.0 korijen vraća samo dva browsable čvora: `controls:root` pa `lyrics:root`.**
+Komande su preseljene pod Controls, poll i `notifyChildrenChanged` sad idu na `controls:root`, a
+korijen se renderira bez čekanja na snapshot (statičan je). Ikone tabova: `ic_status` (brand marka)
+za Controls, `ic_lyrics` za Lyrics - AA za tabove traži jednobojne, što ove već jesu.
+(developer.android.com/training/cars/media/create-media-browser/content-hierarchy)
+
 ## Repo i versioning
 
 - Android kod: **poddirektorij `android/`** u ovom repou (API kontrakt i app se mijenjaju
