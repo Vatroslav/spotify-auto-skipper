@@ -1,8 +1,8 @@
 """Generate the Android Auto browse-list icons for Car Skipper.
 
-Each icon is a single colour — brand green, red for the armed Remove — because
-Android Auto renders the list on a light or a dark background depending on the
-car's day/night mode, and a two-tone glyph loses half of itself in one of them.
+Every icon is brand green and single-colour, because Android Auto renders the list
+on a light or a dark background depending on the car's day/night mode, and a
+two-tone glyph loses half of itself in one of them.
 Palette and the status glyph come from the existing brand mark
 (tools/make_launcher_icon.py), so nothing here is a new design.
 
@@ -20,7 +20,6 @@ from PIL import Image, ImageDraw
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from make_launcher_icon import GREEN, car  # noqa: E402
 
-RED = (255, 68, 68, 255)  # PWA's remove/danger colour, --remove-hover
 CLEAR = (0, 0, 0, 0)
 
 DRAW = 512  # supersampled working canvas
@@ -184,7 +183,6 @@ ICONS = {
     "ic_like_add": (icon_like_add, GREEN),
     "ic_like_remove": (icon_like_remove, GREEN),
     "ic_remove": (icon_trash, GREEN),
-    "ic_remove_armed": (icon_trash, RED),
     "ic_lyrics": (icon_lyrics, GREEN),
 }
 

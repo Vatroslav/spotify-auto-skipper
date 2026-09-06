@@ -213,6 +213,35 @@ mijenja), promašaj 7 dana (LRCLIB pune korisnici, pa "nema" vrijedi za danas).
 korisnik ne izađe i vrati se u podmapu. Ublaženo prozorom od pet redaka umjesto dva - propušteno
 osvježavanje tada ostavlja kontekst umjesto praznine. Ako padne, ručno listanje ostaje.
 
+### Test u autu 2026-09-02 - klik napušta browse listu (app 0.4.0)
+
+Snimke s ekrana auta u 12:10-12:11 CEST, uz server log iste minute
+(`GET /api/playback` + `GET /api/lyrics` iz appa, **nijedan POST**, `device_tokens.last_used_at`
+= 2026-09-02 10:11:13 UTC). Nalaz: mreža, token i Lyrics grana rade; puca **tek klik**.
+
+Sinkroni STATE_ERROR iz spike fixa (Utvrđene činjenice #4) rješava samo *što piše* na ekranu, ne i
+*gdje je korisnik*. Stavke su `FLAG_PLAYABLE`, pa ih AA nakon klika tretira kao pokretanje
+reprodukcije: odvede korisnika s browse liste na playback ekran i tamo čeka `STATE_PLAYING` koji
+kardinalno pravilo zabranjuje. Poruka se vidi 4 s, pa stanje padne na `STATE_NONE` i AA pokaže
+svoje "Could not load your selection" s gumbom "Back to browse". Kriterij 3 iz Faze 4 time pada -
+ne na timingu, nego na navigaciji.
+
+Posljedice: primarna potvrda kroz `notifyChildrenChanged` se nikad ne vidi (korisnik nije na
+listi), a **dvofazni Remove je nedostižan** - prvi klik izbaci s liste, a `ARM_TIMEOUT_MS` od 10 s
+istekne prije nego se čovjek vrati.
+
+**Odluka (Vatra, 2026-09-06): Remove ide na jedan klik** (app 0.4.0). Armiranje, `cmd_remove_armed`,
+`msg_remove_armed`, `ic_remove_armed` i `ARM_TIMEOUT_MS` su maknuti. `expected_track_id` se i dalje
+šalje - sad iz zadnjeg snapshota - pa 409 na promjenu pjesme ostaje jedina zaštita; od promašenog
+klika svjesno ne štiti ništa. Klik bez snapshota javi "Nothing is playing" i ne šalje ništa.
+
+**Neriješeno:** izlazak s liste na klik. Pravi lijek su **Custom Browse Actions**
+(`DESCRIPTION_EXTRAS_KEY_CUSTOM_BROWSER_ACTION_ID_LIST` na stavci, `onCustomAction` u servisu,
+rezultat s `..._RESULT_MESSAGE` i `..._RESULT_REFRESH_ITEM`) - browse ekran tada ostaje otvoren.
+Podržanost AA javlja kroz `BROWSER_ROOT_HINTS_KEY_CUSTOM_BROWSER_ACTION_LIMIT` u root hintovima
+(0 = nema), pa treba fallback na današnje ponašanje.
+(developer.android.com/training/cars/media/create-media-browser/custom-browse-actions)
+
 ## Repo i versioning
 
 - Android kod: **poddirektorij `android/`** u ovom repou (API kontrakt i app se mijenjaju

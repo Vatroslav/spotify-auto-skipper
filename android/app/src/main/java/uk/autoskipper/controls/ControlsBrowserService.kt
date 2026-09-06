@@ -52,12 +52,6 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
     /** Result of the last command, shown as that row's subtitle until the next one. */
     private var feedback: Feedback? = null
 
-    // Remove is two-tap: the first tap only arms it, so a mis-tap on a car screen
-    // cannot delete a track. Armed state is local and expires on its own.
-    private var armedTrackId: String? = null
-    private var armedTrackName: String? = null
-    private var disarmJob: Job? = null
-
     private var subscribers = 0
     private var pollJob: Job? = null
     private var messageResetJob: Job? = null
@@ -219,16 +213,11 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
         // No trash playlist means a removed track has no backup copy, so the command
         // is not offered at all rather than offered and refused.
         if (s.trashConfigured) {
-            val armedName = armedTrackName
             items += item(
                 mediaId = CMD_REMOVE,
-                title = if (armedName != null) {
-                    getString(R.string.cmd_remove_armed, armedName)
-                } else {
-                    getString(R.string.cmd_remove)
-                },
+                title = getString(R.string.cmd_remove),
                 subtitle = feedbackFor(CMD_REMOVE),
-                icon = if (armedName != null) R.drawable.ic_remove_armed else R.drawable.ic_remove,
+                icon = R.drawable.ic_remove,
             )
         }
 
@@ -296,9 +285,10 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
         if (mediaId == LyricsSection.LYRICS_MESSAGE) return
         if (lyrics.onItemTapped(mediaId)) return
 
-        // Remove's first tap is local: it arms, shows the confirmation label, sends nothing.
-        if (mediaId == CMD_REMOVE && armedTrackId == null) {
-            arm()
+        // Remove acts on the track the row is naming. With no snapshot there is nothing
+        // to name, and firing blind would delete whatever Spotify has moved on to.
+        if (mediaId == CMD_REMOVE && state.trackId == null) {
+            showMessage(getString(R.string.msg_nothing_playing))
             return
         }
         if (!commandRunning.compareAndSet(false, true)) {
@@ -321,7 +311,6 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
                     return@launch
                 }
                 val outcome = execute(client, mediaId) ?: return@launch
-                if (mediaId == CMD_REMOVE) disarm()
                 // The status row has no subtitle of its own, so its confirmation lands
                 // on the Check Now row it shares an action with.
                 val row = if (mediaId == CMD_STATUS) CMD_CHECK_NOW else mediaId
@@ -358,7 +347,7 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
             )
         }
 
-        CMD_REMOVE -> io { client.removeFromPlaylist(armedTrackId) }.outcome { track ->
+        CMD_REMOVE -> io { client.removeFromPlaylist(state.trackId) }.outcome { track ->
             getString(R.string.feedback_removed) to
                 getString(R.string.msg_removed, track.name.orEmpty())
         }
@@ -375,7 +364,7 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
             Outcome(subtitle, message)
         }
         // The server already phrases its errors for humans; 409 is the one case the
-        // car has extra context for — the song moved on between the two taps.
+        // car has extra context for — the song moved on between the last poll and the tap.
         is ApiResult.Err -> Outcome(
             getString(R.string.feedback_failed),
             if (code == HTTP_CONFLICT) getString(R.string.msg_track_changed) else message,
@@ -398,36 +387,6 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
         }
     }
 
-    // ── Remove arming ────────────────────────────────────────────
-
-    private fun arm() {
-        val trackId = state.trackId
-        if (trackId == null) {
-            showMessage(getString(R.string.msg_nothing_playing))
-            return
-        }
-        val name = state.trackName.orEmpty()
-        armedTrackId = trackId
-        armedTrackName = name
-        showMessage(getString(R.string.msg_remove_armed, name))
-        notifyChildrenChanged(ROOT_ID)
-
-        disarmJob?.cancel()
-        disarmJob = scope.launch {
-            delay(ARM_TIMEOUT_MS)
-            disarm()
-            notifyChildrenChanged(ROOT_ID)
-        }
-    }
-
-    /** Clears the armed state. Relabelling is the caller's job — it knows if a refresh follows. */
-    private fun disarm() {
-        disarmJob?.cancel()
-        disarmJob = null
-        armedTrackId = null
-        armedTrackName = null
-    }
-
     // ── Server state ─────────────────────────────────────────────
 
     /** Pulls a fresh snapshot. Keeps the last one on failure rather than blanking the screen. */
@@ -442,8 +401,6 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
     private fun applySnapshot(snapshot: PlaybackSnapshot) {
         state = snapshot
         hasState = true
-        // A new song invalidates a pending confirmation — the user armed the old one.
-        if (armedTrackId != null && armedTrackId != snapshot.trackId) disarm()
     }
 
     private suspend fun refreshAndNotify() {
@@ -464,7 +421,6 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
         state.isLiked,
         state.skipExemptTrackId,
         state.trashConfigured,
-        armedTrackId,
         feedback?.mediaId,
         feedback?.text,
     ).joinToString("|")
@@ -531,7 +487,6 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
 
         private const val ANDROID_AUTO_PACKAGE = "com.google.android.projection.gearhead"
         private const val MESSAGE_DURATION_MS = 4000L
-        private const val ARM_TIMEOUT_MS = 10_000L
         private const val POLL_INTERVAL_MS = 30_000L
         private const val HTTP_CONFLICT = 409
     }

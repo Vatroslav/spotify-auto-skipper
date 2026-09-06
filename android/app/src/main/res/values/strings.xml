@@ -28,7 +28,6 @@
     <string name="cmd_like_add">Add to Liked Songs</string>
     <string name="cmd_like_remove">Remove from Liked Songs</string>
     <string name="cmd_remove">Remove from Playlist</string>
-    <string name="cmd_remove_armed">Tap again to remove: %1$s</string>
 
     <!-- Lyrics branch -->
     <string name="lyrics_browse_title">Lyrics</string>
@@ -60,7 +59,6 @@
     <string name="msg_wont_skip">Won\'t skip: %1$s</string>
     <string name="msg_liked">Added to Liked Songs</string>
     <string name="msg_unliked">Removed from Liked Songs</string>
-    <string name="msg_remove_armed">Tap again to remove: %1$s</string>
     <string name="msg_removed">Removed: %1$s</string>
     <string name="msg_track_changed">Track changed - not removed</string>
     <string name="msg_nothing_playing">Nothing is playing</string>

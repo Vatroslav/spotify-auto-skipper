@@ -13,12 +13,16 @@ skip i dalje radi server-side; ovo je samo za ono što se inače klikalo u PWA.
 | Pause / Resume Skipping | `POST /api/playback/toggle-pause`, label po `skipping_paused` |
 | Don't Skip This Song | `POST /api/playback/skip-one-pause`; label postaje "Won't skip: {pjesma}" dok izuzeće vrijedi |
 | Add / Remove Liked Songs | `POST /api/playback/toggle-like`, label po `is_liked` |
-| Remove from Playlist | dvofazno, vidi dolje. Stavke nema ako `trash_configured` nije true. |
+| Remove from Playlist | `POST /api/playback/remove-from-playlist` na jedan klik, vidi dolje. Stavke nema ako `trash_configured` nije true. |
 | Lyrics | podmapa s tekstom pjesme, vidi dolje. Namjerno zadnja - komande iznad su već mišićna memorija. |
 
-**Remove je dvofazan:** prvi klik ništa ne šalje - zapamti pjesmu i promijeni label u "Tap again to
-remove: {pjesma}". Potvrda šalje `expected_track_id`, pa server odbije s 409 ako je pjesma u
-međuvremenu otišla dalje. Armirano stanje pada nakon 10 s, na promjenu pjesme ili nakon izvršenja.
+**Remove je jednofazan** (od 0.4.0; prije je bio dvofazan): klik odmah šalje komandu. Šalje se
+`expected_track_id` iz zadnjeg snapshota, pa server odbije s 409 ako je pjesma u međuvremenu otišla
+dalje - to je jedina zaštita koja je ostala, i namjerno ne štiti od promašenog klika. Bez snapshota
+(ništa ne svira) klik samo javi "Nothing is playing" i ne šalje ništa.
+
+Dvofazna potvrda je maknuta jer je bila nedostižna u autu: prvi klik izbaci korisnika s browse
+liste na playback ekran, pa drugi klik nije imao gdje - vidi "Klik napušta listu" dolje.
 
 Stanje se osvježava na svakom otvaranju liste, nakon svake komande i pollom svakih 30 s dok netko
 gleda listu. Prestanak subscriptiona (odspajanje od auta) gasi poll - nema zasebne detekcije auta.
@@ -34,6 +38,24 @@ komanda na serveru uredno izvršena. Zato:
 - Trajna potvrda je promjena liste (`notifyChildrenChanged`): red dobije podnaslov "Sent ✓",
   "Done ✓", "Removed ✓" ili "Failed".
 - Greške sa servera idu doslovno na ekran - API ih već formulira za ljude.
+
+### Klik napušta listu (neriješeno)
+
+Test u autu 2026-09-02 pokazao je da sinkroni `STATE_ERROR` rješava samo **što piše** na ekranu, ne
+i **gdje se korisnik nalazi**. Stavke su `FLAG_PLAYABLE`; klik na takvu stavku odvede AA s browse
+liste na playback ekran, gdje čeka `STATE_PLAYING` koji ova sesija nikad ne prijavi. Poruka se
+vidi 4 s, pa stanje padne na `STATE_NONE` i AA pokaže svoje "Could not load your selection" s
+gumbom "Back to browse".
+
+Posljedica: trajna potvrda kroz `notifyChildrenChanged` se nikad ne vidi, jer nakon klika korisnik
+više nije na listi. Server log te sesije potvrđuje da je app uredno pollao `/api/playback` i
+`/api/lyrics`, ali nijedan POST nije poslan - do izvršenja komande se nije ni došlo.
+
+Pravi lijek je **Custom Browse Actions** (`DESCRIPTION_EXTRAS_KEY_CUSTOM_BROWSER_ACTION_ID_LIST` na
+stavci, `onCustomAction` u servisu, rezultat s `..._RESULT_MESSAGE` i `..._RESULT_REFRESH_ITEM`) -
+tamo browse ekran ostaje otvoren. Podržanost javlja AA kroz
+`BROWSER_ROOT_HINTS_KEY_CUSTOM_BROWSER_ACTION_LIMIT` u root hintovima (0 = nema), pa treba fallback.
+Nije napravljeno.
 
 ## Lyrics
 
@@ -82,7 +104,7 @@ Compat stack je namjeran: `MediaBrowserServiceCompat` + `MediaSessionCompat` (an
 ## Ikone
 
 `tools/make_launcher_icon.py` crta launcher ikonu (brand strelice + auto), `tools/make_browse_icons.py`
-ikone stavki u listi. Sve su jednobojne (brand zelena, crvena za armirani Remove) jer AA listu
+ikone stavki u listi. Sve su jednobojne (brand zelena) jer AA listu
 renderira na svijetloj ili tamnoj podlozi ovisno o day/night modu auta - dvobojni glif izgubi
 polovicu sebe u jednom od njih. Boje su iz postojećeg `cloud/app/static/icons/maskable-512.png`.
 
@@ -112,7 +134,7 @@ se ne commitaju.
    Settingsa (Android Auto device), **Save**, pa **Test connection** — mora javiti "Connected: …".
 4. Spojiti telefon na auto; app je u AA launcheru.
 
-Verzija piše u zaglavlju setup ekrana ("Car Skipper 0.3.4"). Sideload preko postojeće instalacije
+Verzija piše u zaglavlju setup ekrana ("Car Skipper 0.4.0"). Sideload preko postojeće instalacije
 ne javi je li stvarno prošao, pa je to prva stvar za pogledati nakon instalacije.
 
 Zaglavlje je **vlastiti view**, a app ima `NoActionBar` temu. Sa sistemskim action barom vrh
@@ -129,7 +151,7 @@ force-stopa (ili telefon ne restarta). Utvrđeno na spikeu.
 3. Poruka na klik je vidljiva i čitljiva, bez generičkog "Could not load your selection".
 4. Volan (next/prev) i dalje upravlja Spotifyjem, media kartica ostaje Spotifyjeva, zvuk se
    nijednom ne prekida.
-5. Labeli se osvježe nakon komande (Pause↔Resume, "Won't skip", Liked, "Tap again to remove").
+5. Labeli se osvježe nakon komande (Pause↔Resume, "Won't skip", Liked).
 
 Padne li bilo koji: stop, javiti nalaz. Ne krpati hackovima.
 
@@ -150,7 +172,7 @@ ručnim listanjem — nalaz o tome što radi bez auto-scrolla određuje ima li s
 ## Verzioniranje
 
 `versionName`/`versionCode` u `app/build.gradle.kts`, neovisno o `APP_VERSION` backenda (version
-guard hookovi su scoped na `cloud/`). Trenutno **0.3.4**; traži backend v3.23.0 ili noviji
+guard hookovi su scoped na `cloud/`). Trenutno **0.4.0**; traži backend v3.23.0 ili noviji
 (`GET /api/lyrics`, uz raniji `trash_configured`, `expected_track_id` i transport proxyje).
 
 ## Testovi
