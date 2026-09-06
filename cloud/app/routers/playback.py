@@ -26,8 +26,9 @@ class RemoveFromPlaylistRequest(BaseModel):
     """Body of POST /remove-from-playlist.
 
     expected_track_id is what the caller believes is playing. The car controller
-    sends it because its two-tap confirmation can straddle a track change; the PWA
-    omits it (the button sits next to a live now-playing display).
+    sends it because its browse list is a snapshot up to 30 s old and the song can
+    move on between the poll and the tap; the PWA omits it (the button sits next to
+    a live now-playing display).
     """
 
     expected_track_id: str | None = None
