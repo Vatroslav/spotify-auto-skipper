@@ -52,7 +52,7 @@ komanda na serveru uredno izvršena. Zato:
   "Done ✓", "Removed ✓" ili "Failed".
 - Greške sa servera idu doslovno na ekran - API ih već formulira za ljude.
 
-### Klik napušta listu (neriješeno)
+### Klik napušta listu - ikona akcije ostaje na listi (od 0.7.0)
 
 Test u autu 2026-09-02 pokazao je da sinkroni `STATE_ERROR` rješava samo **što piše** na ekranu, ne
 i **gdje se korisnik nalazi**. Stavke su `FLAG_PLAYABLE`; klik na takvu stavku odvede AA s browse
@@ -64,11 +64,19 @@ Posljedica: trajna potvrda kroz `notifyChildrenChanged` se nikad ne vidi, jer na
 više nije na listi. Server log te sesije potvrđuje da je app uredno pollao `/api/playback` i
 `/api/lyrics`, ali nijedan POST nije poslan - do izvršenja komande se nije ni došlo.
 
-Pravi lijek je **Custom Browse Actions** (`DESCRIPTION_EXTRAS_KEY_CUSTOM_BROWSER_ACTION_ID_LIST` na
-stavci, `onCustomAction` u servisu, rezultat s `..._RESULT_MESSAGE` i `..._RESULT_REFRESH_ITEM`) -
-tamo browse ekran ostaje otvoren. Podržanost javlja AA kroz
-`BROWSER_ROOT_HINTS_KEY_CUSTOM_BROWSER_ACTION_LIMIT` u root hintovima (0 = nema), pa treba fallback.
-Nije napravljeno.
+Od 0.7.0 svaki red nosi i **Custom Browse Action** - ikonu na desnom rubu reda. Klik na ikonu ide u
+`onCustomAction`, izvrši istu komandu, a rezultat se vraća kao toast (`..._RESULT_MESSAGE`) i
+osvježenje reda (`..._RESULT_REFRESH_ITEM`): auto **ostaje na listi**, nema ekrana reprodukcije ni
+"Back to browse". Katalog akcija ide u `BrowserRoot` extras
+(`BROWSER_SERVICE_EXTRAS_KEY_CUSTOM_BROWSER_ACTION_ROOT_LIST`); prekidači (Like, Pause) imaju po
+jedan action id po stanju jer je labela akcije fiksna na korijenu, pa red nakon osvježenja zamijeni
+ikonu i labelu. AA javlja podršku kroz `BROWSER_ROOT_HINTS_KEY_CUSTOM_BROWSER_ACTION_LIMIT` u root
+hintovima; 0 = redovi ostaju bez ikone i vrijedi samo staro ponašanje.
+
+**Klik na tekst reda i dalje ide starim putem** (`playFromMediaId`, napušta listu) - AA ga ne da
+isključiti. U autu se, dakle, tapka ikona, ne tekst. Neprovjereno u autu; dvije poznate nepoznanice:
+AA za ikone akcija traži vektor koji se može tintati, a naše su PNG - i nije poznato prikazuje li
+AA toast i za rezultat koji stigne nakon više sekundi.
 
 ## Lyrics tab
 
@@ -164,6 +172,8 @@ force-stopa (ili telefon ne restarta). Utvrđeno na spikeu.
 2. Sve stavke se renderiraju, s ikonama.
 3. Klik izvršava komandu (potvrda u PWA logu) i AA se ne raspadne bez playbacka.
 4. Poruka na klik je vidljiva i čitljiva, bez generičkog "Could not load your selection".
+7. Redovi imaju ikonu akcije na desnom rubu; klik na nju izvrši komandu, toast s porukom, red
+   dobije podnaslov ("Done ✓" i sl.) i **auto ostaje na listi**. Ako ikona nema, AA je javio limit 0.
 5. Volan (next/prev) i dalje upravlja Spotifyjem, media kartica ostaje Spotifyjeva, zvuk se
    nijednom ne prekida.
 6. Labeli se osvježe nakon komande (Pause↔Resume, "Won't skip", Liked).

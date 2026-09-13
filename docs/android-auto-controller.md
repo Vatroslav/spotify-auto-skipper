@@ -235,11 +235,15 @@ istekne prije nego se čovjek vrati.
 šalje - sad iz zadnjeg snapshota - pa 409 na promjenu pjesme ostaje jedina zaštita; od promašenog
 klika svjesno ne štiti ništa. Klik bez snapshota javi "Nothing is playing" i ne šalje ništa.
 
-**Neriješeno:** izlazak s liste na klik. Pravi lijek su **Custom Browse Actions**
-(`DESCRIPTION_EXTRAS_KEY_CUSTOM_BROWSER_ACTION_ID_LIST` na stavci, `onCustomAction` u servisu,
-rezultat s `..._RESULT_MESSAGE` i `..._RESULT_REFRESH_ITEM`) - browse ekran tada ostaje otvoren.
-Podržanost AA javlja kroz `BROWSER_ROOT_HINTS_KEY_CUSTOM_BROWSER_ACTION_LIMIT` u root hintovima
-(0 = nema), pa treba fallback na današnje ponašanje.
+**Riješeno u app 0.7.0 (Vatrina odluka 2026-09-13): Custom Browse Actions.** Svaki red nosi ikonu
+akcije (`DESCRIPTION_EXTRAS_KEY_CUSTOM_BROWSER_ACTION_ID_LIST`), katalog akcija ide u `BrowserRoot`
+extras, klik na ikonu stiže u `onCustomAction`, a rezultat se vraća kao `..._RESULT_MESSAGE` (toast)
++ `..._RESULT_REFRESH_ITEM` - browse ekran ostaje otvoren. Podršku AA javlja kroz
+`BROWSER_ROOT_HINTS_KEY_CUSTOM_BROWSER_ACTION_LIMIT` (0 = redovi bez ikone, staro ponašanje).
+Klik na tekst reda i dalje ide kroz `playFromMediaId` i napušta listu - to AA ne da isključiti.
+Konstante provjerene u `androidx.media:media:1.7.0` (javap). Neprovjereno u autu; rizici: ikone su
+PNG, a AA za akcije traži tintabilan vektor; nepoznato prikazuje li AA toast za rezultat koji
+stigne nakon više sekundi.
 (developer.android.com/training/cars/media/create-media-browser/custom-browse-actions)
 
 ### Korijen su tabovi, ne lista (app 0.5.0)

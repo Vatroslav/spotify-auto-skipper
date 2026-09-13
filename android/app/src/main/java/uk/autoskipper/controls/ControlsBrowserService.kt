@@ -8,7 +8,9 @@ import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.media.MediaBrowserServiceCompat
+import androidx.media.utils.MediaConstants
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -57,6 +59,14 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
     /** Result of the last command, shown as that row's subtitle until the next one. */
     private var feedback: Feedback? = null
 
+    /**
+     * How many custom browse actions the car shows per row (0 = feature absent). Reported
+     * by Android Auto in the root hints on every connect. Above zero the rows carry an
+     * action icon whose tap stays on the browse list; the row tap itself keeps the old
+     * playFromMediaId path, which leaves the list, as the fallback.
+     */
+    private var browseActionLimit = 0
+
     private var subscribers = 0
     private var pollJob: Job? = null
     private var messageResetJob: Job? = null
@@ -98,8 +108,37 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
         rootHints: Bundle?,
     ): BrowserRoot? {
         val allowed = clientPackageName == ANDROID_AUTO_PACKAGE || clientPackageName == packageName
-        return if (allowed) BrowserRoot(ROOT_ID, null) else null
+        if (!allowed) return null
+        browseActionLimit = rootHints
+            ?.getInt(MediaConstants.BROWSER_ROOT_HINTS_KEY_CUSTOM_BROWSER_ACTION_LIMIT, 0)
+            ?: 0
+        if (browseActionLimit <= 0) return BrowserRoot(ROOT_ID, null)
+        // The global action catalogue. A row may only reference ids declared here.
+        val extras = Bundle().apply {
+            putParcelableArrayList(
+                MediaConstants.BROWSER_SERVICE_EXTRAS_KEY_CUSTOM_BROWSER_ACTION_ROOT_LIST,
+                ArrayList(browseActions()),
+            )
+        }
+        return BrowserRoot(ROOT_ID, extras)
     }
+
+    private fun browseActions(): List<Bundle> = listOf(
+        browseAction(ACT_CHECK_NOW, R.string.cmd_check_now, R.drawable.ic_check_now),
+        browseAction(ACT_REMOVE, R.string.cmd_remove, R.drawable.ic_remove),
+        browseAction(ACT_DONT_SKIP, R.string.cmd_dont_skip, R.drawable.ic_dont_skip),
+        browseAction(ACT_LIKE_ADD, R.string.cmd_like_add, R.drawable.ic_like_add),
+        browseAction(ACT_LIKE_REMOVE, R.string.cmd_like_remove, R.drawable.ic_like_remove),
+        browseAction(ACT_PAUSE, R.string.cmd_pause_skipping, R.drawable.ic_pause_skipping),
+        browseAction(ACT_RESUME, R.string.action_resume_skipping, R.drawable.ic_resume_skipping),
+    )
+
+    private fun browseAction(id: String, @StringRes label: Int, @DrawableRes icon: Int): Bundle =
+        Bundle().apply {
+            putString(MediaConstants.EXTRAS_KEY_CUSTOM_BROWSER_ACTION_ID, id)
+            putString(MediaConstants.EXTRAS_KEY_CUSTOM_BROWSER_ACTION_LABEL, getString(label))
+            putString(MediaConstants.EXTRAS_KEY_CUSTOM_BROWSER_ACTION_ICON_URI, resourceUri(icon).toString())
+        }
 
     override fun onLoadChildren(
         parentId: String,
@@ -184,6 +223,7 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
                 if (s.skippingPaused) R.string.status_skipping_paused else R.string.status_skipping_active,
             ),
             icon = R.drawable.ic_status,
+            action = ACT_CHECK_NOW,
         )
 
         items += item(
@@ -191,6 +231,7 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
             title = getString(R.string.cmd_check_now),
             subtitle = feedbackFor(CMD_CHECK_NOW),
             icon = R.drawable.ic_check_now,
+            action = ACT_CHECK_NOW,
         )
 
         // Row order is the driver's priority: the three actions on the song named
@@ -204,6 +245,7 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
                 title = getString(R.string.cmd_remove),
                 subtitle = feedbackFor(CMD_REMOVE),
                 icon = R.drawable.ic_remove,
+                action = ACT_REMOVE,
             )
         }
 
@@ -217,6 +259,7 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
             },
             subtitle = feedbackFor(CMD_SKIP_ONE_PAUSE),
             icon = R.drawable.ic_dont_skip,
+            action = ACT_DONT_SKIP,
         )
 
         val liked = s.isLiked == true
@@ -225,6 +268,7 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
             title = getString(if (liked) R.string.cmd_like_remove else R.string.cmd_like_add),
             subtitle = feedbackFor(CMD_TOGGLE_LIKE),
             icon = if (liked) R.drawable.ic_like_remove else R.drawable.ic_like_add,
+            action = if (liked) ACT_LIKE_REMOVE else ACT_LIKE_ADD,
         )
 
         items += item(
@@ -234,6 +278,7 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
             ),
             subtitle = feedbackFor(CMD_TOGGLE_PAUSE),
             icon = if (s.skippingPaused) R.drawable.ic_resume_skipping else R.drawable.ic_pause_skipping,
+            action = if (s.skippingPaused) ACT_RESUME else ACT_PAUSE,
         )
 
         return items
@@ -269,13 +314,24 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
         title: String,
         subtitle: String?,
         @DrawableRes icon: Int,
+        action: String,
     ): MediaBrowserCompat.MediaItem {
-        val description = MediaDescriptionCompat.Builder()
+        val builder = MediaDescriptionCompat.Builder()
             .setMediaId(mediaId)
             .setTitle(title)
             .setSubtitle(subtitle)
             .setIconUri(resourceUri(icon))
-            .build()
+        if (browseActionLimit > 0) {
+            builder.setExtras(
+                Bundle().apply {
+                    putStringArrayList(
+                        MediaConstants.DESCRIPTION_EXTRAS_KEY_CUSTOM_BROWSER_ACTION_ID_LIST,
+                        arrayListOf(action),
+                    )
+                },
+            )
+        }
+        val description = builder.build()
         return MediaBrowserCompat.MediaItem(
             description,
             MediaBrowserCompat.MediaItem.FLAG_PLAYABLE,
@@ -312,42 +368,96 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
         if (mediaId == LyricsSection.LYRICS_MESSAGE) return
         if (lyrics.onItemTapped(mediaId)) return
 
-        // Remove acts on the track the row is naming. With no snapshot there is nothing
-        // to name, and firing blind would delete whatever Spotify has moved on to.
-        if (mediaId == CMD_REMOVE && state.trackId == null) {
-            showMessage(getString(R.string.msg_nothing_playing))
-            return
-        }
-        if (!commandRunning.compareAndSet(false, true)) {
-            showMessage(getString(R.string.msg_busy))
+        val refused = refusal(mediaId)
+        if (refused != null) {
+            showMessage(refused)
             return
         }
         // Synchronous state change: Android Auto judges the tap immediately and shows
         // its own generic failure if nothing happens before the HTTP round trip.
         showMessage(getString(R.string.msg_working))
-        feedback = null
-        runCommand(mediaId)
+        scope.launch {
+            val message = runCommand(mediaId)
+            if (message != null) showMessage(message)
+        }
     }
 
-    private fun runCommand(mediaId: String) {
+    /**
+     * The action icon on a row. Unlike a row tap, the car stays on the browse list:
+     * the outcome arrives as a toast (RESULT_MESSAGE) and the row is redrawn
+     * (RESULT_REFRESH_ITEM), so the subtitle confirmation is finally visible.
+     */
+    override fun onCustomAction(action: String, extras: Bundle?, result: Result<Bundle>) {
+        val command = commandForAction(action)
+        if (command == null) {
+            super.onCustomAction(action, extras, result)
+            return
+        }
+        // The row the icon sat on; the status row shares Check Now's action but must
+        // refresh under its own id.
+        val mediaId = extras?.getString(MediaConstants.EXTRAS_KEY_CUSTOM_BROWSER_ACTION_MEDIA_ITEM_ID)
+            ?: command
+        val refused = refusal(command)
+        if (refused != null) {
+            result.sendResult(actionResult(refused, mediaId))
+            return
+        }
+        result.detach()
         scope.launch {
-            try {
-                val client = settings.apiClient()
-                if (client == null) {
-                    showMessage(getString(R.string.msg_not_configured))
-                    return@launch
-                }
-                val outcome = execute(client, mediaId) ?: return@launch
-                // The status row has no subtitle of its own, so its confirmation lands
-                // on the Check Now row it shares an action with.
-                val row = if (mediaId == CMD_STATUS) CMD_CHECK_NOW else mediaId
-                feedback = Feedback(row, outcome.subtitle)
-                refreshState()
-                notifyChildrenChanged(CONTROLS_ROOT)
-                showMessage(outcome.message)
-            } finally {
-                commandRunning.set(false)
-            }
+            val message = runCommand(command)
+            result.sendResult(actionResult(message ?: getString(R.string.msg_unreachable), mediaId))
+        }
+    }
+
+    private fun actionResult(message: String, mediaId: String): Bundle = Bundle().apply {
+        putString(MediaConstants.EXTRAS_KEY_CUSTOM_BROWSER_ACTION_RESULT_MESSAGE, message)
+        putString(MediaConstants.EXTRAS_KEY_CUSTOM_BROWSER_ACTION_RESULT_REFRESH_ITEM, mediaId)
+    }
+
+    /** The command a browse action id runs; null for ids that are not ours. */
+    private fun commandForAction(action: String): String? = when (action) {
+        ACT_CHECK_NOW -> CMD_CHECK_NOW
+        ACT_REMOVE -> CMD_REMOVE
+        ACT_DONT_SKIP -> CMD_SKIP_ONE_PAUSE
+        ACT_LIKE_ADD, ACT_LIKE_REMOVE -> CMD_TOGGLE_LIKE
+        ACT_PAUSE, ACT_RESUME -> CMD_TOGGLE_PAUSE
+        else -> null
+    }
+
+    /**
+     * Why a command must not start right now, as the message to show; null to go ahead.
+     * On go-ahead the busy flag is taken and runCommand must follow to release it.
+     */
+    private fun refusal(mediaId: String): String? {
+        // Remove acts on the track the row is naming. With no snapshot there is nothing
+        // to name, and firing blind would delete whatever Spotify has moved on to.
+        if (mediaId == CMD_REMOVE && state.trackId == null) {
+            return getString(R.string.msg_nothing_playing)
+        }
+        if (!commandRunning.compareAndSet(false, true)) {
+            return getString(R.string.msg_busy)
+        }
+        feedback = null
+        return null
+    }
+
+    /**
+     * Runs one command end to end and returns the message for the driver, or null when
+     * the media id was not a command. Releases the busy flag taken by refusal().
+     */
+    private suspend fun runCommand(mediaId: String): String? {
+        try {
+            val client = settings.apiClient() ?: return getString(R.string.msg_not_configured)
+            val outcome = execute(client, mediaId) ?: return null
+            // The status row has no subtitle of its own, so its confirmation lands
+            // on the Check Now row it shares an action with.
+            val row = if (mediaId == CMD_STATUS) CMD_CHECK_NOW else mediaId
+            feedback = Feedback(row, outcome.subtitle)
+            refreshState()
+            notifyChildrenChanged(CONTROLS_ROOT)
+            return outcome.message
+        } finally {
+            commandRunning.set(false)
         }
     }
 
@@ -516,6 +626,16 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
         private const val CMD_SKIP_ONE_PAUSE = "cmd:skip_one_pause"
         private const val CMD_TOGGLE_LIKE = "cmd:toggle_like"
         private const val CMD_REMOVE = "cmd:remove"
+
+        // Custom browse action ids. Toggles get one id per state so the row can swap
+        // its icon and label on refresh — an action's label is fixed at the root.
+        private const val ACT_CHECK_NOW = "act:check_now"
+        private const val ACT_REMOVE = "act:remove"
+        private const val ACT_DONT_SKIP = "act:dont_skip"
+        private const val ACT_LIKE_ADD = "act:like_add"
+        private const val ACT_LIKE_REMOVE = "act:like_remove"
+        private const val ACT_PAUSE = "act:pause"
+        private const val ACT_RESUME = "act:resume"
 
         private const val ANDROID_AUTO_PACKAGE = "com.google.android.projection.gearhead"
         private const val MESSAGE_DURATION_MS = 4000L
