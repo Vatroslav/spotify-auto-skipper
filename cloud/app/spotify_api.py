@@ -47,6 +47,23 @@ class SpotifyAPIError(Exception):
     pass
 
 
+def _write_ok(r: httpx.Response | None) -> bool:
+    """Spotify player/write endpoints answer 200, 202 or 204 on success."""
+    return r is not None and r.status_code in (200, 202, 204)
+
+
+def _failure_detail(r: httpx.Response | None) -> str:
+    """Status plus Spotify's own reason (e.g. NO_ACTIVE_DEVICE) — a bare 404 blames the wrong thing."""
+    if r is None:
+        return "network error"
+    try:
+        error = (r.json() or {}).get("error") or {}
+    except ValueError:
+        error = {}
+    reason = error.get("reason") or error.get("message")
+    return f"HTTP {r.status_code} {reason}" if reason else f"HTTP {r.status_code}"
+
+
 def _spotify_error(r: httpx.Response | None, context: str) -> SpotifyAPIError:
     """Build a descriptive SpotifyAPIError from a failed response (or None)."""
     if r is None:
@@ -302,60 +319,86 @@ class SpotifyClient:
             return False
         return True
 
-    async def restart_playlist(self, dummy_playlist_id: str) -> bool:
+    async def restart_playlist(self, dummy_playlist_id: str) -> str | None:
         """Restart the current playlist (shuffle on) to break repeating patterns.
 
         Bounces playback onto a dummy playlist, re-enables shuffle, then jumps
-        back to the original context. Returns True only if every PUT succeeded;
-        on any failure it logs a warning and returns False so the caller knows
-        the restart silently degraded. The first PUT is the usual culprit — an
-        invalid ``dummy_playlist_id`` (the default is a Spotify editorial
-        playlist, which the API restricts for newer apps) makes it 404, and
-        without this check the "restart" would look successful while doing
-        nothing.
+        back to the original context. Returns None on success, otherwise a short
+        human-readable reason for the user-facing log.
+
+        Every step is checked against what Spotify *actually did*, not just what
+        it answered: on 2026-09-12 the jump to the dummy playlist was answered
+        with 404 (NO_ACTIVE_DEVICE) yet executed anyway, the old code aborted on
+        the 404, and playback sat on the dummy playlist for ten minutes. So a
+        failed answer is followed by a read of the real context, and the jump
+        back is verified and retried once.
         """
-        r = await self._get("https://api.spotify.com/v1/me/player/currently-playing")
-        if r is None or r.status_code != 200:
-            return False
-        data = r.json()
-        context = data.get("context", {})
-        context_uri = context.get("uri")
+        dummy_uri = f"spotify:playlist:{dummy_playlist_id}"
+        context_uri = await self._playing_context()
         if not context_uri:
-            return False
+            return "could not read the current playback context"
+        if context_uri == dummy_uri:
+            return "playback is already on the dummy playlist"
 
-        def _detail(resp: httpx.Response | None) -> str:
-            return "network error" if resp is None else f"HTTP {resp.status_code}"
+        play_url = "https://api.spotify.com/v1/me/player/play"
 
-        # Jump to the dummy playlist. If this fails, playback is untouched and
-        # the rest of the dance is pointless — abort before disturbing anything.
-        r = await self._put(
-            "https://api.spotify.com/v1/me/player/play", json={"context_uri": f"spotify:playlist:{dummy_playlist_id}"}
-        )
-        if r is None or r.status_code not in (200, 202, 204):
+        r = await self._put(play_url, json={"context_uri": dummy_uri})
+        if not _write_ok(r):
+            detail = _failure_detail(r)
             logger.warning(
-                "[Spotify] restart_playlist: jump to dummy playlist %s failed (%s) — aborting restart",
+                "[Spotify] restart_playlist: jump to dummy playlist %s failed (%s) — checking what actually happened",
                 dummy_playlist_id,
-                _detail(r),
+                detail,
             )
-            return False
-        await asyncio.sleep(1)
+            await asyncio.sleep(2)
+            if await self._playing_context() != dummy_uri:
+                # Playback is untouched; the rest of the dance is pointless.
+                return f"jump to dummy playlist failed ({detail})"
+            logger.warning(
+                "[Spotify] restart_playlist: failure reported, yet playback is on the dummy playlist — continuing"
+            )
+        else:
+            await asyncio.sleep(1)
 
-        # Playback is now on the dummy playlist, so we always attempt the jump
-        # back even if shuffle fails — otherwise the user is stranded there.
-        success = True
+        # Playback is now on the dummy playlist, so the jump back is always
+        # attempted even if shuffle fails — otherwise the user is stranded there.
+        problems: list[str] = []
 
         r = await self._put("https://api.spotify.com/v1/me/player/shuffle", params={"state": "true"})
-        if r is None or r.status_code not in (200, 202, 204):
-            logger.warning("[Spotify] restart_playlist: enabling shuffle failed (%s)", _detail(r))
-            success = False
+        if not _write_ok(r):
+            detail = _failure_detail(r)
+            logger.warning("[Spotify] restart_playlist: enabling shuffle failed (%s)", detail)
+            problems.append(f"shuffle not enabled ({detail})")
         await asyncio.sleep(1)
 
-        r = await self._put("https://api.spotify.com/v1/me/player/play", json={"context_uri": context_uri})
-        if r is None or r.status_code not in (200, 202, 204):
-            logger.warning("[Spotify] restart_playlist: jump back to original context failed (%s)", _detail(r))
-            success = False
+        r = await self._put(play_url, json={"context_uri": context_uri})
+        if not _write_ok(r):
+            detail = _failure_detail(r)
+            logger.warning("[Spotify] restart_playlist: jump back to original context failed (%s)", detail)
+            problems.append(f"jump back failed ({detail})")
 
-        return success
+        # Verify the jump back, whatever Spotify answered, and retry once.
+        await asyncio.sleep(2)
+        if await self._playing_context() == dummy_uri:
+            logger.warning("[Spotify] restart_playlist: still on the dummy playlist after jump back — retrying once")
+            r = await self._put(play_url, json={"context_uri": context_uri})
+            if not _write_ok(r):
+                detail = _failure_detail(r)
+                logger.warning("[Spotify] restart_playlist: second jump back failed (%s)", detail)
+                problems.append(f"second jump back failed ({detail})")
+            await asyncio.sleep(2)
+            if await self._playing_context() == dummy_uri:
+                problems.append("playback stayed on the dummy playlist")
+
+        return "; ".join(problems) or None
+
+    async def _playing_context(self) -> str | None:
+        """Context URI of what is playing right now; None when nothing plays or the read fails."""
+        r = await self._get("https://api.spotify.com/v1/me/player/currently-playing")
+        if r is None or r.status_code != 200:
+            return None
+        data = r.json() or {}
+        return (data.get("context") or {}).get("uri")
 
     async def get_all_saved_tracks(self) -> list[dict]:
         """Return all of the user's Liked Songs (paginates automatically).
