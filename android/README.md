@@ -21,10 +21,13 @@ prolaze bez čitanja hinta.
 |--------|----------|
 | Status | "Now: {pjesma} - {izvođač}", podnaslov "Skipping active"/"Skipping paused". Klik = Check Now. |
 | Check Now | `POST /api/playback/check-now` |
-| Pause / Resume Skipping | `POST /api/playback/toggle-pause`, label po `skipping_paused` |
+| Remove from Playlist | `POST /api/playback/remove-from-playlist` na jedan klik, vidi dolje. Stavke nema ako `trash_configured` nije true. |
 | Don't Skip This Song | `POST /api/playback/skip-one-pause`; label postaje "Won't skip: {pjesma}" dok izuzeće vrijedi |
 | Add / Remove Liked Songs | `POST /api/playback/toggle-like`, label po `is_liked` |
-| Remove from Playlist | `POST /api/playback/remove-from-playlist` na jedan klik, vidi dolje. Stavke nema ako `trash_configured` nije true. |
+| Pause / Resume Skipping | `POST /api/playback/toggle-pause`, label po `skipping_paused` |
+
+Redoslijed od 0.6.0 (Vatra, 2026-09-13): akcije nad trenutnom pjesmom odmah ispod Check Now, Pause
+Skipping zadnji - Remove više nije red koji prvi ispadne s dna ekrana.
 
 **Remove je jednofazan** (od 0.4.0; prije je bio dvofazan): klik odmah šalje komandu. Šalje se
 `expected_track_id` iz zadnjeg snapshota, pa server odbije s 409 ako je pjesma u međuvremenu otišla

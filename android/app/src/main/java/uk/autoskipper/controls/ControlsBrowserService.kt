@@ -193,14 +193,19 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
             icon = R.drawable.ic_check_now,
         )
 
-        items += item(
-            mediaId = CMD_TOGGLE_PAUSE,
-            title = getString(
-                if (s.skippingPaused) R.string.cmd_resume_skipping else R.string.cmd_pause_skipping,
-            ),
-            subtitle = feedbackFor(CMD_TOGGLE_PAUSE),
-            icon = if (s.skippingPaused) R.drawable.ic_resume_skipping else R.drawable.ic_pause_skipping,
-        )
+        // Row order is the driver's priority: the three actions on the song named
+        // above (Remove, Don't Skip, Like) first, the global toggle last, so Remove
+        // is never the row that falls off the bottom of the car screen.
+        // No trash playlist means a removed track has no backup copy, so the command
+        // is not offered at all rather than offered and refused.
+        if (s.trashConfigured) {
+            items += item(
+                mediaId = CMD_REMOVE,
+                title = getString(R.string.cmd_remove),
+                subtitle = feedbackFor(CMD_REMOVE),
+                icon = R.drawable.ic_remove,
+            )
+        }
 
         val exempt = s.trackId != null && s.trackId == s.skipExemptTrackId
         items += item(
@@ -222,16 +227,14 @@ class ControlsBrowserService : MediaBrowserServiceCompat() {
             icon = if (liked) R.drawable.ic_like_remove else R.drawable.ic_like_add,
         )
 
-        // No trash playlist means a removed track has no backup copy, so the command
-        // is not offered at all rather than offered and refused.
-        if (s.trashConfigured) {
-            items += item(
-                mediaId = CMD_REMOVE,
-                title = getString(R.string.cmd_remove),
-                subtitle = feedbackFor(CMD_REMOVE),
-                icon = R.drawable.ic_remove,
-            )
-        }
+        items += item(
+            mediaId = CMD_TOGGLE_PAUSE,
+            title = getString(
+                if (s.skippingPaused) R.string.cmd_resume_skipping else R.string.cmd_pause_skipping,
+            ),
+            subtitle = feedbackFor(CMD_TOGGLE_PAUSE),
+            icon = if (s.skippingPaused) R.drawable.ic_resume_skipping else R.drawable.ic_pause_skipping,
+        )
 
         return items
     }

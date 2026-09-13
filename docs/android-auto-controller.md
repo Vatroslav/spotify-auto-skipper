@@ -137,16 +137,16 @@ Nije još deployano na VPS.
 
 ### Faza 4 - puni app
 
-Browse tree (redoslijed = redoslijed u listi):
+Browse tree (redoslijed = redoslijed u listi; od app 0.6.0 Remove je treći, Pause Skipping zadnji - Vatrina odluka 2026-09-13):
 
 | # | Stavka | mediaId | Endpoint | Label logika |
 |---|--------|---------|----------|--------------|
 | 1 | Status header | `cmd:check_now` | check-now | "Now: {track} - {artist}"; bez pjesme "Nothing playing" |
 | 2 | Check Now | `cmd:check_now` | check-now | fiksno |
-| 3 | Pause Skipping | `cmd:toggle_pause` | toggle-pause | ↔ "Resume Skipping (paused)" po `skipping_paused` |
+| 3 | Remove from Playlist | `cmd:remove` | remove-from-playlist | vidi dolje; stavka postoji SAMO ako `trash_configured` |
 | 4 | Don't Skip This Song | `cmd:skip_one_pause` | skip-one-pause | nakon uspjeha "Won't skip: {track}" dok `skip_exempt_track_id` == trenutna pjesma |
 | 5 | Liked | `cmd:toggle_like` | toggle-like | "Add to Liked Songs" ↔ "Remove from Liked Songs" po `is_liked` |
-| 6 | Remove from Playlist | `cmd:remove` | remove-from-playlist | vidi dolje; stavka postoji SAMO ako `trash_configured` |
+| 6 | Pause Skipping | `cmd:toggle_pause` | toggle-pause | ↔ "Resume Skipping (paused)" po `skipping_paused` |
 
 - Ikone po stavci iz app resursa (`android.resource://` URI u MediaDescription).
   Postojeći brand asset (favicon) kao baza - ne izmišljati novi dizajn (memory feedback).
