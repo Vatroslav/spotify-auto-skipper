@@ -15,10 +15,10 @@ logger = logging.getLogger(__name__)
 LASTFM_DELAY = 0.25  # seconds between Last.fm calls (~4 req/s)
 LASTFM_ERROR_DELAY = 5.0  # seconds to wait after a Last.fm error
 LASTFM_MAX_RETRIES = 2  # retries per track on transient errors
-REDISCOVERY_THRESHOLD_DAYS = 60
+DEFAULT_THRESHOLD_DAYS = 60
 
 
-async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str):
+async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str, threshold_days: int):
     """
     Main rediscovery job. Runs as an asyncio task.
 
@@ -27,7 +27,7 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str):
     Phase 3: Create output playlist with qualifying tracks.
     """
     client = app_state.spotify_client
-    threshold = datetime.now(timezone.utc) - timedelta(days=REDISCOVERY_THRESHOLD_DAYS)
+    threshold = datetime.now(timezone.utc) - timedelta(days=threshold_days)
 
     try:
         # ── Phase 1: Fetch tracks ────────────────────────────
@@ -128,7 +128,7 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str):
                 "phase": "done",
                 "current": len(all_tracks),
                 "total": len(all_tracks),
-                "message": f"Done. No tracks older than {REDISCOVERY_THRESHOLD_DAYS} days found.",
+                "message": f"Done. No tracks older than {threshold_days} days found.",
             }
             return
 
@@ -143,7 +143,7 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str):
 
         new_playlist = await client.create_playlist(
             name=playlist_name,
-            description=f"Rediscovery: {len(qualifying)} tracks not listened to in {REDISCOVERY_THRESHOLD_DAYS}+ days",
+            description=f"Rediscovery: {len(qualifying)} tracks not listened to in {threshold_days}+ days",
         )
         if not new_playlist:
             app_state.rediscovery_status = "failed"
@@ -157,17 +157,24 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str):
             app_state.rediscovery_progress["message"] = "Failed to add tracks to playlist."
             return
 
+        # Never-scrobbled tracks qualify at any threshold, so report them apart
+        # from the ones that really aged past it.
+        never_scrobbled = sum(1 for t in qualifying if t["last_played"] is None)
+        message = (
+            f"Done! {len(qualifying)} tracks added to '{playlist_name}': "
+            f"{len(qualifying) - never_scrobbled} last heard {threshold_days}+ days ago, "
+            f"{never_scrobbled} never scrobbled."
+        )
+        if skipped_errors:
+            message += f" ({skipped_errors} skipped due to errors)"
+
         app_state.rediscovery_playlist_url = new_playlist["url"]
         app_state.rediscovery_status = "completed"
         app_state.rediscovery_progress = {
             "phase": "done",
             "current": len(qualifying),
             "total": len(all_tracks),
-            "message": (
-                f"Done! {len(qualifying)} tracks added to '{playlist_name}'. ({skipped_errors} skipped due to errors)"
-                if skipped_errors
-                else f"Done! {len(qualifying)} tracks added to '{playlist_name}'."
-            ),
+            "message": message,
         }
         logger.info("[Rediscovery] Complete. Playlist URL: %s", new_playlist["url"])
 

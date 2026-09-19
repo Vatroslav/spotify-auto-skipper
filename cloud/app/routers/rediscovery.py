@@ -5,9 +5,9 @@ Rediscovery API routes.
 import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from app.rediscovery import run_rediscovery_job
+from app.rediscovery import DEFAULT_THRESHOLD_DAYS, run_rediscovery_job
 from app.routers.deps import require_auth
 from app.spotify_api import CredentialError, SpotifyAPIError
 from app.state import app_state
@@ -18,6 +18,7 @@ router = APIRouter(prefix="/api/rediscovery", tags=["rediscovery"], dependencies
 class StartRequest(BaseModel):
     playlist_id: str
     playlist_name: str
+    threshold_days: int = Field(DEFAULT_THRESHOLD_DAYS, ge=1, le=36500)
 
 
 @router.get("/playlists")
@@ -66,7 +67,7 @@ async def start_job(body: StartRequest):
 
     # Spawn background task
     app_state.rediscovery_task = asyncio.create_task(
-        run_rediscovery_job(app_state, body.playlist_id.strip(), playlist_name)
+        run_rediscovery_job(app_state, body.playlist_id.strip(), playlist_name, body.threshold_days)
     )
 
     return {"ok": True}

@@ -2,6 +2,7 @@
 
 (async function () {
     const select = document.getElementById('playlist-select');
+    const thresholdInput = document.getElementById('threshold-days');
     const nameInput = document.getElementById('playlist-name');
     const startBtn = document.getElementById('start-btn');
     const configSection = document.getElementById('config-section');
@@ -35,33 +36,44 @@
         select.innerHTML = '<option value="">Error loading playlists</option>';
     }
 
-    // ── Dropdown change ─────────────────────────────────
-    select.addEventListener('change', function () {
+    // ── Threshold + default name ────────────────────────
+    function thresholdDays() {
+        const days = parseInt(thresholdInput.value, 10);
+        return days >= 1 && days <= 36500 ? days : null;
+    }
+
+    // The threshold goes into the default name so runs at different
+    // thresholds on the same playlist don't end up with identical names.
+    function defaultName() {
         const selected = select.options[select.selectedIndex];
-        if (select.value) {
-            nameInput.placeholder = 'Rediscovery - ' + selected.textContent.replace(/ \(\d+ tracks\)$/, '');
-            startBtn.disabled = false;
-        } else {
-            nameInput.placeholder = 'Rediscovery - ...';
-            startBtn.disabled = true;
-        }
-    });
+        const source = select.value ? selected.textContent.replace(/ \(\d+ tracks\)$/, '') : '...';
+        const days = thresholdDays();
+        return 'Rediscovery' + (days ? ' ' + days + 'd+' : '') + ' - ' + source;
+    }
+
+    function refreshForm() {
+        nameInput.placeholder = defaultName();
+        startBtn.disabled = !select.value || thresholdDays() === null;
+    }
+
+    select.addEventListener('change', refreshForm);
+    thresholdInput.addEventListener('input', refreshForm);
+    refreshForm();
 
     // ── Start job ───────────────────────────────────────
     startBtn.addEventListener('click', async function () {
         const playlistId = select.value;
-        if (!playlistId) return;
+        const days = thresholdDays();
+        if (!playlistId || days === null) return;
 
-        const selected = select.options[select.selectedIndex];
-        const defaultName = 'Rediscovery - ' + selected.textContent.replace(/ \(\d+ tracks\)$/, '');
-        const playlistName = nameInput.value.trim() || defaultName;
+        const playlistName = nameInput.value.trim() || defaultName();
 
         startBtn.disabled = true;
         try {
             const r = await fetch('/api/rediscovery/start', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({playlist_id: playlistId, playlist_name: playlistName}),
+                body: JSON.stringify({playlist_id: playlistId, playlist_name: playlistName, threshold_days: days}),
             });
             if (!r.ok) {
                 const err = await r.json().catch(function () { return {}; });
@@ -97,13 +109,16 @@
     resetBtn.addEventListener('click', function () {
         resultSection.classList.add('hidden');
         configSection.classList.remove('hidden');
-        startBtn.disabled = !select.value;
+        refreshForm();
         progressBar.style.width = '0%';
     });
 
     // ── Poll status ─────────────────────────────────────
     function startPolling() {
         if (pollInterval) clearInterval(pollInterval);
+        // Cancel disables itself; re-arm it for this run, or a second run
+        // after a cancelled one could not be cancelled.
+        cancelBtn.disabled = false;
         pollInterval = setInterval(pollStatus, 2000);
         pollStatus();
     }
@@ -147,7 +162,7 @@
                 pollInterval = null;
                 progressSection.classList.add('hidden');
                 configSection.classList.remove('hidden');
-                startBtn.disabled = !select.value;
+                refreshForm();
             }
         } catch (e) {
             // Network error, keep polling
