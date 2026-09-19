@@ -132,6 +132,16 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str, t
             }
             return
 
+        # Never-scrobbled tracks qualify at any threshold, so report them apart
+        # from the ones that really aged past it. Built before Phase 3 so the
+        # counts survive a failed playlist write — the scan is the costly part.
+        never_scrobbled = sum(1 for t in qualifying if t["last_played"] is None)
+        breakdown = (
+            f"{len(qualifying) - never_scrobbled} last heard {threshold_days}+ days ago, "
+            f"{never_scrobbled} never scrobbled"
+        )
+        errors_note = f" ({skipped_errors} skipped due to errors)" if skipped_errors else ""
+
         # ── Phase 3: Create playlist ─────────────────────────
         app_state.rediscovery_progress = {
             "phase": "create",
@@ -145,28 +155,25 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str, t
             name=playlist_name,
             description=f"Rediscovery: {len(qualifying)} tracks not listened to in {threshold_days}+ days",
         )
-        if not new_playlist:
+        if not new_playlist or not new_playlist["id"]:
             app_state.rediscovery_status = "failed"
-            app_state.rediscovery_progress["message"] = "Failed to create Spotify playlist."
+            app_state.rediscovery_progress["message"] = (
+                f"Found {len(qualifying)} tracks ({breakdown}), "
+                f"but creating the Spotify playlist failed.{errors_note}"
+            )
             return
 
         uris = [t["uri"] for t in qualifying]
         success = await client.add_tracks_to_playlist(new_playlist["id"], uris)
         if not success:
             app_state.rediscovery_status = "failed"
-            app_state.rediscovery_progress["message"] = "Failed to add tracks to playlist."
+            app_state.rediscovery_progress["message"] = (
+                f"Found {len(qualifying)} tracks ({breakdown}), "
+                f"but adding them to '{playlist_name}' failed.{errors_note}"
+            )
             return
 
-        # Never-scrobbled tracks qualify at any threshold, so report them apart
-        # from the ones that really aged past it.
-        never_scrobbled = sum(1 for t in qualifying if t["last_played"] is None)
-        message = (
-            f"Done! {len(qualifying)} tracks added to '{playlist_name}': "
-            f"{len(qualifying) - never_scrobbled} last heard {threshold_days}+ days ago, "
-            f"{never_scrobbled} never scrobbled."
-        )
-        if skipped_errors:
-            message += f" ({skipped_errors} skipped due to errors)"
+        message = f"Done! {len(qualifying)} tracks added to '{playlist_name}': {breakdown}.{errors_note}"
 
         app_state.rediscovery_playlist_url = new_playlist["url"]
         app_state.rediscovery_status = "completed"
