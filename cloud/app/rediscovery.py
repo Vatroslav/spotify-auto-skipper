@@ -4,9 +4,9 @@ and creates playlists with tracks not listened to recently.
 
 Several thresholds give exclusive buckets: each track lands only in the highest
 threshold it has passed (thresholds 100, 500, 1000 → a track last heard 678
-days ago goes to "500-999 days" only). Never-scrobbled tracks get their own
-bucket instead of joining the oldest one, where mapping failures (Spotify and
-Last.fm naming a track differently) would pass for real old songs.
+days ago goes to "500-999 days" only). Never-scrobbled tracks go into the
+highest bucket, but are counted apart in the summary: some of them are mapping
+failures (Spotify and Last.fm naming a track differently), not old songs.
 """
 
 import asyncio
@@ -25,8 +25,8 @@ DEFAULT_THRESHOLD_DAYS = 60
 MAX_THRESHOLDS = 5
 
 
-def _build_buckets(thresholds_days: list[int]) -> tuple[list[dict], dict]:
-    """Return (threshold buckets ascending, never-scrobbled bucket)."""
+def _build_buckets(thresholds_days: list[int]) -> list[dict]:
+    """Return one bucket per threshold, ascending."""
     now = datetime.now(timezone.utc)
     buckets = []
     for i, days in enumerate(thresholds_days):
@@ -38,8 +38,7 @@ def _build_buckets(thresholds_days: list[int]) -> tuple[list[dict], dict]:
                 "tracks": [],
             }
         )
-    never = {"label": "never scrobbled", "cutoff": None, "tracks": []}
-    return buckets, never
+    return buckets
 
 
 async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str, thresholds_days: list[int]):
@@ -51,7 +50,8 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str, t
     Phase 3: Create one output playlist per non-empty bucket.
     """
     client = app_state.spotify_client
-    buckets, never = _build_buckets(thresholds_days)
+    buckets = _build_buckets(thresholds_days)
+    highest = buckets[-1]
 
     try:
         # ── Phase 1: Fetch tracks ────────────────────────────
@@ -93,6 +93,7 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str, t
 
         qualifying = []
         skipped_errors = 0
+        never_scrobbled = 0
 
         for i, track in enumerate(all_tracks):
             # Check for cancellation
@@ -117,7 +118,8 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str, t
                 skipped_errors += 1
             else:
                 if result is None:
-                    bucket = never
+                    bucket = highest
+                    never_scrobbled += 1
                 else:
                     # Cutoffs fall as thresholds rise, so the last bucket whose
                     # cutoff the scrobble predates is the highest one it passed.
@@ -155,8 +157,9 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str, t
 
         # Built before Phase 3 so the counts survive a failed playlist write —
         # the scan is the costly part.
-        all_buckets = buckets + [never]
-        summary = ", ".join(f"{b['label']}: {len(b['tracks'])}" for b in all_buckets)
+        summary = ", ".join(f"{b['label']}: {len(b['tracks'])}" for b in buckets)
+        if never_scrobbled:
+            summary += f" (of which {never_scrobbled} never scrobbled, in {highest['label']})"
         errors_note = f" ({skipped_errors} skipped due to errors)" if skipped_errors else ""
 
         if not qualifying:
@@ -170,7 +173,7 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str, t
             return
 
         # ── Phase 3: Create playlists ────────────────────────
-        to_create = [b for b in all_buckets if b["tracks"]]
+        to_create = [b for b in buckets if b["tracks"]]
         app_state.rediscovery_progress = {
             "phase": "create",
             "current": 0,
@@ -187,8 +190,8 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str, t
             app_state.rediscovery_progress["current"] = n - 1
             app_state.rediscovery_progress["message"] = f"Creating '{name}' with {count} tracks..."
             description = (
-                f"Rediscovery: {count} tracks never scrobbled on Last.fm"
-                if b is never
+                f"Rediscovery: {count} tracks last heard {b['label']} ago or never scrobbled"
+                if b is highest and never_scrobbled
                 else f"Rediscovery: {count} tracks last heard {b['label']} ago"
             )
 
