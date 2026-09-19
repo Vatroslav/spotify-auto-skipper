@@ -521,12 +521,17 @@ class SpotifyClient:
         fetch error for the end of the list (which would silently truncate a
         Rediscovery scan).
         """
+        # market=from_token turns on track relinking for the user's country:
+        # a track with no playable version there comes back with
+        # is_playable=false. A relinked track comes back as its playable
+        # version, with the original in linked_from.
         r = await self._get(
             f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks",
             params={
                 "limit": limit,
                 "offset": offset,
-                "fields": "total,items(track(id,name,uri,artists(name)))",
+                "market": "from_token",
+                "fields": "total,items(track(id,name,uri,is_playable,linked_from(id,uri),artists(name)))",
             },
         )
         if r is None or r.status_code != 200:
@@ -538,12 +543,17 @@ class SpotifyClient:
             if not track or not track.get("id"):
                 continue
             artists = track.get("artists") or []
+            # Keep the original id/uri, as before relinking was on: aliases
+            # are keyed by the id that is actually in the playlist.
+            original = track.get("linked_from") or {}
             items.append(
                 {
-                    "id": track["id"],
+                    "id": original.get("id") or track["id"],
                     "name": track.get("name", ""),
-                    "uri": track.get("uri", ""),
+                    "uri": original.get("uri") or track.get("uri", ""),
                     "artist": artists[0]["name"] if artists else "Unknown",
+                    # None when Spotify sent no availability info; only False means unavailable.
+                    "is_playable": track.get("is_playable"),
                 }
             )
         return {"items": items, "total": data.get("total", 0)}
@@ -628,23 +638,22 @@ class SpotifyClient:
         return out
 
     async def create_playlist(self, name: str, description: str = "", public: bool = False) -> dict | None:
-        """Create a new playlist. Returns {id, url} or None."""
-        # Need user ID first
-        r = await self._get("https://api.spotify.com/v1/me")
-        if r is None or r.status_code != 200:
-            return None
-        user_id = r.json().get("id")
-        if not user_id:
-            return None
-
+        """Create a new playlist for the current user. Returns {id, url} or None."""
+        # /me/playlists, not /users/{id}/playlists: Spotify removed the latter
+        # for Development Mode apps in the February 2026 Web API changes, and
+        # it answers 403 "You cannot create a playlist for another user".
         r = await self._request(
             "POST",
-            f"https://api.spotify.com/v1/users/{user_id}/playlists",
+            "https://api.spotify.com/v1/me/playlists",
             json={"name": name, "description": description, "public": public},
         )
         if r is None or r.status_code not in (200, 201):
+            logger.warning(
+                "[Spotify] Create playlist failed (%s)",
+                "network error" if r is None else f"HTTP {r.status_code}: {r.text[:200]}",
+            )
             return None
-        data = r.json()
+        data = r.json() or {}
         return {
             "id": data.get("id"),
             "url": (data.get("external_urls") or {}).get("spotify", ""),
@@ -660,6 +669,11 @@ class SpotifyClient:
                 json={"uris": batch},
             )
             if r is None or r.status_code not in (200, 201):
+                logger.warning(
+                    "[Spotify] Add tracks to playlist failed at offset %d (%s)",
+                    i,
+                    "network error" if r is None else f"HTTP {r.status_code}: {r.text[:200]}",
+                )
                 return False
         return True
 

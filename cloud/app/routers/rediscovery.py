@@ -3,11 +3,12 @@ Rediscovery API routes.
 """
 
 import asyncio
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from app.rediscovery import run_rediscovery_job
+from app.rediscovery import DEFAULT_THRESHOLD_DAYS, MAX_THRESHOLDS, run_rediscovery_job
 from app.routers.deps import require_auth
 from app.spotify_api import CredentialError, SpotifyAPIError
 from app.state import app_state
@@ -18,6 +19,9 @@ router = APIRouter(prefix="/api/rediscovery", tags=["rediscovery"], dependencies
 class StartRequest(BaseModel):
     playlist_id: str
     playlist_name: str
+    thresholds_days: list[Annotated[int, Field(ge=1, le=36500)]] = Field(
+        default_factory=lambda: [DEFAULT_THRESHOLD_DAYS], min_length=1, max_length=MAX_THRESHOLDS
+    )
 
 
 @router.get("/playlists")
@@ -41,7 +45,7 @@ async def get_status():
     return {
         "status": app_state.rediscovery_status,
         "progress": app_state.rediscovery_progress,
-        "playlist_url": app_state.rediscovery_playlist_url,
+        "playlists": app_state.rediscovery_playlists,
         "result_count": len(app_state.rediscovery_results),
     }
 
@@ -60,13 +64,13 @@ async def start_job(body: StartRequest):
 
     # Reset state
     app_state.rediscovery_results = []
-    app_state.rediscovery_playlist_url = None
+    app_state.rediscovery_playlists = []
     app_state.rediscovery_status = "running"
     app_state.rediscovery_progress = {}
 
     # Spawn background task
     app_state.rediscovery_task = asyncio.create_task(
-        run_rediscovery_job(app_state, body.playlist_id.strip(), playlist_name)
+        run_rediscovery_job(app_state, body.playlist_id.strip(), playlist_name, sorted(set(body.thresholds_days)))
     )
 
     return {"ok": True}

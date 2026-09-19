@@ -2,7 +2,9 @@
 
 (async function () {
     const select = document.getElementById('playlist-select');
+    const thresholdInput = document.getElementById('threshold-days');
     const nameInput = document.getElementById('playlist-name');
+    const namePreview = document.getElementById('name-preview');
     const startBtn = document.getElementById('start-btn');
     const configSection = document.getElementById('config-section');
     const progressSection = document.getElementById('progress-section');
@@ -12,7 +14,7 @@
     const cancelBtn = document.getElementById('cancel-btn');
     const resultSection = document.getElementById('result-section');
     const resultMessage = document.getElementById('result-message');
-    const resultLink = document.getElementById('result-link');
+    const resultLinks = document.getElementById('result-links');
     const resetBtn = document.getElementById('reset-btn');
 
     let pollInterval = null;
@@ -35,33 +37,75 @@
         select.innerHTML = '<option value="">Error loading playlists</option>';
     }
 
-    // ── Dropdown change ─────────────────────────────────
-    select.addEventListener('change', function () {
-        const selected = select.options[select.selectedIndex];
-        if (select.value) {
-            nameInput.placeholder = 'Rediscovery - ' + selected.textContent.replace(/ \(\d+ tracks\)$/, '');
-            startBtn.disabled = false;
-        } else {
-            nameInput.placeholder = 'Rediscovery - ...';
-            startBtn.disabled = true;
+    // ── Thresholds + default name ───────────────────────
+    // "100, 500 1000" → [100, 500, 1000]; null if any part is invalid.
+    function thresholdsDays() {
+        const parts = thresholdInput.value.split(/[\s,;]+/).filter(Boolean);
+        if (parts.length === 0) return null;
+        const days = [];
+        for (const part of parts) {
+            if (!/^\d+$/.test(part)) return null;
+            const n = parseInt(part, 10);
+            if (n < 1 || n > 36500) return null;
+            if (!days.includes(n)) days.push(n);
         }
-    });
+        if (days.length > 5) return null;
+        return days.sort(function (a, b) { return a - b; });
+    }
+
+    // Each created playlist gets its bucket appended, e.g. "(500-999 days)".
+    function defaultName() {
+        const selected = select.options[select.selectedIndex];
+        const source = select.value ? selected.textContent.replace(/ \(\d+ tracks\)$/, '') : '...';
+        return 'Rediscovery - ' + source;
+    }
+
+    // Same labels as _build_buckets in rediscovery.py.
+    function bucketLabels(days) {
+        return days.map(function (d, i) {
+            return i + 1 < days.length ? d + '-' + (days[i + 1] - 1) + ' days' : d + '+ days';
+        });
+    }
+
+    function refreshForm() {
+        nameInput.placeholder = defaultName();
+        const days = thresholdsDays();
+        startBtn.disabled = !select.value || days === null;
+
+        namePreview.innerHTML = '';
+        if (days === null) return;
+        const base = nameInput.value.trim() || defaultName();
+        const intro = document.createElement('div');
+        intro.textContent = days.length > 1
+            ? 'Creates up to ' + days.length + ' playlists (one per threshold that has songs):'
+            : 'Creates:';
+        namePreview.appendChild(intro);
+        for (const label of bucketLabels(days)) {
+            const line = document.createElement('div');
+            line.textContent = base + ' (' + label + ')';
+            namePreview.appendChild(line);
+        }
+    }
+
+    select.addEventListener('change', refreshForm);
+    thresholdInput.addEventListener('input', refreshForm);
+    nameInput.addEventListener('input', refreshForm);
+    refreshForm();
 
     // ── Start job ───────────────────────────────────────
     startBtn.addEventListener('click', async function () {
         const playlistId = select.value;
-        if (!playlistId) return;
+        const days = thresholdsDays();
+        if (!playlistId || days === null) return;
 
-        const selected = select.options[select.selectedIndex];
-        const defaultName = 'Rediscovery - ' + selected.textContent.replace(/ \(\d+ tracks\)$/, '');
-        const playlistName = nameInput.value.trim() || defaultName;
+        const playlistName = nameInput.value.trim() || defaultName();
 
         startBtn.disabled = true;
         try {
             const r = await fetch('/api/rediscovery/start', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({playlist_id: playlistId, playlist_name: playlistName}),
+                body: JSON.stringify({playlist_id: playlistId, playlist_name: playlistName, thresholds_days: days}),
             });
             if (!r.ok) {
                 const err = await r.json().catch(function () { return {}; });
@@ -97,13 +141,16 @@
     resetBtn.addEventListener('click', function () {
         resultSection.classList.add('hidden');
         configSection.classList.remove('hidden');
-        startBtn.disabled = !select.value;
+        refreshForm();
         progressBar.style.width = '0%';
     });
 
     // ── Poll status ─────────────────────────────────────
     function startPolling() {
         if (pollInterval) clearInterval(pollInterval);
+        // Cancel disables itself; re-arm it for this run, or a second run
+        // after a cancelled one could not be cancelled.
+        cancelBtn.disabled = false;
         pollInterval = setInterval(pollStatus, 2000);
         pollStatus();
     }
@@ -133,11 +180,14 @@
                 resultSection.classList.remove('hidden');
                 resultMessage.textContent = progress.message || 'Done.';
 
-                if (data.status === 'completed' && data.playlist_url) {
-                    resultLink.href = data.playlist_url;
-                    resultLink.classList.remove('hidden');
-                } else {
-                    resultLink.classList.add('hidden');
+                resultLinks.innerHTML = '';
+                for (const p of data.playlists || []) {
+                    const a = document.createElement('a');
+                    a.href = p.url;
+                    a.target = '_blank';
+                    a.className = 'btn btn-accent btn-full mt-8';
+                    a.textContent = 'Open ' + p.label + ' (' + p.count + ' tracks)';
+                    resultLinks.appendChild(a);
                 }
             }
 
@@ -147,7 +197,7 @@
                 pollInterval = null;
                 progressSection.classList.add('hidden');
                 configSection.classList.remove('hidden');
-                startBtn.disabled = !select.value;
+                refreshForm();
             }
         } catch (e) {
             // Network error, keep polling
