@@ -82,20 +82,32 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str, t
             app_state.rediscovery_progress["message"] = "No tracks found in playlist."
             return
 
+        # Tracks Spotify won't play in the user's country can never have been
+        # scrobbled, so they'd all land in the highest bucket as "never
+        # scrobbled". Drop them before spending Last.fm calls on them.
+        to_check = [t for t in all_tracks if t["is_playable"] is not False]
+        unavailable = len(all_tracks) - len(to_check)
+        if any(t["is_playable"] is not None for t in all_tracks):
+            unavailable_note = f" {unavailable} unavailable on Spotify skipped."
+        else:
+            # Relinking info missing entirely: say so rather than claim 0.
+            unavailable_note = " Spotify sent no availability info, so unavailable tracks were not skipped."
+            logger.warning("[Rediscovery] No is_playable in playlist tracks; unavailable tracks not filtered")
+
         # ── Phase 2: Check Last.fm ───────────────────────────
         app_state.rediscovery_progress = {
             "phase": "check",
             "current": 0,
-            "total": len(all_tracks),
-            "message": f"Checking Last.fm... 0/{len(all_tracks)}",
+            "total": len(to_check),
+            "message": f"Checking Last.fm... 0/{len(to_check)}",
         }
-        logger.info("[Rediscovery] Phase 2: checking %d tracks against Last.fm", len(all_tracks))
+        logger.info("[Rediscovery] Phase 2: checking %d tracks against Last.fm", len(to_check))
 
         qualifying = []
         skipped_errors = 0
         never_scrobbled = 0
 
-        for i, track in enumerate(all_tracks):
+        for i, track in enumerate(to_check):
             # Check for cancellation
             if asyncio.current_task().cancelled():
                 raise asyncio.CancelledError()
@@ -141,7 +153,7 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str, t
             # Update progress every track
             app_state.rediscovery_progress["current"] = i + 1
             app_state.rediscovery_progress["message"] = (
-                f"Checking Last.fm... {i + 1}/{len(all_tracks)} | Found: {len(qualifying)}"
+                f"Checking Last.fm... {i + 1}/{len(to_check)} | Found: {len(qualifying)}"
             )
 
             # Throttle
@@ -160,15 +172,15 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str, t
         summary = ", ".join(f"{b['label']}: {len(b['tracks'])}" for b in buckets)
         if never_scrobbled:
             summary += f" (of which {never_scrobbled} never scrobbled, in {highest['label']})"
-        errors_note = f" ({skipped_errors} skipped due to errors)" if skipped_errors else ""
+        notes = unavailable_note + (f" {skipped_errors} skipped due to Last.fm errors." if skipped_errors else "")
 
         if not qualifying:
             app_state.rediscovery_status = "completed"
             app_state.rediscovery_progress = {
                 "phase": "done",
-                "current": len(all_tracks),
-                "total": len(all_tracks),
-                "message": f"Done. No tracks qualified ({summary}).{errors_note}",
+                "current": len(to_check),
+                "total": len(to_check),
+                "message": f"Done. No tracks qualified ({summary}).{notes}",
             }
             return
 
@@ -206,9 +218,9 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str, t
 
         app_state.rediscovery_playlists = created
         if failed:
-            message = f"Found {summary}. Spotify failed for: {'; '.join(failed)}.{errors_note}"
+            message = f"Found {summary}. Spotify failed for: {'; '.join(failed)}.{notes}"
         else:
-            message = f"Done! Created {len(created)} playlist(s): {summary}.{errors_note}"
+            message = f"Done! Created {len(created)} playlist(s): {summary}.{notes}"
 
         # Partial success still counts as completed so the created ones get links.
         app_state.rediscovery_status = "completed" if created else "failed"
