@@ -3,7 +3,7 @@
 {% block content %}
 <div class="container">
     <h1 class="page-title">Rediscovery</h1>
-    <p class="text-secondary mb-16">Find songs in a playlist you haven't listened to in a while and create a new playlist with them.</p>
+    <p class="text-secondary mb-16">Find songs in a playlist you haven't listened to in a while and create new playlists with them.</p>
 
     <div id="config-section" class="card">
         <div class="card-title">Source Playlist</div>
@@ -22,6 +22,7 @@
         <div class="form-group">
             <label for="playlist-name">Output playlist name</label>
             <input type="text" id="playlist-name" placeholder="Rediscovery - ...">
+            <div id="name-preview" class="help-text"></div>
         </div>
 
         <button id="start-btn" class="btn btn-accent btn-full mt-8" disabled>Start</button>

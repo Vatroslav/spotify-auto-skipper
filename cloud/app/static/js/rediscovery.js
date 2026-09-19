@@ -4,6 +4,7 @@
     const select = document.getElementById('playlist-select');
     const thresholdInput = document.getElementById('threshold-days');
     const nameInput = document.getElementById('playlist-name');
+    const namePreview = document.getElementById('name-preview');
     const startBtn = document.getElementById('start-btn');
     const configSection = document.getElementById('config-section');
     const progressSection = document.getElementById('progress-section');
@@ -59,13 +60,36 @@
         return 'Rediscovery - ' + source;
     }
 
+    // Same labels as _build_buckets in rediscovery.py.
+    function bucketLabels(days) {
+        return days.map(function (d, i) {
+            return i + 1 < days.length ? d + '-' + (days[i + 1] - 1) + ' days' : d + '+ days';
+        });
+    }
+
     function refreshForm() {
         nameInput.placeholder = defaultName();
-        startBtn.disabled = !select.value || thresholdsDays() === null;
+        const days = thresholdsDays();
+        startBtn.disabled = !select.value || days === null;
+
+        namePreview.innerHTML = '';
+        if (days === null) return;
+        const base = nameInput.value.trim() || defaultName();
+        const intro = document.createElement('div');
+        intro.textContent = days.length > 1
+            ? 'Creates up to ' + days.length + ' playlists (one per threshold that has songs):'
+            : 'Creates:';
+        namePreview.appendChild(intro);
+        for (const label of bucketLabels(days)) {
+            const line = document.createElement('div');
+            line.textContent = base + ' (' + label + ')';
+            namePreview.appendChild(line);
+        }
     }
 
     select.addEventListener('change', refreshForm);
     thresholdInput.addEventListener('input', refreshForm);
+    nameInput.addEventListener('input', refreshForm);
     refreshForm();
 
     // ── Start job ───────────────────────────────────────
