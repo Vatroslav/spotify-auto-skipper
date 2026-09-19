@@ -44,7 +44,7 @@ class AppState:
         self.rediscovery_status: str = "idle"  # idle/running/completed/failed
         self.rediscovery_progress: dict = {}  # {phase, current, total, message}
         self.rediscovery_results: list = []  # track dicts that passed filter
-        self.rediscovery_playlist_url: str | None = None
+        self.rediscovery_playlists: list = []  # [{label, name, count, url}] per created playlist
 
     def restart_worker_if_dead(self):
         """Restart the polling loop if it has stopped (e.g. after CredentialError)."""

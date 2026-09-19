@@ -13,7 +13,7 @@
     const cancelBtn = document.getElementById('cancel-btn');
     const resultSection = document.getElementById('result-section');
     const resultMessage = document.getElementById('result-message');
-    const resultLink = document.getElementById('result-link');
+    const resultLinks = document.getElementById('result-links');
     const resetBtn = document.getElementById('reset-btn');
 
     let pollInterval = null;
@@ -36,24 +36,32 @@
         select.innerHTML = '<option value="">Error loading playlists</option>';
     }
 
-    // ── Threshold + default name ────────────────────────
-    function thresholdDays() {
-        const days = parseInt(thresholdInput.value, 10);
-        return days >= 1 && days <= 36500 ? days : null;
+    // ── Thresholds + default name ───────────────────────
+    // "100, 500 1000" → [100, 500, 1000]; null if any part is invalid.
+    function thresholdsDays() {
+        const parts = thresholdInput.value.split(/[\s,;]+/).filter(Boolean);
+        if (parts.length === 0) return null;
+        const days = [];
+        for (const part of parts) {
+            if (!/^\d+$/.test(part)) return null;
+            const n = parseInt(part, 10);
+            if (n < 1 || n > 36500) return null;
+            if (!days.includes(n)) days.push(n);
+        }
+        if (days.length > 5) return null;
+        return days.sort(function (a, b) { return a - b; });
     }
 
-    // The threshold goes into the default name so runs at different
-    // thresholds on the same playlist don't end up with identical names.
+    // Each created playlist gets its bucket appended, e.g. "(500-999 days)".
     function defaultName() {
         const selected = select.options[select.selectedIndex];
         const source = select.value ? selected.textContent.replace(/ \(\d+ tracks\)$/, '') : '...';
-        const days = thresholdDays();
-        return 'Rediscovery' + (days ? ' ' + days + 'd+' : '') + ' - ' + source;
+        return 'Rediscovery - ' + source;
     }
 
     function refreshForm() {
         nameInput.placeholder = defaultName();
-        startBtn.disabled = !select.value || thresholdDays() === null;
+        startBtn.disabled = !select.value || thresholdsDays() === null;
     }
 
     select.addEventListener('change', refreshForm);
@@ -63,7 +71,7 @@
     // ── Start job ───────────────────────────────────────
     startBtn.addEventListener('click', async function () {
         const playlistId = select.value;
-        const days = thresholdDays();
+        const days = thresholdsDays();
         if (!playlistId || days === null) return;
 
         const playlistName = nameInput.value.trim() || defaultName();
@@ -73,7 +81,7 @@
             const r = await fetch('/api/rediscovery/start', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({playlist_id: playlistId, playlist_name: playlistName, threshold_days: days}),
+                body: JSON.stringify({playlist_id: playlistId, playlist_name: playlistName, thresholds_days: days}),
             });
             if (!r.ok) {
                 const err = await r.json().catch(function () { return {}; });
@@ -148,11 +156,14 @@
                 resultSection.classList.remove('hidden');
                 resultMessage.textContent = progress.message || 'Done.';
 
-                if (data.status === 'completed' && data.playlist_url) {
-                    resultLink.href = data.playlist_url;
-                    resultLink.classList.remove('hidden');
-                } else {
-                    resultLink.classList.add('hidden');
+                resultLinks.innerHTML = '';
+                for (const p of data.playlists || []) {
+                    const a = document.createElement('a');
+                    a.href = p.url;
+                    a.target = '_blank';
+                    a.className = 'btn btn-accent btn-full mt-8';
+                    a.textContent = 'Open ' + p.label + ' (' + p.count + ' tracks)';
+                    resultLinks.appendChild(a);
                 }
             }
 

@@ -15,8 +15,8 @@
 
         <div class="form-group">
             <label for="threshold-days">Not listened to in at least (days)</label>
-            <input type="number" id="threshold-days" value="60" min="1" max="36500" step="1">
-            <div class="help-text">Songs never scrobbled are always included.</div>
+            <input type="text" id="threshold-days" value="60" placeholder="e.g. 100, 500, 1000" inputmode="numeric">
+            <div class="help-text">Up to 5 thresholds, one playlist each. A song goes only into the highest threshold it has passed (with 100, 500, 1000, a song last heard 678 days ago lands in 500-999). Songs never scrobbled get their own playlist.</div>
         </div>
 
         <div class="form-group">
@@ -40,7 +40,7 @@
     <div id="result-section" class="card mt-16 hidden">
         <div class="card-title">Done</div>
         <div id="result-message" class="text-secondary"></div>
-        <a id="result-link" href="#" target="_blank" class="btn btn-accent btn-full mt-8 hidden">Open playlist on Spotify</a>
+        <div id="result-links"></div>
         <button id="reset-btn" class="btn btn-full mt-8">Start new</button>
     </div>
 </div>
