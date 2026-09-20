@@ -14,6 +14,7 @@
     --accent-hover: #1ed760;
     --color-success: #4ade80;
     --color-warning: #fb923c;
+    --color-warning-hover: #fdba74;
     --color-error: #f87171;
     --remove-hover: #ff4444;
 }
@@ -201,6 +202,17 @@ a:hover { color: var(--accent-hover); }
 }
 
 .btn-accent:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+/* Same amber as the "Skipping Paused" badge — the button that undoes that
+   state carries the state's colour, so a paused skipper is visible at a glance. */
+.btn-warning {
+    background: var(--color-warning);
+    border-color: var(--color-warning);
+    color: #000;
+    font-weight: 500;
+}
+
+.btn-warning:hover { background: var(--color-warning-hover); border-color: var(--color-warning-hover); }
 
 .btn-danger {
     border-color: var(--remove-hover);
