@@ -149,6 +149,17 @@ CREATE TABLE IF NOT EXISTS lyrics_cache (
     fetched_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Which source playlist a Rediscovery output playlist was built from. Written
+-- when the job creates the playlist, read by the manual remove: removing a song
+-- while a Rediscovery playlist plays also removes it from the playlist it was
+-- drawn from, so the next scan can't serve it again.
+CREATE TABLE IF NOT EXISTS rediscovery_links (
+    child_playlist_id  TEXT PRIMARY KEY,
+    source_playlist_id TEXT NOT NULL,
+    source_name        TEXT NOT NULL DEFAULT '',
+    created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_track_events_timestamp ON track_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
 """
@@ -250,6 +261,21 @@ async def init_db():
                     AND a.artist = te.artist_name
                     AND a.spotify_name = te.track_name)
             """
+        )
+
+        # One-off backfill: the three Rediscovery playlists created before
+        # rediscovery_links existed (v3.27.0) carry their source only in their name.
+        # INSERT OR IGNORE, so a link the job later writes is never overwritten.
+        await db.executemany(
+            """INSERT OR IGNORE INTO rediscovery_links
+               (child_playlist_id, source_playlist_id, source_name)
+               VALUES (?, ?, ?)""",
+            [
+                # Rediscovery - Ambient mostly-Black Metal (1000+ days / 500-999 / 100-499)
+                ("6rEtrUjLSZJYmhyGKKwxLV", "2DTe0ztu8OB5c1B80pjdfc", "Ambient mostly-Black Metal"),
+                ("0x87VNgPIsAVxksR87HWkP", "2DTe0ztu8OB5c1B80pjdfc", "Ambient mostly-Black Metal"),
+                ("6akNzeuTqc1XeSmlybMMfQ", "2DTe0ztu8OB5c1B80pjdfc", "Ambient mostly-Black Metal"),
+            ],
         )
 
         await db.commit()
@@ -1470,5 +1496,48 @@ async def delete_device_token(token_id: int) -> bool:
             )
         await db.commit()
         return cursor.rowcount == 1
+    finally:
+        await db.close()
+
+
+# ── Rediscovery playlist links ───────────────────────────────────
+
+
+async def add_rediscovery_link(child_playlist_id: str, source_playlist_id: str, source_name: str = ""):
+    """Record that child_playlist_id was generated from source_playlist_id.
+
+    INSERT OR REPLACE rather than IGNORE: Spotify hands out a fresh id per
+    created playlist, so a collision means an id got reused and the newer
+    source is the right one.
+    """
+    if not child_playlist_id or not source_playlist_id:
+        return
+    db = await get_db()
+    try:
+        await db.execute(
+            """INSERT OR REPLACE INTO rediscovery_links
+               (child_playlist_id, source_playlist_id, source_name)
+               VALUES (?, ?, ?)""",
+            (child_playlist_id, source_playlist_id, source_name),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def get_rediscovery_link(child_playlist_id: str) -> dict | None:
+    """Return {source_playlist_id, source_name} for a Rediscovery playlist, else None."""
+    if not child_playlist_id:
+        return None
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT source_playlist_id, source_name FROM rediscovery_links WHERE child_playlist_id = ?",
+            (child_playlist_id,),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            return None
+        return {"source_playlist_id": row["source_playlist_id"], "source_name": row["source_name"]}
     finally:
         await db.close()

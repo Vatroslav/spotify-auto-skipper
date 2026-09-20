@@ -262,9 +262,12 @@ function initDashboard() {
                 const trackLabel = result.artist
                     ? `${result.track_name} — ${result.artist}`
                     : result.track_name;
+                // Non-empty only for a Rediscovery playlist: names the source it also left.
+                const alsoFrom = result.also_removed_from || [];
+                const scope = alsoFrom.length ? ` (+ ${alsoFrom.join(", ")})` : "";
                 const msg = result.backed_up
-                    ? `Removed: ${trackLabel}`
-                    : `Removed (no backup): ${trackLabel}`;
+                    ? `Removed: ${trackLabel}${scope}`
+                    : `Removed (no backup): ${trackLabel}${scope}`;
                 showToast(msg);
             } catch (e) {
                 showToast(e.message || "Failed", 3000, "error");

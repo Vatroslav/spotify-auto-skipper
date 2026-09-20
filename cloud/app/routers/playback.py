@@ -10,7 +10,14 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.config import load_settings
-from app.database import add_log, add_track_alias, get_lastfm_session, get_track_alias, is_reauth_required
+from app.database import (
+    add_log,
+    add_track_alias,
+    get_lastfm_session,
+    get_rediscovery_link,
+    get_track_alias,
+    is_reauth_required,
+)
 from app.lastfm_api import get_nowplaying, track_love, track_unlove
 from app.loved_sync import _normalize, _similarity
 from app.routers.deps import require_auth_or_device_token
@@ -171,6 +178,9 @@ async def remove_from_playlist(request: Request, body: RemoveFromPlaylistRequest
 
     Reproduces the AHK Ctrl+Media_Next workflow. When the caller sends
     expected_track_id and the song has moved on since, nothing is touched (409).
+
+    When the playlist is a Rediscovery output (see rediscovery_links), the track
+    is removed from the playlist it was drawn from as well.
     """
     client = app_state.spotify_client
     if not client:
@@ -228,6 +238,24 @@ async def remove_from_playlist(request: Request, body: RemoveFromPlaylistRequest
             status_code=502,
         )
 
+    # A Rediscovery playlist is a copy: the same song still sits in the playlist it
+    # was drawn from, and the next scan would serve it again. Best-effort — the
+    # removal above already happened, so a failure here is logged, not returned.
+    also_removed_from: list[str] = []
+    link = await get_rediscovery_link(playlist_id)
+    if link:
+        source_label = link["source_name"] or link["source_playlist_id"]
+        ok_source, err_source = await client.remove_tracks_from_playlist(
+            link["source_playlist_id"], [track_uri]
+        )
+        if ok_source:
+            also_removed_from.append(source_label)
+        else:
+            await add_log(
+                f"Manual remove: {track_label} left in source playlist {source_label}: {err_source}",
+                "warning",
+            )
+
     # Skip to next, then trigger an immediate check on the new track.
     # Wait 1s so Spotify propagates the new track before the worker polls —
     # otherwise /currently-playing still returns the removed track and the
@@ -237,8 +265,9 @@ async def remove_from_playlist(request: Request, body: RemoveFromPlaylistRequest
     app_state.check_now_event.set()
 
     backup_suffix = f", backed up to {trash_id}" if trash_id else ""
+    source_suffix = f" and from {', '.join(also_removed_from)}" if also_removed_from else ""
     await add_log(
-        f"Manually removed {track_label} from playlist {playlist_id}{backup_suffix}",
+        f"Manually removed {track_label} from playlist {playlist_id}{source_suffix}{backup_suffix}",
         "info",
     )
 
@@ -247,6 +276,7 @@ async def remove_from_playlist(request: Request, body: RemoveFromPlaylistRequest
         "track_name": track["name"],
         "artist": track["artist"],
         "backed_up": bool(trash_id),
+        "also_removed_from": also_removed_from,
     }
 
 
