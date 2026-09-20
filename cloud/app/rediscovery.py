@@ -13,6 +13,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
+from app.database import add_rediscovery_link
 from app.lastfm_api import LASTFM_ERROR, get_last_play_date
 from app.observability import report_exception
 
@@ -58,6 +59,10 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str, t
         app_state.rediscovery_status = "running"
         app_state.rediscovery_progress = {"phase": "fetch", "current": 0, "total": 0, "message": "Loading tracks..."}
         logger.info("[Rediscovery] Phase 1: fetching tracks from playlist %s", playlist_id)
+
+        # Source name is only for logs and the link record; the job works without it.
+        source_info = await client.get_playlist_info(playlist_id)
+        source_name = (source_info or {}).get("name", "")
 
         all_tracks = []
         offset = 0
@@ -211,6 +216,9 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str, t
             if not new_playlist or not new_playlist["id"]:
                 failed.append(f"{b['label']} (creating the playlist)")
                 continue
+            # Linked before the tracks go in: an incomplete playlist is still one
+            # the user can play, and manual removes from it should reach the source.
+            await add_rediscovery_link(new_playlist["id"], playlist_id, source_name)
             if not await client.add_tracks_to_playlist(new_playlist["id"], [t["uri"] for t in b["tracks"]]):
                 failed.append(f"{b['label']} (adding tracks - the playlist exists but is incomplete)")
                 continue
