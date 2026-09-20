@@ -263,6 +263,21 @@ async def init_db():
             """
         )
 
+        # One-off backfill: the three Rediscovery playlists created before
+        # rediscovery_links existed (v3.27.0) carry their source only in their name.
+        # INSERT OR IGNORE, so a link the job later writes is never overwritten.
+        await db.executemany(
+            """INSERT OR IGNORE INTO rediscovery_links
+               (child_playlist_id, source_playlist_id, source_name)
+               VALUES (?, ?, ?)""",
+            [
+                # Rediscovery - Ambient mostly-Black Metal (1000+ days / 500-999 / 100-499)
+                ("6rEtrUjLSZJYmhyGKKwxLV", "2DTe0ztu8OB5c1B80pjdfc", "Ambient mostly-Black Metal"),
+                ("0x87VNgPIsAVxksR87HWkP", "2DTe0ztu8OB5c1B80pjdfc", "Ambient mostly-Black Metal"),
+                ("6akNzeuTqc1XeSmlybMMfQ", "2DTe0ztu8OB5c1B80pjdfc", "Ambient mostly-Black Metal"),
+            ],
+        )
+
         await db.commit()
     finally:
         await db.close()
