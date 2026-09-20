@@ -124,6 +124,7 @@ function initDashboard() {
             // Pause button text
             if (pauseBtn) {
                 pauseBtn.textContent = data.skipping_paused ? "Resume Skipping" : "Pause Skipping";
+                pauseBtn.classList.toggle("btn-warning", data.skipping_paused);
             }
 
             // "Don't Skip This Song" button
