@@ -160,6 +160,15 @@ CREATE TABLE IF NOT EXISTS rediscovery_links (
     created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Aliases the user deleted. Mapping issues never suggests the same name for
+-- that track again, so the alias learner (app.alias_learner) can't recreate it.
+CREATE TABLE IF NOT EXISTS rejected_aliases (
+    track_id    TEXT NOT NULL,
+    lastfm_name TEXT NOT NULL,
+    rejected_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (track_id, lastfm_name)
+);
+
 CREATE INDEX IF NOT EXISTS idx_track_events_timestamp ON track_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
 """
@@ -1400,12 +1409,25 @@ def _parse_timestamp(value) -> datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
-async def get_dismissed_track_ids() -> set[str]:
-    """Every track ever dismissed from the mapping-fails view, whenever."""
+async def reject_alias(track_id: str, lastfm_name: str):
+    """Remember that the user deleted this alias, so it is never suggested again."""
     db = await get_db()
     try:
-        cursor = await db.execute("SELECT track_id FROM mapping_fail_dismissals")
-        return {row["track_id"] for row in await cursor.fetchall()}
+        await db.execute(
+            "INSERT OR IGNORE INTO rejected_aliases (track_id, lastfm_name) VALUES (?, ?)",
+            (track_id, lastfm_name),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def get_rejected_aliases() -> set[tuple[str, str]]:
+    """Every rejected alias as (track_id, lastfm_name casefolded)."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT track_id, lastfm_name FROM rejected_aliases")
+        return {(row["track_id"], row["lastfm_name"].casefold()) for row in await cursor.fetchall()}
     finally:
         await db.close()
 

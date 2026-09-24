@@ -42,7 +42,12 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 
-from app.database import get_all_track_aliases, get_mapping_fail_events, get_track_events_since
+from app.database import (
+    get_all_track_aliases,
+    get_mapping_fail_events,
+    get_rejected_aliases,
+    get_track_events_since,
+)
 from app.lastfm_api import LASTFM_ERROR, get_recent_tracks, get_track_scrobble_times
 from app.scrobble_pairing import pair_plays
 
@@ -168,11 +173,18 @@ async def _suggest_names(candidates: list[dict], since_uts: int):
     heard: dict[str, Counter] = {}
     for event, scrobble in pair_plays(await get_track_events_since(since_uts), scrobbles):
         heard.setdefault(event["track_id"], Counter())[scrobble["name"]] += 1
+    rejected = await get_rejected_aliases()
     for c in candidates:
         names = heard.get(c["track_id"], Counter()).most_common()
-        # The name already looked up is the one failing; suggesting it again helps nobody.
+        # The name already looked up is the one failing, and a rejected one was
+        # wrong; suggesting either again helps nobody.
         c["suggested_lastfm_name"] = next(
-            (name for name, _ in names if name.casefold() != c["lastfm_name"].casefold()), None
+            (
+                name
+                for name, _ in names
+                if name.casefold() != c["lastfm_name"].casefold() and (c["track_id"], name.casefold()) not in rejected
+            ),
+            None,
         )
 
 

@@ -13,10 +13,12 @@ from app.database import (
     delete_track_alias,
     dismiss_mapping_fail,
     get_cached_overall_metrics,
+    get_track_alias,
     get_track_event_dates,
     get_track_events,
     get_unconfirmed_track_aliases,
     recompute_overall_metrics,
+    reject_alias,
 )
 from app.insights import (
     compute_metrics,
@@ -135,16 +137,18 @@ async def confirm_alias_route(payload: TrackIdRequest):
 async def delete_alias_route(payload: TrackIdRequest):
     """Delete an alias by track_id.
 
-    Also dismisses the track from Mapping issues, which keeps the alias learner
-    (app.alias_learner) from storing the rejected name again.
+    The name is remembered as rejected, so Mapping issues stops suggesting it
+    and the alias learner (app.alias_learner) never stores it again.
     """
     track_id = payload.track_id.strip()
     if not track_id:
         raise HTTPException(status_code=400, detail="track_id is required")
+    lastfm_name = await get_track_alias(track_id)
     deleted = await delete_track_alias(track_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Alias not found")
-    await dismiss_mapping_fail(track_id)
+    if lastfm_name:
+        await reject_alias(track_id, lastfm_name)
     return {"ok": True}
 
 

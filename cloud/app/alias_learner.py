@@ -14,16 +14,21 @@ Across all mismatched tracks with a single play, 9 of 20 pairings were a
 different song by the same artist — those are left alone.
 
 Never touched: a track that already has an alias (confirmed or not — it is the
-user's or the Like button's call), and a track ever dismissed from Mapping
-issues. Deleting an unconfirmed alias dismisses its track too, so a rejected
-suggestion is not created again.
+user's or the Like button's call). A deleted alias is remembered as rejected
+(rejected_aliases) and never suggested again, so it can't come back.
+
+Dismiss is no veto. It only hides a track until new unexplained plays arrive,
+and the user used it when the two names looked identical; on 2026-09-24, 17
+of 18 such dismissals with plays were indeed fine. A dismissed track that
+returns with a suggestion has shown a real mismatch, so it is handled like any
+other candidate.
 """
 
 import asyncio
 import logging
 
 from app.config import load_settings
-from app.database import add_log, add_track_alias, get_dismissed_track_ids, get_track_alias
+from app.database import add_log, add_track_alias, get_track_alias
 from app.mapping_fails import get_mapping_fail_candidates
 from app.observability import report_exception
 
@@ -37,12 +42,12 @@ async def learn_aliases() -> int:
     """Store an unconfirmed alias for each eligible candidate. Returns how many were stored."""
     settings = await load_settings()
     candidates = await get_mapping_fail_candidates(settings["skip_window_days"])
-    dismissed = await get_dismissed_track_ids()
 
     stored = 0
     for c in candidates:
+        # Rejected names are already left out of the suggestion.
         name = c["suggested_lastfm_name"]
-        if not name or c["track_id"] in dismissed:
+        if not name:
             continue
         if await get_track_alias(c["track_id"], c["artist_name"], c["track_name"]):
             continue

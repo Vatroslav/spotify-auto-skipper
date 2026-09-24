@@ -925,8 +925,8 @@ function initInsights() {
                 actions.closest(".mapping-fail-meta").classList.remove("editing");
                 actions.closest(".mapping-fail-row").querySelector(".mapping-fail-hint")?.remove();
                 actions.innerHTML = `
-                    <button class="btn btn-sm mapping-fail-alias">Add alias</button>
-                    <button class="btn btn-sm mapping-fail-dismiss">Dismiss</button>
+                    <button class="btn btn-sm mapping-fail-alias" title="Tell the app which name Last.fm uses for this song">Add alias</button>
+                    <button class="btn btn-sm mapping-fail-dismiss" title="Hide from this list until the song gets new plays the app can't match. Changes nothing else.">Dismiss</button>
                 `;
                 actions.querySelector(".mapping-fail-alias").addEventListener("click", () => startAliasEdit(actions, ctx));
                 actions.querySelector(".mapping-fail-dismiss").addEventListener("click", () => doDismiss(actions, ctx));
