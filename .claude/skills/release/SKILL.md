@@ -1,6 +1,6 @@
 ---
 name: release
-description: Finalize and release a tested change - land it on main, create git tag + GitHub release, update todo. Use when the user says "release", "release it", "merge it", "ship the release", "završi", or when a change has been verified healthy on production and is ready for main. NOT for deploying during iteration - that is the /deploy skill.
+description: Finalize and release a tested change - land it on main, create git tag + GitHub release, deploy main, delete the merged branch, update todo. Use when the user says "release", "release it", "merge it", "ship the release", "završi", or when a change has been verified healthy on production and is ready for main. NOT for deploying during iteration - that is the /deploy skill.
 ---
 
 # Release a finished change
@@ -62,7 +62,19 @@ Never create the tag without the GitHub release or vice versa.
 
 Run the `/deploy` skill from main. The health check must report the target version, `worker_running: true`, `worker_alive: true`.
 
-### 6. Record it
+### 6. Delete the feature branch
+
+Once main is deployed and healthy, delete the released branch everywhere — no need to ask (user's standing instruction, 2026-09-24). Use `-d`, never `-D`: it refuses a branch that isn't merged, so nothing unmerged is ever lost.
+
+```bash
+git branch -d <branch>
+git push origin --delete <branch>
+ssh $DEPLOY_USER@$DEPLOY_HOST "cd $DEPLOY_REPO && git fetch --prune origin && git branch -d <branch>"
+```
+
+The last line clears the VPS clone, which keeps a local copy of every branch that was deployed for testing. If `-d` refuses anywhere, stop and report — do not force it.
+
+### 7. Record it
 
 Update the project memory: last known version, one-paragraph summary of what shipped and any watch-outs learned during the work.
 
@@ -71,4 +83,4 @@ Update the project memory: last known version, one-paragraph summary of what shi
 - Versioning rules (which commit types bump, hook enforcement): `~/.claude/knowledge/versioning-intent.md`.
 - Do **not** make a source-touching "Release ..." commit: a bare `Release` subject is not a conventional type and the hook will block it. The version already lives in the feature commit, so the release step touches only `docs/todo.md` and the main merge.
 - Never `git push --force` to main (branch protection is on).
-- Do not delete the feature branch without asking.
+- Delete only the released, merged branch (step 6). Any other branch still needs the user's go-ahead.
