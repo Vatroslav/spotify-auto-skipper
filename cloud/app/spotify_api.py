@@ -531,7 +531,7 @@ class SpotifyClient:
                 "limit": limit,
                 "offset": offset,
                 "market": "from_token",
-                "fields": "total,items(track(id,name,uri,is_playable,linked_from(id,uri),artists(name)))",
+                "fields": "total,items(added_at,track(id,name,uri,is_playable,linked_from(id,uri),artists(name)))",
             },
         )
         if r is None or r.status_code != 200:
@@ -554,6 +554,8 @@ class SpotifyClient:
                     "artist": artists[0]["name"] if artists else "Unknown",
                     # None when Spotify sent no availability info; only False means unavailable.
                     "is_playable": track.get("is_playable"),
+                    # ISO timestamp the track went into this playlist; None on very old playlists.
+                    "added_at": entry.get("added_at"),
                 }
             )
         return {"items": items, "total": data.get("total", 0)}

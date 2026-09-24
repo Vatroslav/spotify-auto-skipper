@@ -8,7 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.rediscovery import DEFAULT_THRESHOLD_DAYS, MAX_THRESHOLDS, run_rediscovery_job
+from app.rediscovery import DEFAULT_THRESHOLD_DAYS, MAX_THRESHOLDS, run_cleanup_job, run_rediscovery_job
 from app.routers.deps import require_auth
 from app.spotify_api import CredentialError, SpotifyAPIError
 from app.state import app_state
@@ -72,6 +72,28 @@ async def start_job(body: StartRequest):
     app_state.rediscovery_task = asyncio.create_task(
         run_rediscovery_job(app_state, body.playlist_id.strip(), playlist_name, sorted(set(body.thresholds_days)))
     )
+
+    return {"ok": True}
+
+
+@router.post("/cleanup")
+async def start_cleanup():
+    """Start removing listened and unavailable tracks from all Rediscovery playlists.
+
+    Shares the scan's job slot, status and cancel: one job at a time keeps
+    Last.fm under its rate limit.
+    """
+    if app_state.rediscovery_status == "running":
+        raise HTTPException(status_code=409, detail="A job is already running.")
+    if not app_state.spotify_client:
+        raise HTTPException(status_code=503, detail="Spotify client not ready")
+
+    app_state.rediscovery_results = []
+    app_state.rediscovery_playlists = []
+    app_state.rediscovery_status = "running"
+    app_state.rediscovery_progress = {}
+
+    app_state.rediscovery_task = asyncio.create_task(run_cleanup_job(app_state))
 
     return {"ok": True}
 

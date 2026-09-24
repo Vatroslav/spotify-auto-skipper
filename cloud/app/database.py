@@ -1541,3 +1541,16 @@ async def get_rediscovery_link(child_playlist_id: str) -> dict | None:
         return {"source_playlist_id": row["source_playlist_id"], "source_name": row["source_name"]}
     finally:
         await db.close()
+
+
+async def get_rediscovery_links() -> list[dict]:
+    """Return every Rediscovery playlist link, oldest first."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            """SELECT child_playlist_id, source_playlist_id, source_name
+               FROM rediscovery_links ORDER BY created_at, child_playlist_id"""
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+    finally:
+        await db.close()
