@@ -1543,6 +1543,23 @@ async def get_rediscovery_link(child_playlist_id: str) -> dict | None:
         await db.close()
 
 
+async def get_track_events_since(since_uts: int) -> list[dict]:
+    """Every track event from ``since_uts`` on, oldest first, with its time as unix seconds in ``uts``."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            """SELECT CAST(strftime('%s', timestamp) AS INTEGER) AS uts,
+                      track_id, track_name, artist_name, outcome
+               FROM track_events
+               WHERE timestamp >= datetime(?, 'unixepoch')
+               ORDER BY timestamp, id""",
+            (since_uts,),
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+
 async def get_rediscovery_playlist_ids() -> set[str]:
     """Return the ids of every playlist Rediscovery created."""
     db = await get_db()
