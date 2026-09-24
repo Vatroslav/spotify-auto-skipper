@@ -29,16 +29,22 @@ two passes:
 An event with a scrobble sitting next to its timestamp was that race, not a
 mapping failure, and drops out. A track with fewer than MIN_EVENTS suspicious
 events left is not a candidate at all.
+
+Each surviving candidate carries the name Last.fm scrobbled its plays under,
+found by pairing plays with scrobbles by time (app.scrobble_pairing), to
+pre-fill Add alias.
 """
 
 import asyncio
 import logging
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 
 import httpx
 
-from app.database import get_all_track_aliases, get_mapping_fail_events
+from app.database import get_all_track_aliases, get_mapping_fail_events, get_track_events_since
 from app.lastfm_api import LASTFM_ERROR, get_recent_tracks, get_track_scrobble_times
+from app.scrobble_pairing import pair_plays
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +84,7 @@ TRACK_CACHE_MAX_ENTRIES = 500
 REFRESH_LOOKBACK = timedelta(minutes=60)
 
 # Scrobbles covering [from_uts, until_uts] as (artist casefolded, name
-# casefolded, uts). Process-local, rebuilt on restart.
+# casefolded, uts, name as scrobbled). Process-local, rebuilt on restart.
 _recent: dict = {"from_uts": 0, "until_uts": 0, "scrobbles": []}
 
 # (artist, name) casefolded -> (fetched_at, covered_since_uts, uts list)
@@ -140,14 +146,34 @@ async def _recent_index(since_uts: int) -> dict[tuple[str, str], list[int]] | No
         merged = _recent["scrobbles"]
     else:
         kept = [s for s in _recent["scrobbles"] if s[2] < fetch_from] if reusable else []
-        merged = kept + [(s["artist"].casefold(), s["name"].casefold(), s["uts"]) for s in fetched]
+        merged = kept + [(s["artist"].casefold(), s["name"].casefold(), s["uts"], s["name"]) for s in fetched]
         merged = [s for s in merged if s[2] >= since_uts]  # window slid forward
         _recent.update({"from_uts": since_uts, "until_uts": now_uts, "scrobbles": merged})
 
     index: dict[tuple[str, str], list[int]] = {}
-    for artist, name, uts in merged:
+    for artist, name, uts, _ in merged:
         index.setdefault((artist, name), []).append(uts)
     return index
+
+
+async def _suggest_names(candidates: list[dict], since_uts: int):
+    """Set each candidate's ``suggested_lastfm_name``: the name Last.fm scrobbled its plays under.
+
+    Plays are paired with the scrobbles in the ``_recent`` cache by time and
+    artist (app.scrobble_pairing), so this finds the name where a name lookup
+    cannot. The most frequent one wins. A pairing can be wrong, so the name
+    only pre-fills Add alias for the user to check; None when nothing paired.
+    """
+    scrobbles = [{"artist": artist, "name": name, "uts": uts} for artist, _, uts, name in _recent["scrobbles"]]
+    heard: dict[str, Counter] = {}
+    for event, scrobble in pair_plays(await get_track_events_since(since_uts), scrobbles):
+        heard.setdefault(event["track_id"], Counter())[scrobble["name"]] += 1
+    for c in candidates:
+        names = heard.get(c["track_id"], Counter()).most_common()
+        # The name already looked up is the one failing; suggesting it again helps nobody.
+        c["suggested_lastfm_name"] = next(
+            (name for name, _ in names if name.casefold() != c["lastfm_name"].casefold()), None
+        )
 
 
 async def _track_scrobble_times(
@@ -212,6 +238,7 @@ def _as_list(groups: list[dict]) -> list[dict]:
                 "no_scrobble_count": sum(1 for _, o in events if o == "no_scrobble"),
                 "played_count": sum(1 for _, o in events if o == "played"),
                 "last_seen": max(ts for ts, _ in events).strftime("%Y-%m-%d %H:%M:%S"),
+                "suggested_lastfm_name": g.get("suggested_lastfm_name"),
             }
         )
     # Worst offenders first, then most recent. Two stable sorts, low key first.
@@ -285,4 +312,6 @@ async def get_mapping_fail_candidates(skip_window_days: int) -> list[dict]:
 
     await _per_track_pass(survivors)
 
-    return _as_list([c for c in survivors if len(c["events"]) >= MIN_EVENTS])
+    result = [c for c in survivors if len(c["events"]) >= MIN_EVENTS]
+    await _suggest_names(result, int(earliest.timestamp()))
+    return _as_list(result)

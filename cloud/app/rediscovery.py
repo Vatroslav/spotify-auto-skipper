@@ -13,13 +13,13 @@ tracks heard since they went in, and of tracks Spotify no longer plays.
 """
 
 import asyncio
-import bisect
 import logging
 from datetime import datetime, timedelta, timezone
 
 from app.database import add_rediscovery_link, get_track_events_since
 from app.lastfm_api import LASTFM_ERROR, get_last_play_date, get_recent_tracks
 from app.observability import report_exception
+from app.scrobble_pairing import PAIR_LATE, pair_plays
 
 logger = logging.getLogger(__name__)
 
@@ -258,22 +258,6 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str, t
 
 # ── Clean-up ─────────────────────────────────────────────────────
 
-# Plays are paired with scrobbles by time and artist, not by track name.
-# Rediscovery playlists gather exactly the tracks a name lookup gets wrong: one
-# that Last.fm files under another name ("Darker Days - Remastered" for
-# Spotify's "Darker Days") never looks heard, so the scan puts it in the
-# highest bucket, and a name lookup would not see it played afterwards either.
-#
-# A scrobble is stamped with the moment its track started; the worker logs its
-# track_events row once it has checked the track, a little later (on
-# production 2 s to 4 min later, median about a minute). So a scrobble belongs
-# to the earliest same-artist event logged within this window after its start.
-PAIR_EARLY = 10  # seconds an event may precede its scrobble: clock skew only
-PAIR_LATE = 1800  # the worker caught the track late: restart, un-pause, idle polling
-# The worker logs a skip after skipping, when the next track has already
-# started, so a skipped event must trail the scrobble it claims by more than that.
-SKIPPED_MIN_LAG = 30
-
 
 def _parse_added_at(value: str | None) -> datetime | None:
     """Spotify's added_at ("2026-09-19T14:03:12Z") as an aware datetime, else None."""
@@ -283,44 +267,6 @@ def _parse_added_at(value: str | None) -> datetime | None:
         return datetime.fromisoformat(value)
     except ValueError:
         return None
-
-
-def _loose(name: str) -> str:
-    """Letters and digits only, casefolded: "Darker Days - Remastered" → "darkerdaysremastered"."""
-    return "".join(ch for ch in name.casefold() if ch.isalnum())
-
-
-def _same_song(a: str, b: str) -> bool:
-    """Whether one name extends the other ("Darker Days" / "Darker Days - Remastered")."""
-    a, b = _loose(a), _loose(b)
-    return bool(a) and bool(b) and (a.startswith(b) or b.startswith(a))
-
-
-def _heard_events(events: list[dict], scrobbles: list[dict]) -> list[dict]:
-    """The worker events (oldest first) that have a Last.fm scrobble of their own.
-
-    Each scrobble, oldest first, goes to the earliest unclaimed event of the
-    same artist inside its window. When an album plays through several fit,
-    and one whose name matches the scrobble's wins.
-    """
-    times = [e["uts"] for e in events]
-    claimed = set()
-    for s in sorted(scrobbles, key=lambda s: s["uts"]):
-        artist = s["artist"].casefold()
-        fits = []
-        for i in range(bisect.bisect_left(times, s["uts"] - PAIR_EARLY), len(events)):
-            e = events[i]
-            lag = e["uts"] - s["uts"]
-            if lag > PAIR_LATE:
-                break
-            if i in claimed or e["artist_name"].casefold() != artist:
-                continue
-            if e["outcome"] == "skipped" and lag < SKIPPED_MIN_LAG:
-                continue
-            fits.append(i)
-        if fits:
-            claimed.add(next((i for i in fits if _same_song(events[i]["track_name"], s["name"])), fits[0]))
-    return [events[i] for i in sorted(claimed)]
 
 
 async def _find_listened(tracks: list[dict]) -> tuple[set[str], int] | str:
@@ -351,7 +297,7 @@ async def _find_listened(tracks: list[dict]) -> tuple[set[str], int] | str:
     # Keyed by id and by name too: the worker logs the id Spotify played, which
     # for a relinked track is not the one in the playlist.
     heard: dict = {}
-    for e in _heard_events(events, scrobbles):
+    for e, _ in pair_plays(events, scrobbles):
         for key in (e["track_id"], (e["artist_name"].casefold(), e["track_name"].casefold())):
             heard[key] = max(heard.get(key, 0), e["uts"])
 
@@ -371,8 +317,9 @@ async def run_cleanup_job(app_state, playlist_id: str, playlist_name: str):
 
     A track counts as listened when the worker logged it playing after it went
     into the playlist (Spotify's added_at) and Last.fm has a scrobble for that
-    play. The play may come from any context, not only this playlist. The
-    source playlist is not touched: a track heard again still belongs there.
+    play, paired by time rather than name (see app.scrobble_pairing). The play
+    may come from any context, not only this playlist. The source playlist is
+    not touched: a track heard again still belongs there.
 
     Phase 1: Fetch all tracks of the playlist.
     Phase 2: Pair the worker's plays with Last.fm scrobbles.

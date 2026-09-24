@@ -956,8 +956,11 @@ function initInsights() {
 
             const startAliasEdit = (actions, ctx) => {
                 actions.closest(".mapping-fail-meta").classList.add("editing");
+                // Pre-filled with the name Last.fm scrobbled this track under, when
+                // a play could be paired with a scrobble; it can be wrong, so it is
+                // only a starting point for the user to check.
                 actions.innerHTML = `
-                    <input class="mapping-fail-alias-input" type="text" value="${escapeHtml(ctx.trackName)}">
+                    <input class="mapping-fail-alias-input" type="text" value="${escapeHtml(ctx.suggestedName || ctx.trackName)}">
                     <button class="btn btn-sm mapping-fail-alias-save">Save</button>
                     <button class="btn btn-sm mapping-fail-alias-cancel">Cancel</button>
                 `;
@@ -1033,6 +1036,7 @@ function initInsights() {
                     trackId: c.track_id,
                     trackName: c.track_name,
                     artist: c.artist_name,
+                    suggestedName: c.suggested_lastfm_name,
                 };
                 const actions = row.querySelector(".mapping-fail-actions");
                 renderDefaultActions(actions, ctx);
