@@ -110,7 +110,7 @@ async def add_track_alias_route(payload: AliasRequest):
 
 @router.get("/unconfirmed-aliases")
 async def list_unconfirmed_aliases():
-    """List aliases auto-created by toggle-like that the user hasn't reviewed."""
+    """List aliases auto-created (by toggle-like or the alias learner) that the user hasn't reviewed."""
     aliases = await get_unconfirmed_track_aliases()
     return {"aliases": aliases}
 
@@ -133,13 +133,18 @@ async def confirm_alias_route(payload: TrackIdRequest):
 
 @router.post("/track-aliases/delete")
 async def delete_alias_route(payload: TrackIdRequest):
-    """Delete an alias by track_id."""
+    """Delete an alias by track_id.
+
+    Also dismisses the track from Mapping issues, which keeps the alias learner
+    (app.alias_learner) from storing the rejected name again.
+    """
     track_id = payload.track_id.strip()
     if not track_id:
         raise HTTPException(status_code=400, detail="track_id is required")
     deleted = await delete_track_alias(track_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Alias not found")
+    await dismiss_mapping_fail(track_id)
     return {"ok": True}
 
 

@@ -63,21 +63,23 @@ async def lifespan(app: FastAPI):
     # Create a single shared SpotifyClient for the entire process
     app_state.spotify_client = SpotifyClient(get_spotify_client_id(), get_spotify_client_secret())
 
+    from app.alias_learner import alias_learner_loop
     from app.worker import polling_loop, worker_supervisor
 
     app_state.worker_task = asyncio.create_task(polling_loop())
     app_state.worker_running = True
     app_state.supervisor_task = asyncio.create_task(worker_supervisor())
+    app_state.alias_learner_task = asyncio.create_task(alias_learner_loop())
 
     yield
 
     # Shutdown — stop the supervisor first so it doesn't try to restart the
     # worker we're about to cancel.
-    for task in (app_state.supervisor_task, app_state.worker_task):
+    for task in (app_state.supervisor_task, app_state.worker_task, app_state.alias_learner_task):
         if task:
             task.cancel()
     app_state.worker_running = False
-    for task in (app_state.supervisor_task, app_state.worker_task):
+    for task in (app_state.supervisor_task, app_state.worker_task, app_state.alias_learner_task):
         try:
             if task:
                 await task

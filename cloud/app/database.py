@@ -1400,6 +1400,16 @@ def _parse_timestamp(value) -> datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
+async def get_dismissed_track_ids() -> set[str]:
+    """Every track ever dismissed from the mapping-fails view, whenever."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT track_id FROM mapping_fail_dismissals")
+        return {row["track_id"] for row in await cursor.fetchall()}
+    finally:
+        await db.close()
+
+
 async def dismiss_mapping_fail(track_id: str):
     """Mark a Spotify track as dismissed from the mapping-fails view."""
     db = await get_db()
