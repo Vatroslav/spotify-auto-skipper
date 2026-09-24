@@ -27,6 +27,7 @@ class AppState:
         self.spotify_client = None  # Shared SpotifyClient, set during lifespan
         self.worker_task: asyncio.Task | None = None  # Reference to polling_loop task
         self.supervisor_task: asyncio.Task | None = None  # Watches/restarts worker on crash
+        self.alias_learner_task: asyncio.Task | None = None  # Periodic automatic aliases (app.alias_learner)
 
         # Liked-status cache for the dashboard poll. Single-entry (holds only the
         # most recently queried track_id) so it never accumulates stale ids. Avoids

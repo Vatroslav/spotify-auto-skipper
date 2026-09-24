@@ -7,15 +7,19 @@ threshold it has passed (thresholds 100, 500, 1000 → a track last heard 678
 days ago goes to "500-999 days" only). Never-scrobbled tracks go into the
 highest bucket, but are counted apart in the summary: some of them are mapping
 failures (Spotify and Last.fm naming a track differently), not old songs.
+
+The clean-up job works the other way: it empties a created playlist of
+tracks heard since they went in, and of tracks Spotify no longer plays.
 """
 
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
-from app.database import add_rediscovery_link
-from app.lastfm_api import LASTFM_ERROR, get_last_play_date
+from app.database import add_rediscovery_link, get_track_events_since
+from app.lastfm_api import LASTFM_ERROR, get_last_play_date, get_recent_tracks
 from app.observability import report_exception
+from app.scrobble_pairing import PAIR_LATE, pair_plays
 
 logger = logging.getLogger(__name__)
 
@@ -249,4 +253,158 @@ async def run_rediscovery_job(app_state, playlist_id: str, playlist_name: str, t
         app_state.rediscovery_status = "failed"
         app_state.rediscovery_progress = {"phase": "error", "message": f"Error: {e}"}
         logger.exception("[Rediscovery] Job failed: %s", e)
+        report_exception(e, component="rediscovery")
+
+
+# ── Clean-up ─────────────────────────────────────────────────────
+
+
+def _parse_added_at(value: str | None) -> datetime | None:
+    """Spotify's added_at ("2026-09-19T14:03:12Z") as an aware datetime, else None."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+async def _find_listened(tracks: list[dict]) -> tuple[set[str], int] | str:
+    """URIs of the tracks heard since they went into the playlist.
+
+    Returns (uris, tracks without an added_at), or LASTFM_ERROR when Last.fm
+    can't be reached.
+    """
+    dated = []
+    no_date = 0
+    for t in tracks:
+        added = _parse_added_at(t["added_at"])
+        if added is None:
+            no_date += 1
+        else:
+            dated.append((t, added.timestamp()))
+    if not dated:
+        return set(), no_date
+
+    # Reach back PAIR_LATE past the oldest add: a play logged after it may have
+    # started (and been scrobbled) that much earlier.
+    since = int(min(added for _, added in dated)) - PAIR_LATE
+    scrobbles = await get_recent_tracks(since, int(datetime.now(timezone.utc).timestamp()))
+    if scrobbles is LASTFM_ERROR:
+        return LASTFM_ERROR
+    events = await get_track_events_since(since)
+
+    # Keyed by id and by name too: the worker logs the id Spotify played, which
+    # for a relinked track is not the one in the playlist.
+    heard: dict = {}
+    for e, _ in pair_plays(events, scrobbles):
+        for key in (e["track_id"], (e["artist_name"].casefold(), e["track_name"].casefold())):
+            heard[key] = max(heard.get(key, 0), e["uts"])
+
+    listened = set()
+    for t, added in dated:
+        last = max(heard.get(t["id"], 0), heard.get((t["artist"].casefold(), t["name"].casefold()), 0))
+        if last > added:
+            listened.add(t["uri"])
+    return listened, no_date
+
+
+async def run_cleanup_job(app_state, playlist_id: str, playlist_name: str):
+    """
+    Clean-up job: remove listened and unavailable tracks from one Rediscovery
+    playlist. Runs in the same job slot as the scan, so only one of them runs
+    at a time.
+
+    A track counts as listened when the worker logged it playing after it went
+    into the playlist (Spotify's added_at) and Last.fm has a scrobble for that
+    play, paired by time rather than name (see app.scrobble_pairing). The play
+    may come from any context, not only this playlist. The source playlist is
+    not touched: a track heard again still belongs there.
+
+    Phase 1: Fetch all tracks of the playlist.
+    Phase 2: Pair the worker's plays with Last.fm scrobbles.
+    Phase 3: Remove the listened and unavailable tracks.
+    """
+    client = app_state.spotify_client
+
+    try:
+        # ── Phase 1: Fetch tracks ────────────────────────────
+        app_state.rediscovery_status = "running"
+        app_state.rediscovery_progress = {"phase": "fetch", "current": 0, "total": 0, "message": "Loading tracks..."}
+
+        tracks = []
+        offset = 0
+        while True:
+            page = await client.get_playlist_tracks(playlist_id, limit=100, offset=offset)
+            tracks.extend(page.get("items", []))
+            total = page.get("total", 0)
+            app_state.rediscovery_progress["current"] = len(tracks)
+            app_state.rediscovery_progress["total"] = total
+            app_state.rediscovery_progress["message"] = f"Loading tracks... {len(tracks)}/{total}"
+
+            offset += 100
+            if offset >= total:
+                break
+
+        logger.info("[Rediscovery] Clean-up: %d tracks in '%s'", len(tracks), playlist_name)
+
+        # ── Phase 2: Pair plays with scrobbles ───────────────
+        app_state.rediscovery_progress = {
+            "phase": "check",
+            "current": 0,
+            "total": 0,
+            "message": "Matching plays to Last.fm scrobbles...",
+        }
+
+        # Sets: a track in the playlist twice is one removal (Spotify drops every copy).
+        unavailable = {t["uri"] for t in tracks if t["is_playable"] is False}
+        found = await _find_listened([t for t in tracks if t["is_playable"] is not False])
+        if found is LASTFM_ERROR:
+            app_state.rediscovery_status = "failed"
+            app_state.rediscovery_progress = {
+                "phase": "error",
+                "message": "Last.fm could not be reached. Nothing was removed, try again.",
+            }
+            return
+        listened, no_date = found
+
+        notes = ""
+        if tracks and all(t["is_playable"] is None for t in tracks):
+            notes += " Spotify sent no availability info, so unavailable tracks were not removed."
+        if no_date:
+            notes += f" {no_date} kept because Spotify sent no date added."
+        counts = f"{len(listened)} listened, {len(unavailable)} unavailable"
+
+        # ── Phase 3: Remove ──────────────────────────────────
+        uris = list(listened | unavailable)
+        if uris:
+            app_state.rediscovery_progress["message"] = f"Removing {len(uris)} tracks..."
+            ok, error = await client.remove_tracks_from_playlist(playlist_id, uris)
+            if not ok:
+                logger.warning("[Rediscovery] Clean-up: removing from '%s' failed: %s", playlist_name, error)
+                app_state.rediscovery_status = "failed"
+                app_state.rediscovery_progress = {
+                    "phase": "done",
+                    "message": f"Found {counts}, but Spotify failed to remove them: {error}.{notes}",
+                }
+                return
+
+        app_state.rediscovery_status = "completed"
+        app_state.rediscovery_progress = {
+            "phase": "done",
+            "current": len(tracks),
+            "total": len(tracks),
+            "message": f"Done! Removed {len(uris)} tracks from '{playlist_name}' ({counts}).{notes}",
+        }
+        logger.info("[Rediscovery] Clean-up complete. %d removed from '%s'.", len(uris), playlist_name)
+
+    except asyncio.CancelledError:
+        app_state.rediscovery_status = "idle"
+        app_state.rediscovery_progress = {"phase": "cancelled", "message": "Cancelled."}
+        logger.info("[Rediscovery] Clean-up cancelled.")
+
+    except Exception as e:
+        app_state.rediscovery_status = "failed"
+        app_state.rediscovery_progress = {"phase": "error", "message": f"Error: {e}"}
+        logger.exception("[Rediscovery] Clean-up failed: %s", e)
         report_exception(e, component="rediscovery")

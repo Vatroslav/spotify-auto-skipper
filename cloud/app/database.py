@@ -160,6 +160,15 @@ CREATE TABLE IF NOT EXISTS rediscovery_links (
     created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Aliases the user deleted. Mapping issues never suggests the same name for
+-- that track again, so the alias learner (app.alias_learner) can't recreate it.
+CREATE TABLE IF NOT EXISTS rejected_aliases (
+    track_id    TEXT NOT NULL,
+    lastfm_name TEXT NOT NULL,
+    rejected_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (track_id, lastfm_name)
+);
+
 CREATE INDEX IF NOT EXISTS idx_track_events_timestamp ON track_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
 """
@@ -1400,6 +1409,29 @@ def _parse_timestamp(value) -> datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
+async def reject_alias(track_id: str, lastfm_name: str):
+    """Remember that the user deleted this alias, so it is never suggested again."""
+    db = await get_db()
+    try:
+        await db.execute(
+            "INSERT OR IGNORE INTO rejected_aliases (track_id, lastfm_name) VALUES (?, ?)",
+            (track_id, lastfm_name),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def get_rejected_aliases() -> set[tuple[str, str]]:
+    """Every rejected alias as (track_id, lastfm_name casefolded)."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT track_id, lastfm_name FROM rejected_aliases")
+        return {(row["track_id"], row["lastfm_name"].casefold()) for row in await cursor.fetchall()}
+    finally:
+        await db.close()
+
+
 async def dismiss_mapping_fail(track_id: str):
     """Mark a Spotify track as dismissed from the mapping-fails view."""
     db = await get_db()
@@ -1539,5 +1571,32 @@ async def get_rediscovery_link(child_playlist_id: str) -> dict | None:
         if not row:
             return None
         return {"source_playlist_id": row["source_playlist_id"], "source_name": row["source_name"]}
+    finally:
+        await db.close()
+
+
+async def get_track_events_since(since_uts: int) -> list[dict]:
+    """Every track event from ``since_uts`` on, oldest first, with its time as unix seconds in ``uts``."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            """SELECT CAST(strftime('%s', timestamp) AS INTEGER) AS uts,
+                      track_id, track_name, artist_name, outcome
+               FROM track_events
+               WHERE timestamp >= datetime(?, 'unixepoch')
+               ORDER BY timestamp, id""",
+            (since_uts,),
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+
+async def get_rediscovery_playlist_ids() -> set[str]:
+    """Return the ids of every playlist Rediscovery created."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT child_playlist_id FROM rediscovery_links")
+        return {row["child_playlist_id"] for row in await cursor.fetchall()}
     finally:
         await db.close()

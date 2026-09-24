@@ -8,7 +8,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.rediscovery import DEFAULT_THRESHOLD_DAYS, MAX_THRESHOLDS, run_rediscovery_job
+from app.database import get_rediscovery_playlist_ids
+from app.rediscovery import DEFAULT_THRESHOLD_DAYS, MAX_THRESHOLDS, run_cleanup_job, run_rediscovery_job
 from app.routers.deps import require_auth
 from app.spotify_api import CredentialError, SpotifyAPIError
 from app.state import app_state
@@ -24,6 +25,11 @@ class StartRequest(BaseModel):
     )
 
 
+class CleanupRequest(BaseModel):
+    playlist_id: str
+    playlist_name: str = ""
+
+
 @router.get("/playlists")
 async def list_playlists():
     """Return user's Spotify playlists for the dropdown."""
@@ -36,7 +42,10 @@ async def list_playlists():
         raise HTTPException(status_code=401, detail="Spotify credentials expired.")
     except SpotifyAPIError as e:
         raise HTTPException(status_code=502, detail=f"Could not load playlists from Spotify: {e}")
-    return {"playlists": playlists}
+    # The clean-up dropdown offers only these: on any other playlist, "heard
+    # since added" would strip most of it.
+    linked = await get_rediscovery_playlist_ids()
+    return {"playlists": playlists, "rediscovery_ids": [p["id"] for p in playlists if p["id"] in linked]}
 
 
 @router.get("/status")
@@ -71,6 +80,34 @@ async def start_job(body: StartRequest):
     # Spawn background task
     app_state.rediscovery_task = asyncio.create_task(
         run_rediscovery_job(app_state, body.playlist_id.strip(), playlist_name, sorted(set(body.thresholds_days)))
+    )
+
+    return {"ok": True}
+
+
+@router.post("/cleanup")
+async def start_cleanup(body: CleanupRequest):
+    """Start removing listened and unavailable tracks from one Rediscovery playlist.
+
+    Shares the scan's job slot, status and cancel: one job at a time keeps
+    Last.fm under its rate limit.
+    """
+    if app_state.rediscovery_status == "running":
+        raise HTTPException(status_code=409, detail="A job is already running.")
+    if not app_state.spotify_client:
+        raise HTTPException(status_code=503, detail="Spotify client not ready")
+
+    playlist_id = body.playlist_id.strip()
+    if playlist_id not in await get_rediscovery_playlist_ids():
+        raise HTTPException(status_code=400, detail="Only a playlist Rediscovery created can be cleaned up.")
+
+    app_state.rediscovery_results = []
+    app_state.rediscovery_playlists = []
+    app_state.rediscovery_status = "running"
+    app_state.rediscovery_progress = {}
+
+    app_state.rediscovery_task = asyncio.create_task(
+        run_cleanup_job(app_state, playlist_id, body.playlist_name.strip() or playlist_id)
     )
 
     return {"ok": True}

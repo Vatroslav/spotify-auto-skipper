@@ -7,6 +7,9 @@
     const namePreview = document.getElementById('name-preview');
     const startBtn = document.getElementById('start-btn');
     const configSection = document.getElementById('config-section');
+    const cleanupSection = document.getElementById('cleanup-section');
+    const cleanupSelect = document.getElementById('cleanup-select');
+    const cleanupBtn = document.getElementById('cleanup-btn');
     const progressSection = document.getElementById('progress-section');
     const progressMessage = document.getElementById('progress-message');
     const progressBar = document.getElementById('progress-bar');
@@ -33,9 +36,27 @@
             opt.textContent = p.name + ' (' + p.track_count + ' tracks)';
             select.appendChild(opt);
         }
+
+        const linked = data.rediscovery_ids || [];
+        cleanupSelect.innerHTML = linked.length
+            ? '<option value="">Select a Rediscovery playlist...</option>'
+            : '<option value="">No Rediscovery playlists yet</option>';
+        for (const p of playlists) {
+            if (!linked.includes(p.id)) continue;
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name + ' (' + p.track_count + ' tracks)';
+            opt.dataset.name = p.name;
+            cleanupSelect.appendChild(opt);
+        }
     } catch (e) {
         select.innerHTML = '<option value="">Error loading playlists</option>';
+        cleanupSelect.innerHTML = '<option value="">Error loading playlists</option>';
     }
+
+    cleanupSelect.addEventListener('change', function () {
+        cleanupBtn.disabled = !cleanupSelect.value;
+    });
 
     // ── Thresholds + default name ───────────────────────
     // "100, 500 1000" → [100, 500, 1000]; null if any part is invalid.
@@ -119,13 +140,52 @@
             return;
         }
 
-        // Switch to progress view
-        configSection.classList.add('hidden');
+        showProgress();
+    });
+
+    // ── Clean-up job ────────────────────────────────────
+    // Runs in the scan's job slot, so it reuses its progress and result views.
+    cleanupBtn.addEventListener('click', async function () {
+        const playlistId = cleanupSelect.value;
+        if (!playlistId) return;
+        const playlistName = cleanupSelect.options[cleanupSelect.selectedIndex].dataset.name;
+        if (!confirm('Remove listened and unavailable songs from "' + playlistName + '"? The source playlist is not touched.')) return;
+
+        cleanupBtn.disabled = true;
+        try {
+            const r = await fetch('/api/rediscovery/cleanup', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({playlist_id: playlistId, playlist_name: playlistName}),
+            });
+            if (!r.ok) {
+                const err = await r.json().catch(function () { return {}; });
+                alert(err.detail || 'Failed to start clean-up');
+                cleanupBtn.disabled = false;
+                return;
+            }
+        } catch (e) {
+            alert('Network error');
+            cleanupBtn.disabled = false;
+            return;
+        }
+
+        cleanupBtn.disabled = false;
+        showProgress();
+    });
+
+    // Scan and clean-up forms hide together while a job runs.
+    function showForms(visible) {
+        configSection.classList.toggle('hidden', !visible);
+        cleanupSection.classList.toggle('hidden', !visible);
+    }
+
+    function showProgress() {
+        showForms(false);
         progressSection.classList.remove('hidden');
         resultSection.classList.add('hidden');
-
         startPolling();
-    });
+    }
 
     // ── Cancel job ──────────────────────────────────────
     cancelBtn.addEventListener('click', async function () {
@@ -140,7 +200,7 @@
     // ── Reset ───────────────────────────────────────────
     resetBtn.addEventListener('click', function () {
         resultSection.classList.add('hidden');
-        configSection.classList.remove('hidden');
+        showForms(true);
         refreshForm();
         progressBar.style.width = '0%';
     });
@@ -196,7 +256,7 @@
                 clearInterval(pollInterval);
                 pollInterval = null;
                 progressSection.classList.add('hidden');
-                configSection.classList.remove('hidden');
+                showForms(true);
                 refreshForm();
             }
         } catch (e) {
@@ -210,7 +270,7 @@
         if (r.ok) {
             const data = await r.json();
             if (data.status === 'running') {
-                configSection.classList.add('hidden');
+                showForms(false);
                 progressSection.classList.remove('hidden');
                 startPolling();
             }

@@ -586,6 +586,11 @@ input:focus, select:focus {
     align-items: center;
 }
 
+.mapping-fail-alias-label {
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
 .mapping-fail-alias-input {
     width: auto;
     min-width: 180px;

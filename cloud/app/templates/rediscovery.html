@@ -28,6 +28,17 @@
         <button id="start-btn" class="btn btn-accent btn-full mt-8" disabled>Start</button>
     </div>
 
+    <div id="cleanup-section" class="card mt-16">
+        <div class="card-title">Clean Up Rediscovery Playlists</div>
+        <div class="form-group">
+            <select id="cleanup-select">
+                <option value="">Loading playlists...</option>
+            </select>
+            <div class="help-text">Removes the songs you've scrobbled since they were added (played from anywhere, not only this playlist), and songs Spotify won't play in your country. The source playlist keeps them. Only playlists Rediscovery created are listed.</div>
+        </div>
+        <button id="cleanup-btn" class="btn btn-full mt-8" disabled>Remove Listened Songs</button>
+    </div>
+
     <div id="progress-section" class="card mt-16 hidden">
         <div class="card-title">Progress</div>
         <div id="progress-message" class="text-secondary">Waiting...</div>
