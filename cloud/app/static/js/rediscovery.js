@@ -8,6 +8,7 @@
     const startBtn = document.getElementById('start-btn');
     const configSection = document.getElementById('config-section');
     const cleanupSection = document.getElementById('cleanup-section');
+    const cleanupSelect = document.getElementById('cleanup-select');
     const cleanupBtn = document.getElementById('cleanup-btn');
     const progressSection = document.getElementById('progress-section');
     const progressMessage = document.getElementById('progress-message');
@@ -35,9 +36,27 @@
             opt.textContent = p.name + ' (' + p.track_count + ' tracks)';
             select.appendChild(opt);
         }
+
+        const linked = data.rediscovery_ids || [];
+        cleanupSelect.innerHTML = linked.length
+            ? '<option value="">Select a Rediscovery playlist...</option>'
+            : '<option value="">No Rediscovery playlists yet</option>';
+        for (const p of playlists) {
+            if (!linked.includes(p.id)) continue;
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name + ' (' + p.track_count + ' tracks)';
+            opt.dataset.name = p.name;
+            cleanupSelect.appendChild(opt);
+        }
     } catch (e) {
         select.innerHTML = '<option value="">Error loading playlists</option>';
+        cleanupSelect.innerHTML = '<option value="">Error loading playlists</option>';
     }
+
+    cleanupSelect.addEventListener('change', function () {
+        cleanupBtn.disabled = !cleanupSelect.value;
+    });
 
     // ── Thresholds + default name ───────────────────────
     // "100, 500 1000" → [100, 500, 1000]; null if any part is invalid.
@@ -127,11 +146,18 @@
     // ── Clean-up job ────────────────────────────────────
     // Runs in the scan's job slot, so it reuses its progress and result views.
     cleanupBtn.addEventListener('click', async function () {
-        if (!confirm('Remove listened and unavailable songs from every Rediscovery playlist? The source playlist is not touched.')) return;
+        const playlistId = cleanupSelect.value;
+        if (!playlistId) return;
+        const playlistName = cleanupSelect.options[cleanupSelect.selectedIndex].dataset.name;
+        if (!confirm('Remove listened and unavailable songs from "' + playlistName + '"? The source playlist is not touched.')) return;
 
         cleanupBtn.disabled = true;
         try {
-            const r = await fetch('/api/rediscovery/cleanup', {method: 'POST'});
+            const r = await fetch('/api/rediscovery/cleanup', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({playlist_id: playlistId, playlist_name: playlistName}),
+            });
             if (!r.ok) {
                 const err = await r.json().catch(function () { return {}; });
                 alert(err.detail || 'Failed to start clean-up');

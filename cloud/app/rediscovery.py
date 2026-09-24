@@ -8,7 +8,7 @@ days ago goes to "500-999 days" only). Never-scrobbled tracks go into the
 highest bucket, but are counted apart in the summary: some of them are mapping
 failures (Spotify and Last.fm naming a track differently), not old songs.
 
-The clean-up job works the other way: it empties the created playlists of
+The clean-up job works the other way: it empties a created playlist of
 tracks heard since they went in, and of tracks Spotify no longer plays.
 """
 
@@ -16,7 +16,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
-from app.database import add_rediscovery_link, get_rediscovery_links
+from app.database import add_rediscovery_link
 from app.lastfm_api import LASTFM_ERROR, get_last_play_date
 from app.observability import report_exception
 
@@ -272,143 +272,108 @@ def _parse_added_at(value: str | None) -> datetime | None:
         return None
 
 
-async def run_cleanup_job(app_state):
+async def run_cleanup_job(app_state, playlist_id: str, playlist_name: str):
     """
-    Clean-up job: remove listened and unavailable tracks from Rediscovery playlists.
-    Runs in the same job slot as the scan, so only one of them runs at a time.
+    Clean-up job: remove listened and unavailable tracks from one Rediscovery
+    playlist. Runs in the same job slot as the scan, so only one of them runs
+    at a time.
 
     A track counts as listened when its last scrobble is newer than the moment
     it went into the playlist (Spotify's added_at). A play from any context
     counts, not only one started from the Rediscovery playlist. The source
     playlist is not touched: a track heard again still belongs there.
 
-    Phase 1: Fetch all tracks of every Rediscovery playlist still in the library.
-    Phase 2: Check each against Last.fm; clean each playlist once it is checked,
-             so a cancel or failure later keeps the work already done.
+    Phase 1: Fetch all tracks of the playlist.
+    Phase 2: Check each against Last.fm, then remove listened and unavailable ones.
     """
     client = app_state.spotify_client
 
     try:
         # ── Phase 1: Fetch tracks ────────────────────────────
         app_state.rediscovery_status = "running"
-        app_state.rediscovery_progress = {
-            "phase": "fetch",
-            "current": 0,
-            "total": 0,
-            "message": "Loading Rediscovery playlists...",
-        }
+        app_state.rediscovery_progress = {"phase": "fetch", "current": 0, "total": 0, "message": "Loading tracks..."}
 
-        links = await get_rediscovery_links()
-        # A playlist the user deleted stays readable by id, so only clean the
-        # ones still in the library.
-        library = {p["id"]: p["name"] for p in await client.get_user_playlists()}
-        targets = [
-            (link["child_playlist_id"], library[link["child_playlist_id"]])
-            for link in links
-            if link["child_playlist_id"] in library
-        ]
-        gone = len(links) - len(targets)
-        gone_note = f" {gone} Rediscovery playlist(s) no longer in your library skipped." if gone else ""
+        tracks = []
+        offset = 0
+        while True:
+            page = await client.get_playlist_tracks(playlist_id, limit=100, offset=offset)
+            tracks.extend(page.get("items", []))
+            total = page.get("total", 0)
+            app_state.rediscovery_progress["current"] = len(tracks)
+            app_state.rediscovery_progress["total"] = total
+            app_state.rediscovery_progress["message"] = f"Loading tracks... {len(tracks)}/{total}"
 
-        if not targets:
-            app_state.rediscovery_status = "completed"
-            app_state.rediscovery_progress = {
-                "phase": "done",
-                "current": 0,
-                "total": 0,
-                "message": f"Done. No Rediscovery playlists found in your library.{gone_note}",
-            }
-            return
+            offset += 100
+            if offset >= total:
+                break
 
-        playlists = []
-        for n, (playlist_id, name) in enumerate(targets, start=1):
-            app_state.rediscovery_progress["message"] = f"Loading '{name}' ({n}/{len(targets)})..."
-            tracks = []
-            offset = 0
-            while True:
-                page = await client.get_playlist_tracks(playlist_id, limit=100, offset=offset)
-                tracks.extend(page.get("items", []))
-                offset += 100
-                if offset >= page.get("total", 0):
-                    break
-            playlists.append((playlist_id, name, tracks))
-
-        total = sum(len(tracks) for _, _, tracks in playlists)
-        logger.info("[Rediscovery] Clean-up: %d tracks in %d playlists", total, len(playlists))
+        logger.info("[Rediscovery] Clean-up: %d tracks in '%s'", len(tracks), playlist_name)
 
         # ── Phase 2: Check Last.fm and clean ─────────────────
         app_state.rediscovery_progress = {
             "phase": "check",
             "current": 0,
-            "total": total,
-            "message": f"Checking Last.fm... 0/{total}",
+            "total": len(tracks),
+            "message": f"Checking Last.fm... 0/{len(tracks)}",
         }
 
-        checked = 0
-        removed_total = 0
+        # Sets: a track in the playlist twice is one removal (Spotify drops every copy).
+        listened = set()
+        unavailable = set()
         lastfm_errors = 0
         no_date = 0
-        availability_seen = False
-        lines = []
-        failed = []
 
-        for playlist_id, name, tracks in playlists:
-            # Sets: a track in the playlist twice is one removal (Spotify drops every copy).
-            listened = set()
-            unavailable = set()
-            for track in tracks:
-                if track["is_playable"] is not None:
-                    availability_seen = True
-                if track["is_playable"] is False:
-                    unavailable.add(track["uri"])
+        for i, track in enumerate(tracks):
+            if track["is_playable"] is False:
+                unavailable.add(track["uri"])
+            else:
+                added = _parse_added_at(track["added_at"])
+                if added is None:
+                    no_date += 1
                 else:
-                    added = _parse_added_at(track["added_at"])
-                    if added is None:
-                        no_date += 1
-                    else:
-                        result = await _last_play_date(track)
-                        if result is LASTFM_ERROR:
-                            lastfm_errors += 1
-                        elif result is not None and result > added:
-                            listened.add(track["uri"])
-                        await asyncio.sleep(LASTFM_DELAY)
+                    result = await _last_play_date(track)
+                    if result is LASTFM_ERROR:
+                        lastfm_errors += 1
+                    elif result is not None and result > added:
+                        listened.add(track["uri"])
+                    await asyncio.sleep(LASTFM_DELAY)
 
-                checked += 1
-                to_remove = removed_total + len(listened) + len(unavailable)
-                app_state.rediscovery_progress["current"] = checked
-                app_state.rediscovery_progress["message"] = (
-                    f"Checking '{name}'... {checked}/{total} | To remove: {to_remove}"
-                )
+            app_state.rediscovery_progress["current"] = i + 1
+            app_state.rediscovery_progress["message"] = (
+                f"Checking Last.fm... {i + 1}/{len(tracks)} | To remove: {len(listened) + len(unavailable)}"
+            )
 
-            uris = list(listened | unavailable)
-            if uris:
-                ok, error = await client.remove_tracks_from_playlist(playlist_id, uris)
-                if not ok:
-                    logger.warning("[Rediscovery] Clean-up: removing from '%s' failed: %s", name, error)
-                    failed.append(f"{name} ({error})")
-                    continue
-            removed_total += len(uris)
-            lines.append(f"{name}: {len(listened)} listened, {len(unavailable)} unavailable")
-
-        notes = gone_note
-        if not availability_seen:
+        notes = ""
+        if tracks and all(t["is_playable"] is None for t in tracks):
             notes += " Spotify sent no availability info, so unavailable tracks were not removed."
         if lastfm_errors:
             notes += f" {lastfm_errors} kept because Last.fm failed."
         if no_date:
             notes += f" {no_date} kept because Spotify sent no date added."
+        counts = f"{len(listened)} listened, {len(unavailable)} unavailable"
 
-        if failed:
-            message = f"Removed {removed_total} tracks. Spotify failed for: {'; '.join(failed)}."
-        else:
-            message = f"Done! Removed {removed_total} tracks."
-        if lines:
-            message += " " + "; ".join(lines) + "."
-        message += notes
+        uris = list(listened | unavailable)
+        if uris:
+            ok, error = await client.remove_tracks_from_playlist(playlist_id, uris)
+            if not ok:
+                logger.warning("[Rediscovery] Clean-up: removing from '%s' failed: %s", playlist_name, error)
+                app_state.rediscovery_status = "failed"
+                app_state.rediscovery_progress = {
+                    "phase": "done",
+                    "current": len(tracks),
+                    "total": len(tracks),
+                    "message": f"Found {counts}, but Spotify failed to remove them: {error}.{notes}",
+                }
+                return
 
-        app_state.rediscovery_status = "failed" if failed and not lines else "completed"
-        app_state.rediscovery_progress = {"phase": "done", "current": total, "total": total, "message": message}
-        logger.info("[Rediscovery] Clean-up complete. %d removed, %d failed.", removed_total, len(failed))
+        app_state.rediscovery_status = "completed"
+        app_state.rediscovery_progress = {
+            "phase": "done",
+            "current": len(tracks),
+            "total": len(tracks),
+            "message": f"Done! Removed {len(uris)} tracks from '{playlist_name}' ({counts}).{notes}",
+        }
+        logger.info("[Rediscovery] Clean-up complete. %d removed from '%s'.", len(uris), playlist_name)
 
     except asyncio.CancelledError:
         app_state.rediscovery_status = "idle"
