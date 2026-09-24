@@ -923,6 +923,7 @@ function initInsights() {
 
             const renderDefaultActions = (actions, ctx) => {
                 actions.closest(".mapping-fail-meta").classList.remove("editing");
+                actions.closest(".mapping-fail-row").querySelector(".mapping-fail-hint")?.remove();
                 actions.innerHTML = `
                     <button class="btn btn-sm mapping-fail-alias">Add alias</button>
                     <button class="btn btn-sm mapping-fail-dismiss">Dismiss</button>
@@ -960,10 +961,18 @@ function initInsights() {
                 // a play could be paired with a scrobble; it can be wrong, so it is
                 // only a starting point for the user to check.
                 actions.innerHTML = `
+                    <span class="mapping-fail-alias-label">Name on Last.fm:</span>
                     <input class="mapping-fail-alias-input" type="text" value="${escapeHtml(ctx.suggestedName || ctx.trackName)}">
                     <button class="btn btn-sm mapping-fail-alias-save">Save</button>
                     <button class="btn btn-sm mapping-fail-alias-cancel">Cancel</button>
                 `;
+                const hint = document.createElement("div");
+                hint.className = "help-text mapping-fail-hint";
+                hint.textContent = (ctx.suggestedName
+                    ? `Last.fm scrobbled "${ctx.trackName}" under this name.`
+                    : `Type the name this song has on Last.fm.`)
+                    + " Save makes the app look it up on Last.fm under this name, so it knows when you last heard it.";
+                actions.closest(".mapping-fail-row").appendChild(hint);
                 const input = actions.querySelector(".mapping-fail-alias-input");
                 const saveBtn = actions.querySelector(".mapping-fail-alias-save");
                 const cancelBtn = actions.querySelector(".mapping-fail-alias-cancel");
