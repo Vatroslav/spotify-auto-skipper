@@ -25,12 +25,12 @@
         ]
       },
       {
-        "matcher": "mcp__Claude_Preview__preview_start",
+        "matcher": "Bash|PowerShell|mcp__Claude_(Browser|Preview)__preview_start",
         "hooks": [
           {
             "type": "command",
-            "command": "python -c \"import sys,json; data=json.load(sys.stdin); name=data.get('tool_input',{}).get('name',''); print(json.dumps({'decision':'block','reason':'[Cloud Server Blocked] cloud-dev requires production secrets (SECRET_KEY, Spotify OAuth) and cannot run locally. Deploy to VPS instead. For import verification: cd cloud && python -c \\\"import app\\\"'})) if name=='cloud-dev' else None\"",
-            "statusMessage": "Checking server..."
+            "command": "python .claude/hooks/check-local-app-run.py",
+            "statusMessage": "Checking local app run..."
           }
         ]
       }
