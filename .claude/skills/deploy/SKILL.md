@@ -54,10 +54,12 @@ git push origin $(git branch --show-current)
 Run this single SSH command (do NOT cd into subdirectories separately or try other paths):
 
 ```bash
-ssh $DEPLOY_USER@$DEPLOY_HOST "cd $DEPLOY_REPO && git fetch --all && git checkout <BRANCH> && git pull && cd cloud && docker compose up -d --build"
+ssh $DEPLOY_USER@$DEPLOY_HOST "cd $DEPLOY_REPO && git fetch --all && git checkout <BRANCH> && git pull && cd cloud && docker compose build --pull && docker compose up -d"
 ```
 
-Replace `<BRANCH>` with the current branch name. Use a 120-second timeout for this command since Docker builds can take a while.
+Replace `<BRANCH>` with the current branch name. Use a 300-second timeout for this command: when the base image has moved, the pip layer is rebuilt from scratch.
+
+`build --pull` is deliberate. A plain `up -d --build` reuses whatever `python:3.12-slim` the VPS cached at its first build, so the container's Python and Debian security patches would freeze at that date. `--pull` checks Docker Hub for the newest `python:3.12-slim` on every deploy. If Docker Hub is unreachable the build fails; only then, as a one-off, drop `--pull` and say so in the report.
 
 ### 4. Health check
 
