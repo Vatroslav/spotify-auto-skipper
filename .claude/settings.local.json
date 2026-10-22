@@ -1,6 +1,7 @@
 {
   "permissions": {
     "allow": [
+      "Bash(ssh root@autoskipper.uk:*)",
       "mcp__Claude_Preview__preview_start",
       "Skill(deploy)",
       "Skill(deploy:*)"
