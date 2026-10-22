@@ -1,11 +1,42 @@
-fastapi>=0.109.0,<0.135.0
-starlette>=0.46.0,<1.0.0
-uvicorn[standard]>=0.27.0
-httpx>=0.26.0
-jinja2>=3.1.6,<3.2
-aiosqlite>=0.19.0
-python-multipart>=0.0.6
-itsdangerous>=2.1.0
-cryptography>=42.0.0
-sentry-sdk>=2.20.0,<3.0.0
-ruff>=0.11.0
+# Fully locked for the Docker image (python:3.12-slim, linux/x86_64).
+# Every package — direct and transitive — is pinned so a rebuild installs exactly
+# this set and Dependabot can raise a pin when an advisory lands.
+# To upgrade: change the direct pin, re-resolve on Python 3.12 Linux, update the
+# transitive pins to match, and run an OSV / pip-audit check over the result.
+#
+# fastapi stays on 0.134.x: 0.135+ changes body/default validation behaviour.
+
+# ── Direct dependencies ──────────────────────────────────────────
+aiosqlite==0.22.1
+cryptography==50.0.2
+fastapi==0.134.0
+httpx==0.28.1
+itsdangerous==2.2.0
+jinja2==3.1.6
+sentry-sdk==2.72.0
+starlette==1.9.0
+uvicorn[standard]==0.54.0
+
+# ── Transitive dependencies ──────────────────────────────────────
+annotated-doc==0.0.5        # via fastapi
+annotated-types==0.8.0      # via pydantic
+anyio==4.15.1               # via httpx, starlette, watchfiles
+certifi==2026.10.19         # via httpcore, httpx, sentry-sdk
+cffi==2.1.1                 # via cryptography
+click==8.5.0                # via uvicorn
+h11==0.16.0                 # via httpcore, uvicorn
+httpcore==1.0.9             # via httpx
+httptools==0.9.0            # via uvicorn[standard]
+idna==3.20                  # via anyio, httpx
+markupsafe==3.0.4           # via jinja2
+pycparser==3.11             # via cffi
+pydantic==2.14.1            # via fastapi
+pydantic-core==2.50.1       # via pydantic
+python-dotenv==1.2.4        # via uvicorn[standard]
+pyyaml==6.0.3               # via uvicorn[standard]
+typing-extensions==4.16.0   # via anyio, fastapi, pydantic, starlette, ...
+typing-inspection==0.4.4    # via fastapi, pydantic
+urllib3==2.8.0              # via sentry-sdk
+uvloop==0.23.0              # via uvicorn[standard]
+watchfiles==1.3.0           # via uvicorn[standard]
+websockets==17.3            # via uvicorn[standard]

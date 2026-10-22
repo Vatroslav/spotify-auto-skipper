@@ -198,59 +198,59 @@ def _is_authenticated(request: Request) -> bool:
 @app.get("/")
 async def index(request: Request):
     if not _is_authenticated(request):
-        return templates.TemplateResponse("login.html", {"request": request, "version": APP_VERSION})
-    return templates.TemplateResponse("index.html", {"request": request, "version": APP_VERSION})
+        return templates.TemplateResponse(request, "login.html", {"version": APP_VERSION})
+    return templates.TemplateResponse(request, "index.html", {"version": APP_VERSION})
 
 
 @app.get("/settings")
 async def settings_page(request: Request):
     if not _is_authenticated(request):
-        return templates.TemplateResponse("login.html", {"request": request, "version": APP_VERSION})
-    return templates.TemplateResponse("settings.html", {"request": request, "version": APP_VERSION})
+        return templates.TemplateResponse(request, "login.html", {"version": APP_VERSION})
+    return templates.TemplateResponse(request, "settings.html", {"version": APP_VERSION})
 
 
 @app.get("/artists")
 async def artists_page(request: Request):
     if not _is_authenticated(request):
-        return templates.TemplateResponse("login.html", {"request": request, "version": APP_VERSION})
-    return templates.TemplateResponse("artists.html", {"request": request, "version": APP_VERSION})
+        return templates.TemplateResponse(request, "login.html", {"version": APP_VERSION})
+    return templates.TemplateResponse(request, "artists.html", {"version": APP_VERSION})
 
 
 @app.get("/insights")
 async def insights_page(request: Request):
     if not _is_authenticated(request):
-        return templates.TemplateResponse("login.html", {"request": request, "version": APP_VERSION})
-    return templates.TemplateResponse("insights.html", {"request": request, "version": APP_VERSION})
+        return templates.TemplateResponse(request, "login.html", {"version": APP_VERSION})
+    return templates.TemplateResponse(request, "insights.html", {"version": APP_VERSION})
 
 
 @app.get("/logs")
 async def logs_page(request: Request):
     if not _is_authenticated(request):
-        return templates.TemplateResponse("login.html", {"request": request, "version": APP_VERSION})
-    return templates.TemplateResponse("logs.html", {"request": request, "version": APP_VERSION})
+        return templates.TemplateResponse(request, "login.html", {"version": APP_VERSION})
+    return templates.TemplateResponse(request, "logs.html", {"version": APP_VERSION})
 
 
 @app.get("/rediscovery")
 async def rediscovery_page(request: Request):
     if not _is_authenticated(request):
-        return templates.TemplateResponse("login.html", {"request": request, "version": APP_VERSION})
-    return templates.TemplateResponse("rediscovery.html", {"request": request, "version": APP_VERSION})
+        return templates.TemplateResponse(request, "login.html", {"version": APP_VERSION})
+    return templates.TemplateResponse(request, "rediscovery.html", {"version": APP_VERSION})
 
 
 @app.get("/genres")
 async def genres_page(request: Request):
     if not _is_authenticated(request):
-        return templates.TemplateResponse("login.html", {"request": request, "version": APP_VERSION})
-    return templates.TemplateResponse("genres.html", {"request": request, "version": APP_VERSION})
+        return templates.TemplateResponse(request, "login.html", {"version": APP_VERSION})
+    return templates.TemplateResponse(request, "genres.html", {"version": APP_VERSION})
 
 
 @app.get("/sync")
 async def sync_page(request: Request):
     if not _is_authenticated(request):
-        return templates.TemplateResponse("login.html", {"request": request, "version": APP_VERSION})
-    return templates.TemplateResponse("loved_sync.html", {"request": request, "version": APP_VERSION})
+        return templates.TemplateResponse(request, "login.html", {"version": APP_VERSION})
+    return templates.TemplateResponse(request, "loved_sync.html", {"version": APP_VERSION})
 
 
 @app.get("/unauthorized")
 async def unauthorized_page(request: Request):
-    return templates.TemplateResponse("unauthorized.html", {"request": request, "version": APP_VERSION})
+    return templates.TemplateResponse(request, "unauthorized.html", {"version": APP_VERSION})
