@@ -817,7 +817,76 @@ input:focus, select:focus {
 .nav-item:hover, .nav-item.active { color: var(--text-primary); }
 .nav-item.active { color: var(--accent); }
 
-.nav-icon { font-size: 1.3rem; }
+/* Explicit line-height keeps the SVG (Tools) and emoji icons on the same row height. */
+.nav-icon { font-size: 1.3rem; line-height: 1.3; }
+
+.nav-icon svg {
+    width: 1em;
+    height: 1em;
+    vertical-align: -0.15em;
+}
+
+/* ── Tools ───────────────────────────────────────── */
+
+.tool-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    padding: 10px 0;
+    color: var(--text-primary);
+}
+
+.tool-row + .tool-row {
+    border-top: 1px solid var(--border-secondary);
+}
+
+.tool-row:hover { color: var(--text-primary); }
+.tool-row:hover .tool-name { color: var(--accent-hover); }
+
+.tool-icon {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    color: var(--text-secondary);
+}
+
+.tool-text {
+    flex: 1;
+    min-width: 0; /* lets .tool-desc truncate instead of wrapping */
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.tool-name {
+    font-weight: 600;
+}
+
+.tool-desc {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tool-chevron {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    color: var(--text-muted);
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.back-link:hover { color: var(--text-primary); }
 
 /* ── Login Page ──────────────────────────────────── */
 

@@ -223,6 +223,13 @@ async def insights_page(request: Request):
     return templates.TemplateResponse(request, "insights.html", {"version": APP_VERSION})
 
 
+@app.get("/tools")
+async def tools_page(request: Request):
+    if not _is_authenticated(request):
+        return templates.TemplateResponse(request, "login.html", {"version": APP_VERSION})
+    return templates.TemplateResponse(request, "tools.html", {"version": APP_VERSION})
+
+
 @app.get("/logs")
 async def logs_page(request: Request):
     if not _is_authenticated(request):
