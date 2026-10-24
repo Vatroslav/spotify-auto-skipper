@@ -549,6 +549,9 @@ async function initArtists() {
                     : "Enable never-skip artists above to use this";
             }
         });
+        list.querySelectorAll(".artist-window-input").forEach(inp => {
+            inp.disabled = !enabled;
+        });
     }
 
     // Load and bind the enable toggle
@@ -602,6 +605,43 @@ async function initArtists() {
 
             const controls = document.createElement("div");
             controls.className = "artist-controls";
+
+            // The artist's own skip window. Empty = never skipped.
+            const windowWrap = document.createElement("label");
+            windowWrap.className = "artist-window";
+            windowWrap.title = "Days before this artist's songs play again. Empty = never skipped.";
+            const windowInput = document.createElement("input");
+            windowInput.type = "number";
+            windowInput.className = "artist-window-input";
+            windowInput.min = "1";
+            windowInput.max = "365";
+            windowInput.placeholder = "∞";
+            windowInput.value = a.window_days ?? "";
+            windowInput.addEventListener("change", async () => {
+                const raw = windowInput.value.trim();
+                const days = raw === "" ? null : Number(raw);
+                if (days !== null && (!Number.isInteger(days) || days < 1 || days > 365)) {
+                    showToast("Days must be a whole number from 1 to 365", 3000, "error");
+                    windowInput.value = a.window_days ?? "";
+                    return;
+                }
+                try {
+                    await API.patch(`/api/artists/${encodeURIComponent(a.id)}`, { window_days: days });
+                    a.window_days = days;
+                    showToast(days === null
+                        ? `${a.name}: never skipped`
+                        : `${a.name}: plays again after ${days} day${days === 1 ? "" : "s"}`);
+                } catch (err) {
+                    showToast(err.message || "Failed to update artist", 3000, "error");
+                    windowInput.value = a.window_days ?? "";
+                }
+            });
+            const windowUnit = document.createElement("span");
+            windowUnit.className = "artist-window-unit";
+            windowUnit.textContent = "days";
+            windowWrap.appendChild(windowInput);
+            windowWrap.appendChild(windowUnit);
+            controls.appendChild(windowWrap);
 
             const toggle = document.createElement("label");
             toggle.className = "toggle-switch";

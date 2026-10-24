@@ -11,8 +11,8 @@ from app.database import (
     add_log,
     add_track_event,
     get_last_track_event_id,
+    get_never_skip_protection,
     get_oauth_tokens,
-    is_artist_never_skipped,
     purge_old_logs,
     recompute_overall_metrics,
     set_reauth_required,
@@ -229,6 +229,21 @@ async def polling_loop():
                 cutoff = datetime.now(timezone.utc) - timedelta(days=effective_window_days)
 
                 if last_played > cutoff:
+                    # Never-skip artists: no window means never skipped; with one,
+                    # the artist gets their own shorter window instead of the
+                    # general one. A window at or above the general one adds nothing.
+                    ns_protected, ns_window = (
+                        await get_never_skip_protection(track.get("artist_ids", []))
+                        if settings["enable_never_skip_artists"]
+                        else (False, None)
+                    )
+                    never_skip = ns_protected and (
+                        ns_window is None
+                        or last_played <= datetime.now(timezone.utc) - timedelta(days=ns_window)
+                    )
+                    if ns_protected and not never_skip:
+                        await _log(f"Protected artist, but heard within their {ns_window}-day window")
+
                     # Check one-time skip pause
                     if app_state.skip_exempt_track_id == track["id"]:
                         await _log("Skip paused for this song (one-time) — not skipping")
@@ -243,10 +258,13 @@ async def polling_loop():
                         )
                         await _update_skip_streak(False)
                     # Check never-skip list
-                    elif settings["enable_never_skip_artists"] and await is_artist_never_skipped(
-                        track.get("artist_ids", [])
-                    ):
-                        await _log("Artist is in never-skip list \u2014 not skipping")
+                    elif never_skip:
+                        if ns_window is None:
+                            await _log("Artist is in never-skip list \u2014 not skipping")
+                        else:
+                            await _log(
+                                f"Artist is in never-skip list, {ns_window}-day window passed \u2014 not skipping"
+                            )
                         await add_track_event(
                             track["id"],
                             track["name"],

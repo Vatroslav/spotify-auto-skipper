@@ -26,7 +26,10 @@ CREATE TABLE IF NOT EXISTS never_skip_artists (
     name      TEXT NOT NULL,
     image_url TEXT DEFAULT '',
     enabled   INTEGER NOT NULL DEFAULT 1,
-    added_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    added_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- NULL = never skipped. A number = the artist's own, shorter skip window:
+    -- their songs play once this many days have passed since the last scrobble.
+    window_days INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS track_events (
@@ -191,13 +194,16 @@ async def init_db():
     try:
         await db.executescript(_CREATE_TABLES)
 
-        # Migrate: add image_url / enabled columns if missing
+        # Migrate: add image_url / enabled / window_days columns if missing
         cursor = await db.execute("PRAGMA table_info(never_skip_artists)")
         columns = {row[1] for row in await cursor.fetchall()}
         if "image_url" not in columns:
             await db.execute("ALTER TABLE never_skip_artists ADD COLUMN image_url TEXT DEFAULT ''")
         if "enabled" not in columns:
             await db.execute("ALTER TABLE never_skip_artists ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1")
+        if "window_days" not in columns:
+            # Existing artists keep NULL, i.e. today's "never skipped" behaviour
+            await db.execute("ALTER TABLE never_skip_artists ADD COLUMN window_days INTEGER")
 
         # Migrate: add album_name to track_events
         cursor = await db.execute("PRAGMA table_info(track_events)")
@@ -496,7 +502,7 @@ async def get_never_skip_artists() -> list[dict]:
     db = await get_db()
     try:
         cursor = await db.execute(
-            "SELECT id, name, image_url, enabled, added_at FROM never_skip_artists ORDER BY name"
+            "SELECT id, name, image_url, enabled, window_days, added_at FROM never_skip_artists ORDER BY name"
         )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
@@ -539,18 +545,43 @@ async def set_never_skip_artist_enabled(artist_id: str, enabled: bool) -> bool:
         await db.close()
 
 
-async def is_artist_never_skipped(artist_ids: list[str]) -> bool:
+async def set_never_skip_artist_window(artist_id: str, window_days: int | None) -> bool:
+    """Set an artist's own skip window (None = never skipped). Returns True if a row was updated."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "UPDATE never_skip_artists SET window_days = ? WHERE id = ?",
+            (window_days, artist_id),
+        )
+        await db.commit()
+        return cursor.rowcount > 0
+    finally:
+        await db.close()
+
+
+async def get_never_skip_protection(artist_ids: list[str]) -> tuple[bool, int | None]:
+    """Never-skip protection for a track's artists, as (protected, window_days).
+
+    window_days None means never skipped; a number means skipped only when the
+    song was heard within that many days. With several listed artists the most
+    lenient one wins: any without a window means never skipped, otherwise the
+    shortest window applies.
+    """
     if not artist_ids:
-        return False
+        return False, None
     db = await get_db()
     try:
         placeholders = ",".join("?" for _ in artist_ids)
         cursor = await db.execute(
-            f"SELECT COUNT(*) as cnt FROM never_skip_artists WHERE enabled = 1 AND id IN ({placeholders})",
+            f"SELECT window_days FROM never_skip_artists WHERE enabled = 1 AND id IN ({placeholders})",
             artist_ids,
         )
-        row = await cursor.fetchone()
-        return row["cnt"] > 0
+        windows = [row["window_days"] for row in await cursor.fetchall()]
+        if not windows:
+            return False, None
+        if any(w is None for w in windows):
+            return True, None
+        return True, min(windows)
     finally:
         await db.close()
 

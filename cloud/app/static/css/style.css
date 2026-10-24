@@ -433,6 +433,26 @@ input:focus, select:focus {
     flex-shrink: 0;
 }
 
+/* Per-artist skip window: a compact number field, wide enough for "365" */
+.artist-window {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.artist-window input[type="number"].artist-window-input {
+    width: 56px;
+    padding: 6px 4px;
+    text-align: center;
+}
+
+.artist-window-input:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.artist-window-unit {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
 /* Dim the row when never-skip protection is toggled off, but keep the
    toggle itself fully legible so it stays easy to switch back on. */
 .artist-disabled .artist-info { opacity: 0.4; }
