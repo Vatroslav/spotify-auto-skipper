@@ -29,6 +29,7 @@ class SettingsUpdate(BaseModel):
     trash_playlist_id: Optional[str] = None
     always_play_liked_songs: Optional[bool] = None
     enable_never_skip_artists: Optional[bool] = None
+    never_skip_window_days: Optional[int] = None
     log_retention_days: Optional[int] = None
 
 

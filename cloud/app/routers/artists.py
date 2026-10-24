@@ -3,18 +3,16 @@ Never-skip artists API routes.
 """
 
 import re
-from typing import Optional
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, field_validator
 
 from app.database import (
     add_never_skip_artist,
     get_never_skip_artists,
     remove_never_skip_artist,
     set_never_skip_artist_enabled,
-    set_never_skip_artist_window,
 )
 from app.routers.deps import require_auth
 from app.spotify_api import CredentialError
@@ -64,11 +62,7 @@ class ArtistCreate(BaseModel):
 
 
 class ArtistUpdate(BaseModel):
-    """Partial update: only the fields actually sent are applied."""
-
-    enabled: Optional[bool] = None
-    # Explicit null clears the artist's window (back to never skipped)
-    window_days: Optional[int] = Field(default=None, ge=1, le=365)
+    enabled: bool
 
 
 @router.get("")
@@ -92,20 +86,12 @@ async def add_artist(body: ArtistCreate):
 
 @router.patch("/{artist_id}")
 async def update_artist(artist_id: str, body: ArtistUpdate):
-    """Toggle an artist's never-skip protection and/or set their own skip window."""
+    """Toggle whether an artist's never-skip protection is active."""
     if not _SPOTIFY_ID_RE.match(artist_id):
         raise HTTPException(status_code=400, detail="Invalid artist ID")
-    sent = body.model_fields_set
-    if not sent:
-        raise HTTPException(status_code=400, detail="Nothing to update")
-    if "enabled" in sent:
-        if body.enabled is None:
-            raise HTTPException(status_code=400, detail="enabled must be true or false")
-        if not await set_never_skip_artist_enabled(artist_id, body.enabled):
-            raise HTTPException(status_code=404, detail="Artist not found")
-    if "window_days" in sent:
-        if not await set_never_skip_artist_window(artist_id, body.window_days):
-            raise HTTPException(status_code=404, detail="Artist not found")
+    updated = await set_never_skip_artist_enabled(artist_id, body.enabled)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Artist not found")
     return {"ok": True}
 
 
