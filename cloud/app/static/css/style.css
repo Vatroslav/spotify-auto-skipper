@@ -92,28 +92,64 @@ a:hover { color: var(--accent-hover); }
     min-height: 1.2em;
 }
 
-.album-art {
+/* The frame always holds the space, so the buttons below don't jump when the
+   art loads, is missing, or nothing is playing. */
+.album-art-frame {
     width: 180px;
     height: 180px;
+    margin: 0 auto 16px;
+    border-radius: 8px;
+    background: var(--bg-input);
+}
+
+.album-art {
+    width: 100%;
+    height: 100%;
+    vertical-align: top;
     border-radius: 8px;
     object-fit: cover;
-    margin-bottom: 16px;
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Fixed height for a two-line track name + artist + last-check line, so the
+   buttons stay put between songs and when nothing is playing. The height is
+   the sum of the line boxes below: 2 x 1.625rem + 1.3rem + 1.04rem, plus the
+   4px and 6px margins. Change it together with them. */
+.track-area {
+    height: calc(5.59rem + 10px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .now-playing .track-name {
     font-size: 1.25rem;
     font-weight: 600;
+    line-height: 1.3;
     margin-bottom: 4px;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+}
+
+.now-playing .artist-name,
+.now-playing .last-check {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .now-playing .artist-name {
     font-size: 1rem;
+    line-height: 1.3;
     color: var(--text-secondary);
 }
 
 .now-playing .last-check {
     font-size: 0.8rem;
+    line-height: 1.3;
     color: var(--text-muted);
     margin-top: 6px;
 }
