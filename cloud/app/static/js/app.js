@@ -533,6 +533,7 @@ async function initArtists() {
     const searchInput = document.getElementById("artist-search");
     const searchResults = document.getElementById("search-results");
     const toggleNeverSkip = document.getElementById("toggle-never-skip");
+    const windowInput = document.getElementById("never-skip-window");
     if (!list) return;
 
     // Per-artist switches only matter while the whole feature is on, so
@@ -549,11 +550,42 @@ async function initArtists() {
                     : "Enable never-skip artists above to use this";
             }
         });
+        if (windowInput) windowInput.disabled = !enabled;
+    }
+
+    const settings = (toggleNeverSkip || windowInput) ? await API.get("/api/settings") : {};
+
+    // One window for all never-skip artists. Stored as 0 = never skipped,
+    // shown as an empty field.
+    if (windowInput) {
+        let savedWindow = settings.never_skip_window_days || 0;
+        const showWindow = () => { windowInput.value = savedWindow ? String(savedWindow) : ""; };
+        showWindow();
+        windowInput.addEventListener("change", async () => {
+            const raw = windowInput.value.trim();
+            const days = raw === "" ? 0 : Number(raw);
+            if (!Number.isInteger(days) || days < 0 || days > 365) {
+                showToast("Days must be a whole number from 1 to 365", 3000, "error");
+                showWindow();
+                return;
+            }
+            try {
+                const res = await API.put("/api/settings", { never_skip_window_days: days });
+                if (res._warnings && res._warnings.length) throw new Error(res._warnings[0]);
+                savedWindow = days;
+                showWindow();
+                showToast(days
+                    ? `Never-skip artists play again after ${days} day${days === 1 ? "" : "s"}`
+                    : "Never-skip artists are never skipped");
+            } catch (err) {
+                showToast(err.message || "Failed to update setting", 3000, "error");
+                showWindow();
+            }
+        });
     }
 
     // Load and bind the enable toggle
     if (toggleNeverSkip) {
-        const settings = await API.get("/api/settings");
         toggleNeverSkip.checked = settings.enable_never_skip_artists;
         toggleNeverSkip.addEventListener("change", async () => {
             try {
@@ -567,6 +599,8 @@ async function initArtists() {
             }
         });
     }
+    // Sync the window field now too: loadArtists only does it when the list isn't empty
+    applyGlobalEnabledState();
 
     async function loadArtists() {
         const data = await API.get("/api/artists");

@@ -976,6 +976,7 @@ input:focus, select:focus {
 .mt-8 { margin-top: 8px; }
 .mt-16 { margin-top: 16px; }
 .mt-24 { margin-top: 24px; }
+.mb-0 { margin-bottom: 0; }
 .mb-8 { margin-bottom: 8px; }
 .mb-16 { margin-bottom: 16px; }
 .hidden { display: none !important; }

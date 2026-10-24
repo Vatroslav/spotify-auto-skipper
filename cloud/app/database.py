@@ -198,6 +198,11 @@ async def init_db():
             await db.execute("ALTER TABLE never_skip_artists ADD COLUMN image_url TEXT DEFAULT ''")
         if "enabled" not in columns:
             await db.execute("ALTER TABLE never_skip_artists ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1")
+        if "window_days" in columns:
+            # Left by an unreleased per-artist window build (2026-10-24), only on
+            # the prod DB and never set; the window is the global setting
+            # never_skip_window_days now. Unindexed, so DROP COLUMN is safe.
+            await db.execute("ALTER TABLE never_skip_artists DROP COLUMN window_days")
 
         # Migrate: add album_name to track_events
         cursor = await db.execute("PRAGMA table_info(track_events)")

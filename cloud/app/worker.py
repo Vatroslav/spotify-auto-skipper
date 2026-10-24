@@ -44,6 +44,14 @@ def _effective_window(base_days: int, level: int) -> int:
     return max(1, int(round(base_days * (1 - ADAPTIVE_REDUCTION_PER_LEVEL * level))))
 
 
+def _never_skip_window_passed(last_played: datetime, window_days: int) -> bool:
+    """Whether a never-skip artist's song may play. 0 = no window, always plays.
+    Same comparison as the general window, so a window at or above it adds nothing."""
+    if not window_days:
+        return True
+    return last_played <= datetime.now(timezone.utc) - timedelta(days=window_days)
+
+
 async def polling_loop():
     """
     Continuously check what's playing, ask Last.fm if it was scrobbled recently,
@@ -242,11 +250,19 @@ async def polling_loop():
                             track.get("context_uri"), album_name=track.get("album"),
                         )
                         await _update_skip_streak(False)
-                    # Check never-skip list
-                    elif settings["enable_never_skip_artists"] and await is_artist_never_skipped(
-                        track.get("artist_ids", [])
+                    # Check never-skip list. With a never-skip window set, these
+                    # artists get that shorter window instead of the general one.
+                    elif (
+                        settings["enable_never_skip_artists"]
+                        and await is_artist_never_skipped(track.get("artist_ids", []))
+                        and _never_skip_window_passed(last_played, settings["never_skip_window_days"])
                     ):
-                        await _log("Artist is in never-skip list \u2014 not skipping")
+                        ns_window = settings["never_skip_window_days"]
+                        await _log(
+                            f"Artist is in never-skip list, {ns_window}-day window passed \u2014 not skipping"
+                            if ns_window
+                            else "Artist is in never-skip list \u2014 not skipping"
+                        )
                         await add_track_event(
                             track["id"],
                             track["name"],
