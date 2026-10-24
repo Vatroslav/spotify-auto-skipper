@@ -92,12 +92,22 @@ a:hover { color: var(--accent-hover); }
     min-height: 1.2em;
 }
 
-.album-art {
+/* The frame always holds the space, so the buttons below don't jump when the
+   art loads, is missing, or nothing is playing. */
+.album-art-frame {
     width: 180px;
     height: 180px;
+    margin: 0 auto 16px;
+    border-radius: 8px;
+    background: var(--bg-input);
+}
+
+.album-art {
+    width: 100%;
+    height: 100%;
+    vertical-align: top;
     border-radius: 8px;
     object-fit: cover;
-    margin-bottom: 16px;
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
