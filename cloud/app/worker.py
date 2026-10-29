@@ -44,9 +44,10 @@ def _effective_window(base_days: int, level: int) -> int:
     return max(1, int(round(base_days * (1 - ADAPTIVE_REDUCTION_PER_LEVEL * level))))
 
 
-def _never_skip_window_passed(last_played: datetime, window_days: int) -> bool:
-    """Whether a never-skip artist's song may play. 0 = no window, always plays.
-    Same comparison as the general window, so a window at or above it adds nothing."""
+def _own_window_passed(last_played: datetime, window_days: int) -> bool:
+    """Whether a protected song (never-skip artist, liked song) may play under its
+    own window. 0 = no window, always plays. Same comparison as the general window,
+    so a window at or above it adds nothing."""
     if not window_days:
         return True
     return last_played <= datetime.now(timezone.utc) - timedelta(days=window_days)
@@ -255,7 +256,7 @@ async def polling_loop():
                     elif (
                         settings["enable_never_skip_artists"]
                         and await is_artist_never_skipped(track.get("artist_ids", []))
-                        and _never_skip_window_passed(last_played, settings["never_skip_window_days"])
+                        and _own_window_passed(last_played, settings["never_skip_window_days"])
                     ):
                         ns_window = settings["never_skip_window_days"]
                         await _log(
@@ -272,9 +273,19 @@ async def polling_loop():
                             track.get("context_uri"), album_name=track.get("album"),
                         )
                         await _update_skip_streak(False)
-                    # Check liked songs
-                    elif settings["always_play_liked_songs"] and await client.is_track_liked(track["id"]):
-                        await _log("Track is in Liked Songs \u2014 not skipping")
+                    # Check liked songs. Window check first: it is free, the
+                    # liked lookup is a Spotify call.
+                    elif (
+                        settings["always_play_liked_songs"]
+                        and _own_window_passed(last_played, settings["liked_songs_window_days"])
+                        and await client.is_track_liked(track["id"])
+                    ):
+                        liked_window = settings["liked_songs_window_days"]
+                        await _log(
+                            f"Track is in Liked Songs, {liked_window}-day window passed \u2014 not skipping"
+                            if liked_window
+                            else "Track is in Liked Songs \u2014 not skipping"
+                        )
                         await add_track_event(
                             track["id"],
                             track["name"],

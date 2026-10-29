@@ -309,6 +309,9 @@ function initSettings() {
             if (key in data) {
                 if (el.type === "checkbox") {
                     el.checked = data[key];
+                } else if ("emptyZero" in el.dataset && !data[key]) {
+                    // 0 = no window, shown as an empty field
+                    el.value = "";
                 } else {
                     el.value = data[key];
                 }
@@ -323,6 +326,8 @@ function initSettings() {
             const key = el.dataset.setting;
             if (el.type === "checkbox") {
                 updates[key] = el.checked;
+            } else if (el.type === "number" && "emptyZero" in el.dataset && el.value.trim() === "") {
+                updates[key] = 0;
             } else if (el.type === "number") {
                 updates[key] = parseInt(el.value, 10);
             } else {
@@ -407,7 +412,7 @@ function initSettings() {
     bindLogout();
 }
 
-// ── Android Auto device tokens (settings.html) ──────────────────
+// ── Android Auto device tokens (android_auto.html) ──────────────────
 
 function initDeviceTokens() {
     const generateBtn = document.getElementById("generate-token-btn");
