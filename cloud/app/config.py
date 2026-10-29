@@ -19,6 +19,9 @@ CONFIG_DEFAULTS = {
     "dummy_playlist_id": "37i9dQZF1DX0XUsuxWHRQd",
     "trash_playlist_id": "",
     "always_play_liked_songs": True,
+    # 0 = liked songs are never skipped. A number = their own, shorter skip
+    # window, same model as never_skip_window_days.
+    "liked_songs_window_days": 0,
     "enable_never_skip_artists": True,
     # 0 = never-skip artists are never skipped. A number = their own, shorter
     # skip window: their songs play once this many days have passed.
@@ -35,6 +38,7 @@ _INT_KEYS = {
     "restart_pattern_song_count",
     "restart_pattern_day_diff",
     "never_skip_window_days",
+    "liked_songs_window_days",
     "log_retention_days",
 }
 _BOOL_KEYS = {
@@ -144,6 +148,7 @@ _RANGES = {
     "restart_pattern_song_count": (2, 20),
     "restart_pattern_day_diff": (0, 30),
     "never_skip_window_days": (0, 365),
+    "liked_songs_window_days": (0, 365),
 }
 
 

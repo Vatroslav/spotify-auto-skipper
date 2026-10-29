@@ -153,7 +153,7 @@ se ne commitaju.
 1. Prebaciti APK na telefon i dopustiti instalaciju iz nepoznatih izvora.
 2. Android Auto app → Settings → 10x tap na verziju → developer mode → **Unknown sources** ON.
 3. Otvoriti Car Skipper na telefonu: server URL (`https://autoskipper.uk`) + device token iz PWA
-   Settingsa (Android Auto device), **Save**, pa **Test connection** — mora javiti "Connected: …".
+   (Tools → Android Auto), **Save**, pa **Test connection** — mora javiti "Connected: …".
 4. Spojiti telefon na auto; app je u AA launcheru.
 
 Verzija piše u zaglavlju setup ekrana ("Car Skipper 0.5.0"). Sideload preko postojeće instalacije

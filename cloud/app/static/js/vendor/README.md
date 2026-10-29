@@ -8,7 +8,7 @@ than on a CDN.
 - Library: [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) v1.4.4
 - License: MIT (Kazuhiko Arase)
 - Source: `https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js`, unmodified
-- Used by: Settings → Android Auto device, to render the pairing QR via
+- Used by: Tools → Android Auto, to render the pairing QR via
   `createSvgTag()`. Inline SVG rather than `createDataURL()`, because `img-src`
   in the CSP does not allow `data:`.
 
