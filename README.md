@@ -24,6 +24,7 @@ A self-hosted web app you can run on any VPS with Docker. Access it from any dev
 
 - **Web dashboard** — see what's playing, skip status, and countdown to next check
 - **Manual track actions** — remove the current track from its playlist (with optional backup to a trash playlist), like/unlike (synced to Last.fm), or exempt the current song from skipping once
+- **Exempt a song ahead of time** — a tool of your own that starts a song can first send `POST /api/playback/skip-one-pause` with `{"track_id": "..."}` and a device token; only that song is spared, once, and the next one is checked as usual
 - **Adaptive skip window** — temporarily narrows the skip window after a run of consecutive skips so more songs get through
 - **Adaptive polling** — slows down polling when nothing is playing, speeds back up on playback
 - **Never-skip artists** — search Spotify and add artists directly from the browser

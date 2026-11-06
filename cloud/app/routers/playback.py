@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.config import load_settings
 from app.database import (
@@ -39,6 +39,18 @@ class RemoveFromPlaylistRequest(BaseModel):
     """
 
     expected_track_id: str | None = None
+
+
+class SkipOnePauseRequest(BaseModel):
+    """Body of POST /skip-one-pause.
+
+    track_id names the song to exempt, for a caller that is about to start it: asking
+    afterwards could lose the race against the worker. The PWA and the car controller
+    omit it and exempt whatever is playing now.
+    """
+
+    track_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9]{22}$")
+
 
 # Device tokens are accepted here only: these are the manual commands the
 # Android Auto controller sends. Every other router stays session-only.
@@ -110,11 +122,14 @@ async def check_now(request: Request):
 
 
 @router.post("/skip-one-pause")
-async def skip_one_pause(request: Request):
-    """Exempt the currently playing song from being skipped (one-time).
+async def skip_one_pause(request: Request, body: SkipOnePauseRequest | None = None):
+    """Exempt a song from being skipped (one-time): the one named, else the one playing now.
 
-    Fetches the current track directly from Spotify to ensure freshness.
+    The song playing now is fetched directly from Spotify to ensure freshness.
     """
+    if body and body.track_id:
+        app_state.skip_exempt_track_id = body.track_id
+        return {"ok": True, "track_id": body.track_id}
     client = app_state.spotify_client
     if not client:
         return JSONResponse({"ok": False, "error": "Spotify client not ready"}, status_code=503)

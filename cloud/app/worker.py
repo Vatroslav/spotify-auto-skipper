@@ -312,8 +312,16 @@ async def polling_loop():
                             await app_state.interruptible_sleep(poll_interval)
                             continue
 
-                        await _log(f"Already listened to {days_since} days ago \u2014 skipping")
                         was_paused = await client.is_spotify_paused()
+                        # Only skip the song this verdict is about. Playback can move
+                        # while Last.fm answers (a song started by hand, maybe already
+                        # exempted), and `next` would hit that song instead.
+                        latest = await client.get_current_track()
+                        if latest and latest["id"] != track["id"]:
+                            await _log("Song changed while checking \u2014 not skipping, checking the new one")
+                            continue
+
+                        await _log(f"Already listened to {days_since} days ago \u2014 skipping")
                         await client.skip_current_track()
                         if was_paused:
                             await asyncio.sleep(1)
@@ -376,6 +384,11 @@ async def polling_loop():
                     track.get("context_uri"), album_name=track.get("album"),
                 )
                 await _update_skip_streak(False)
+
+            # This song has had its check, so its exemption is spent whatever the verdict:
+            # it must not wait around to excuse some later play of the same song.
+            if app_state.skip_exempt_track_id == track["id"]:
+                app_state.skip_exempt_track_id = None
 
         except ReauthRequiredError as e:
             # Refresh token died (e.g. six-month expiry). The dead token and the
