@@ -45,6 +45,8 @@ bumped_in() {
     fi
     [ "$(git symbolic-ref --short -q HEAD)" != "main" ] || return 1
     BRANCH_BASE=$(git merge-base HEAD origin/main 2>/dev/null) || return 1
+    # The same version as main means that bump has landed: a branch reused after a squash merge.
+    git diff origin/main HEAD -U0 -- "$1" 2>/dev/null | grep -qE "$2" || return 1
     git diff "$BRANCH_BASE" HEAD -U0 -- "$1" 2>/dev/null | grep -qE "$2"
 }
 

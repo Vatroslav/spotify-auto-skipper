@@ -15,6 +15,8 @@ import subprocess
 import sys
 
 SEP = object()
+OPEN = object()
+CLOSE = object()
 MARK = "\x01"
 MARKER = re.compile(MARK + r"(\d+)" + MARK)
 KEYWORDS = {"do", "then", "else", "elif", "if", "while", "until", "{", "!", "time", "command", "nohup"}
@@ -27,17 +29,15 @@ COMMIT_VALUE_OPTS = {"--author", "--date", "--fixup", "--squash", "--cleanup", "
 ADD_ALL_OPTS = {"-A", "--all", "-u", "--update"}
 
 
-def take_bodies(text, powershell):
+def take_bodies(text, powershell, bodies):
     """Swap here-doc bodies and PowerShell here-strings for markers: their quotes mean nothing to the shell."""
-    bodies = []
 
     def mark(body):
         bodies.append(body)
         return f"{MARK}{len(bodies) - 1}{MARK}"
 
     if powershell:
-        text = re.sub(r"""@(['"])\r?\n(.*?)\r?\n\1@""", lambda m: mark(m.group(2)), text, flags=re.S)
-        return text, bodies
+        return re.sub(r"""@(['"])\r?\n(.*?)\r?\n\1@""", lambda m: mark(m.group(2)), text, flags=re.S)
     pos = 0
     opener = re.compile(r"""(?<!<)<<-?\s*(['"]?)([A-Za-z_]\w*)\1""")
     while True:
@@ -53,8 +53,7 @@ def take_bodies(text, powershell):
         text = head + text[m.end() : eol + 1] + text[end.end() :].lstrip("\r\n")
         pos = len(head)
     # -m "$(cat <<'EOF' ... EOF)" is the message itself.
-    text = re.sub(r'"\$\(\s*cat\s+(' + MARK + r"\d+" + MARK + r')\s*\)"', r"\1", text)
-    return text, bodies
+    return re.sub(r'"\$\(\s*cat\s+(' + MARK + r"\d+" + MARK + r')\s*\)"', r"\1", text)
 
 
 def after_parens(text, i):
@@ -115,6 +114,8 @@ def read_words(text, powershell):
         if word is not None:
             if drop_next:
                 drop_next = False
+            elif word in ([("{", "plain")], [("}", "plain")]):
+                out.append(SEP)  # a block's brace, as in PowerShell's if (...) { git commit ... }
             else:
                 out.append(word)
             word = None
@@ -134,10 +135,13 @@ def read_words(text, powershell):
         elif c == "#" and word is None:
             while i < n and text[i] != "\n":
                 i += 1
-        elif c in "\n;|()" or (c == "&" and text[i + 1 : i + 2] != ">"):
+        elif c in "()":
             end_word()
-            if out and out[-1] is not SEP:
-                out.append(SEP)
+            out.append(OPEN if c == "(" else CLOSE)
+            i += 1
+        elif c in "\n;|" or (c == "&" and text[i + 1 : i + 2] != ">"):
+            end_word()
+            out.append(SEP)
             i += 1
         elif c in "<>&":  # a redirection and its target are not arguments
             if word and len(word) == 1 and word[0][0].isdigit():
@@ -232,27 +236,33 @@ def join_dir(base, path):
 
 
 class Commit:
-    def __init__(self, directory, args, adds):
+    def __init__(self, directory, args, adds, names):
         self.dir = directory
         self.args = args  # words
         self.adds = adds  # (directory, strings or None) from `git add` earlier in the command
+        self.names = names  # variables as they stand at this commit
 
 
-def find_commits(text, powershell, cwd, names=None):
-    text, bodies = take_bodies(text, powershell)
-    words = read_words(text, powershell)
+def find_commits(text, powershell, cwd, names=None, bodies=None):
+    bodies = [] if bodies is None else bodies
+    words = read_words(take_bodies(text, powershell, bodies), powershell)
     names = {} if names is None else names
     commits = []
     adds = []
     here = cwd
+    shells = []  # a subshell's cd ends with it
     segment = []
     for item in words + [SEP]:
-        if item is not SEP:
+        if item is not SEP and item is not OPEN and item is not CLOSE:
             segment.append(item)
             continue
         if segment:
             here = read_segment(segment, powershell, here, names, commits, adds, bodies)
         segment = []
+        if item is OPEN:
+            shells.append(here)
+        elif item is CLOSE and shells:
+            here = shells.pop()
     return commits, bodies
 
 
@@ -297,11 +307,11 @@ def read_segment(words, powershell, here, names, commits, adds, bodies):
         return read_segment(words[2:], powershell, here, names, commits, adds, bodies)
     if tool == "eval" or (tool in ("bash", "sh", "pwsh", "powershell") and len(words) > 2 and raw(words[1]).lower() in ("-c", "-command")):
         inner = " ".join(raw(w) for w in words[1:]) if tool == "eval" else raw(words[2])
-        inner_commits, inner_bodies = find_commits(inner, tool in ("pwsh", "powershell"), here, names)
-        commits.extend(inner_commits)
-        bodies.extend(inner_bodies)
+        commits.extend(find_commits(inner, tool in ("pwsh", "powershell"), here, names, bodies)[0])
         return here
-    if tool in ("cd", "set-location", "sl", "pushd", "chdir"):
+    if tool in ("popd", "pop-location"):
+        return None
+    if tool in ("cd", "set-location", "sl", "pushd", "push-location", "chdir"):
         args = [w for w in words[1:] if not raw(w).startswith("-")]
         if not args:
             return here if len(words) > 1 else native("~")
@@ -331,7 +341,7 @@ def read_segment(words, powershell, here, names, commits, adds, bodies):
             strings += expand(w, names)
         adds.append((target, strings))
     elif sub == "commit":
-        commits.append(Commit(target, words[i + 1 :], list(adds)))
+        commits.append(Commit(target, words[i + 1 :], list(adds), dict(names)))
     return here
 
 
@@ -350,9 +360,10 @@ class Args:
         self.stdin = None  # the here-doc on this command's stdin
 
 
-def read_args(commit, names, bodies):
+def read_args(commit, bodies):
     a = Args()
     words = commit.args
+    names = commit.names
     i = 0
     raw = lambda w: "".join(p for p, _ in w)
     text = lambda w: one(w, names) or raw(w)  # a message keeps what it cannot expand
@@ -386,6 +397,8 @@ def read_args(commit, names, bodies):
                 a.amend = True
             elif name in COMMIT_VALUE_OPTS and not eq:
                 i += 1
+            if name == "--pathspec-from-file":
+                a.paths.append(None)
             continue
         if token.startswith("-") and len(token) > 1:
             j = 1
@@ -422,12 +435,11 @@ def names_from(directory, *args):
     return [x for x in (run_git(directory, *args) or "").split("\0") if x]
 
 
-def changed(directory, specs=None):
-    """Files that differ from HEAD (or are new) under these pathspecs, root-relative."""
-    tail = ["--", *specs] if specs else []
-    files = names_from(directory, "diff", "HEAD", "--name-only", "--no-renames", "-z", *tail)
-    if specs:
-        files += names_from(directory, "ls-files", "--others", "--exclude-standard", "--full-name", "-z", *tail)
+def changed(directory, specs=None, new_files=True):
+    """Root-relative files that differ from HEAD, under these pathspecs or in the whole tree."""
+    files = names_from(directory, "diff", "HEAD", "--name-only", "--no-renames", "-z", "--", *(specs or [":/"]))
+    if new_files:
+        files += names_from(directory, "ls-files", "--others", "--exclude-standard", "--full-name", "-z", "--", *(specs or [":/"]))
     return files
 
 
@@ -448,7 +460,7 @@ def commit_files(commit, a):
         return files + cached if a.include else files
     files = list(cached)
     if a.all:
-        files += changed(commit.dir)
+        files += changed(commit.dir, new_files=False)  # -a takes tracked files only
     for directory, strings in commit.adds:
         if directory is None:
             files += changed(commit.dir)
@@ -500,7 +512,6 @@ def facts(command, powershell, cwd, hook_dir):
     commits, bodies = find_commits(command, powershell, cwd)
     if not commits:
         return []
-    names = {}  # the walk's variables are gone by now: what a commit's own words still need is unread
     mine, unread = [], False
     for c in commits:
         if c.dir is None:
@@ -514,7 +525,7 @@ def facts(command, powershell, cwd, hook_dir):
         return []
     files, messages = [], []
     for c in mine:
-        a = read_args(c, names, bodies)
+        a = read_args(c, bodies)
         if not a.paths and run_git(c.dir, "rev-parse", "-q", "--verify", "MERGE_HEAD"):
             continue  # concluding a merge declares no intent of its own
         files += commit_files(c, a)
@@ -528,12 +539,12 @@ def facts(command, powershell, cwd, hook_dir):
 
 
 def main():
-    hook = json.loads(sys.stdin.buffer.read().decode("utf-8", "replace"))
-    command = (hook.get("tool_input") or {}).get("command") or ""
-    cwd = hook.get("cwd") or ""
-    cwd = cwd if os.path.isdir(cwd) else os.getcwd()
-    powershell = hook.get("tool_name") == "PowerShell"
     try:
+        hook = json.loads(sys.stdin.buffer.read().decode("utf-8", "replace"))
+        command = (hook.get("tool_input") or {}).get("command") or ""
+        cwd = hook.get("cwd") or ""
+        cwd = cwd if os.path.isdir(cwd) else os.getcwd()
+        powershell = hook.get("tool_name") == "PowerShell"
         lines = facts(command, powershell, cwd, os.path.dirname(os.path.abspath(__file__)))
     except Exception as e:
         lines = [f"skip read-commit.py failed ({type(e).__name__}), guard skipped"]
