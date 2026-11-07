@@ -14,7 +14,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/check-version-bump.sh",
+            "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/check-version-bump.sh\"",
             "statusMessage": "Checking version bump..."
           },
           {
@@ -41,7 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/scripts/format-on-save.sh",
+            "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/scripts/format-on-save.sh\"",
             "statusMessage": "Formatting..."
           }
         ]
