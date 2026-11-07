@@ -250,7 +250,7 @@ def find_commits(text, powershell, cwd, names=None, bodies=None):
     commits = []
     adds = []
     here = cwd
-    shells = []  # a subshell's cd ends with it
+    shells = []  # what a subshell changes ends with it; PowerShell's parentheses are no subshell
     segment = []
     for item in words + [SEP]:
         if item is not SEP and item is not OPEN and item is not CLOSE:
@@ -259,10 +259,12 @@ def find_commits(text, powershell, cwd, names=None, bodies=None):
         if segment:
             here = read_segment(segment, powershell, here, names, commits, adds, bodies)
         segment = []
-        if item is OPEN:
-            shells.append(here)
+        if item is OPEN and not powershell:
+            shells.append((here, dict(names)))
         elif item is CLOSE and shells:
-            here = shells.pop()
+            here, saved = shells.pop()
+            names.clear()
+            names.update(saved)
     return commits, bodies
 
 
@@ -314,7 +316,7 @@ def read_segment(words, powershell, here, names, commits, adds, bodies):
     if tool in ("cd", "set-location", "sl", "pushd", "push-location", "chdir"):
         args = [w for w in words[1:] if not raw(w).startswith("-")]
         if not args:
-            return here if len(words) > 1 else native("~")
+            return native("~") if tool == "cd" and len(words) == 1 and not powershell else here
         return join_dir(here, one(args[0], names))
     if tool != "git":
         return here
