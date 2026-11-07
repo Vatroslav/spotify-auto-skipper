@@ -16,15 +16,10 @@
             "type": "command",
             "command": "bash .claude/hooks/check-version-bump.sh",
             "statusMessage": "Checking version bump..."
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
+          },
           {
             "type": "command",
-            "command": "bash .claude/hooks/check-delete-transaction.sh",
+            "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/check-delete-transaction.sh\"",
             "statusMessage": "Checking DELETE safety..."
           }
         ]
@@ -34,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/check-local-app-run.py",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/check-local-app-run.py\"",
             "statusMessage": "Checking local app run..."
           }
         ]
