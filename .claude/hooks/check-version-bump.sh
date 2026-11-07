@@ -10,7 +10,7 @@ echo "$CMD" | grep -qE 'git commit' || exit 0
 
 # Staged fileovi (+ fileovi dodani inline preko git add u istoj komandi)
 STAGED=$(git diff --cached --name-only)
-ADD_PART=$(echo "$CMD" | sed -n 's/.*git add \([^&]*\).*/\1/p')
+ADD_PART=$(echo "$CMD" | sed -n 's/.*git add \([^&;|]*\).*/\1/p')
 if [ -n "$ADD_PART" ]; then
     STAGED="$STAGED
 $(echo "$ADD_PART" | tr ' ' '\n')"
@@ -25,10 +25,16 @@ deny() {
 }
 
 # Commit poruka iz -m / --message (robusno preko shlex)
+# A PowerShell here-string (@'...'@ or @"..."@) goes first: shlex cannot read it.
 MSG=$(printf '%s' "$CMD" | python -c "
-import sys, shlex
+import re, sys, shlex
+cmd = sys.stdin.read()
+here = re.search(r'(?:-m|--message)[ =]*@([\x27\x22])\r?\n(.*?)\r?\n\1@', cmd, re.S)
+if here:
+    print(here.group(2).strip())
+    sys.exit()
 try:
-    toks = shlex.split(sys.stdin.read())
+    toks = shlex.split(cmd)
 except Exception:
     toks = []
 msg = ''

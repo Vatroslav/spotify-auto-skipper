@@ -10,13 +10,18 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
             "command": "bash .claude/hooks/check-version-bump.sh",
             "statusMessage": "Checking version bump..."
-          },
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
           {
             "type": "command",
             "command": "bash .claude/hooks/check-delete-transaction.sh",
