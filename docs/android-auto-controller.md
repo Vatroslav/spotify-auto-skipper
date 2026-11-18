@@ -1,3 +1,11 @@
+---
+verified:
+  - by: claude/opus-5.5
+    at: 2026-11-18T10:32:00+01:00
+    how: "GET na autoskipper.uk/api/playback/pause i /resume vraća 405 (ruta postoji, samo POST), kontrolna nepostojeća ruta 404 - transport endpointi su na serveru. Rute nisu pozvane, pa nije provjereno da stvarno pauziraju"
+stale_after: 2027-02-18T00:00:00+01:00
+---
+
 # Android Auto kontroler - implementacijski plan
 
 Samostalan spec: sve što treba za implementaciju je ovdje, razgovor u kojem je nastao nije potreban.
@@ -133,7 +141,7 @@ i 5 (refresh labela) Vatra svjesno testira na punom appu umjesto ponovnog spike 
 poziv bez bodyja i dalje prolazi - provjereno lokalno: prazan body uz
 `Content-Type: application/json` → 200, nesklad → 409 bez ijednog Spotify writea.
 `pause_spotify_playback` sad vraća bool (prije je slao PUT bez provjere statusa).
-Nije još deployano na VPS.
+Nije još deployano na VPS. (Stanje 18.11.2026.: deployano, rute `/pause` i `/resume` postoje na serveru.)
 
 ### Faza 4 - puni app
 
